@@ -2,7 +2,7 @@
    practice.css : practice page (.pr-*) + inline quiz blocks (.qz-*, used on learn pages)
    Loaded on every page, so every rule is namespaced.  Tokens only; motion only under data-anim="on".
    ===================================================================== */
-:root { --c-quant: #1fae7a; --c-reason: #8b6cf0; --c-verbal: #e2609a; --c-di: #22a3b6; }
+:root { --c-quant: #FF8AB0; --c-reason: #3DDC84; --c-verbal: #FFD23F; --c-di: #8EC5FF; }
 .grow { flex: 1; }
 
 .page.pr { max-width: 1240px; padding-top: 1.25rem; }

@@ -304,7 +304,7 @@
               <span class="hm-stats"><span>Active days <b>${H.days}</b></span><span>Current streak <b>${M.streak}</b></span><span>Max streak <b>${M.best}</b></span>
               <select id="hmYear" aria-label="Year">${H.years.map((y) => `<option ${y === year ? "selected" : ""}>${y}</option>`).join("")}</select></span></div>
             ${H.svg}
-            <div class="hm-foot"><span>Each square is a day; the darkest green means you hit your goal of ${M.goal}.</span><span class="hm-legend">Less ${[0, 1, 2, 3, 4].map((l) => `<i class="l${l}"></i>`).join("")} More</span></div>
+            <div class="hm-foot"><span>Each square is a day; the darkest square means you hit your goal of ${M.goal}.</span><span class="hm-legend">Less ${[0, 1, 2, 3, 4].map((l) => `<i class="l${l}"></i>`).join("")} More</span></div>
           </section>
         </div>
       </div>
@@ -370,8 +370,8 @@
     const st = document.createElement("style");
     st.id = "homeStyle";
     st.textContent = `
-.sc-quant { --sc: #1fae7a; --si: #177f59; } .sc-reasoning { --sc: #8b6cf0; --si: #785dce; } .sc-verbal { --sc: #e2609a; --si: #b34c7a; } .sc-di { --sc: #22a3b6; --si: #197a88; }
-[data-theme="dark"] .sc-quant { --si: #2fc28d; } [data-theme="dark"] .sc-reasoning { --si: #9d84f3; } [data-theme="dark"] .sc-verbal { --si: #e874a8; } [data-theme="dark"] .sc-di { --si: #33b5c8; }
+.sc-quant { --sc: #FF8AB0; --si: #B8124A; } .sc-reasoning { --sc: #3DDC84; --si: #0B7A43; } .sc-verbal { --sc: #FFD23F; --si: #8A5A00; } .sc-di { --sc: #8EC5FF; --si: #1F5FA8; }
+[data-theme="dark"] .sc-quant { --si: #FF8AB0; } [data-theme="dark"] .sc-reasoning { --si: #3DDC84; } [data-theme="dark"] .sc-verbal { --si: #FFD23F; } [data-theme="dark"] .sc-di { --si: #8EC5FF; }
 .text-strong { color: var(--text); }
 .dash-left > .card, .dash-main > .card { margin: 0; }
 button.hm-goalbtn { border: 0; padding: 0; background: none; color: inherit; font: inherit; cursor: pointer; border-radius: 50%; }
