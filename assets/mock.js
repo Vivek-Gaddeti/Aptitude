@@ -247,17 +247,15 @@
       return `<div class="pr-card pr-resume mk-live">${ic("timer")}<div><b>${esc(R.p.name)} is in progress</b><div class="muted small">${c.an + c.am} of ${c.n} answered · the clock keeps running while you're away</div></div>
         <span class="grow"></span><button class="btn" data-act="discard">Discard</button><a class="btn primary" href="#run">Resume test</a></div>`;
     }
-    function cardHTML(p) {
+    function cardHTML(p, primary) {
       const st = statsFor(p.id), n = totalQ(p), mins = totalMin(p);
-      const secs = p.sections.map((s) => `<li><i style="--sc:var(${SEC_VAR[s.sec] || "--accent"})"></i>${esc(s.title)}<b>${s.count}</b>${s.minutes ? `<span>${s.minutes} min</span>` : ""}</li>`).join("");
-      return `<article class="mk-card">
-        <div class="mk-card-top">${p.company ? `<span class="mk-co">${esc(p.company)}</span>` : `<span class="mk-co plain">${p.kind === "section" ? "Sectional" : "Mixed"}</span>`}${p.negative ? `<span class="mk-neg">${ic("warn")}${esc(negShort(p.negative))}</span>` : ""}</div>
-        <h3>${esc(p.name)}</h3>
-        <p class="mk-blurb">${esc(p.blurb || "")}</p>
-        <div class="mk-meta"><span>${ic("list")}<b>${n}</b> questions</span><span>${ic("clock")}<b>${mins}</b> min${p.minutes ? "" : " (per section)"}</span>${p.calculator ? `<span>Calculator</span>` : ""}</div>
-        <ul class="mk-secs">${secs}</ul>
-        <div class="mk-card-foot">${st ? `<span class="mk-best">Best <b>${scoreTxt(st.best.score)}</b>/${st.best.max} <span class="muted">· ${plural(st.n, "attempt")}</span></span>` : `<span class="muted small">Not attempted yet</span>`}
-          <span class="grow"></span><a class="btn primary sm" href="#start/${encodeURIComponent(p.id)}">Start</a></div></article>`;
+      const secs = p.sections.map((s) => `<li><i style="--sc:var(${SEC_VAR[s.sec] || "--accent"})"></i>${esc(s.title)} <b>${s.count}</b></li>`).join("");
+      return `<li class="mk-row">
+        <div class="mk-r-main"><h3>${esc(p.name)}${p.company ? `<span class="mk-co">${esc(p.company)}</span>` : `<span class="mk-co">${p.kind === "section" ? "Sectional" : "Mixed"}</span>`}${p.negative ? `<span class="mk-neg">${esc(negShort(p.negative))}</span>` : ""}</h3>
+          <p class="mk-blurb">${esc(p.blurb || "")}</p>
+          <ul class="mk-secs">${secs}</ul></div>
+        <div class="mk-r-meta">${n} questions · ${mins} min${p.minutes ? "" : " (per section)"}<small>${st ? `Best ${scoreTxt(st.best.score)}/${st.best.max} · ${plural(st.n, "attempt")}` : "Not attempted yet"}</small></div>
+        <a class="btn${primary ? " primary" : ""} mk-start" href="#start/${encodeURIComponent(p.id)}" aria-label="Start ${esc(p.name)}">Start</a></li>`;
     }
     function historyRows(list) {
       return list.map((m) => {
@@ -283,7 +281,7 @@
         ${liveBanner()}
         ${groups.map(([k, t, sub]) => {
           const ps = presets().filter((p) => (p.kind || "company") === k);
-          return ps.length ? `<section class="mk-group"><div class="mk-gh"><h2>${t}</h2><span class="muted small">${sub}</span></div><div class="mk-cards">${ps.map(cardHTML).join("")}</div></section>` : "";
+          return ps.length ? `<section class="mk-group"><div class="mk-gh"><h2>${t}</h2><span class="muted small">${sub}</span></div><ul class="mk-list">${ps.map((p) => cardHTML(p, p.id === "quick-15" && !(R && !R.done))).join("")}</ul></section>` : "";
         }).join("")}
         <section class="mk-group"><div class="mk-gh"><h2>Your mock history</h2>${ms.length > 8 ? `<a class="small" href="#history">See all ${ms.length}</a>` : ""}</div>
           <div class="pr-card">${ms.length ? historyTable(ms.slice(0, 8)) : `<p class="muted" style="margin:0">No mocks yet. Start with <a href="#start/quick-15">Quick 15</a> to get a feel for the exam screen.</p>`}</div></section>
@@ -325,8 +323,8 @@
         ${live ? `<div class="pr-card pr-resume mk-live">${ic("warn")}<div><b>${esc(R.p.name)} is still in progress</b><div class="muted small">Starting a new test discards it.</div></div><span class="grow"></span><a class="btn" href="#run">Resume that test</a></div>` : ""}
         <div class="pr-setup">
           <div>
-            <div class="pr-card"><h5>Sections</h5><div class="pr-tbl-wrap"><table class="pr-table"><thead><tr><th>Section</th><th>Questions</th><th>Time</th><th>Draws from</th></tr></thead><tbody>${rows}</tbody></table></div></div>
-            <div class="pr-card"><h5>Rules</h5><ul class="mk-rules">
+            <div class="pr-card"><h5>Sections</h5><div class="pr-tbl-wrap"><table class="pr-table mk-setup-t"><thead><tr><th>Section</th><th>Questions</th><th>Time</th><th>Draws from</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+            <details class="pr-card mk-more" open><summary>How the test works</summary><ul class="mk-rules">
               <li>${ic("clock")}<span><b>${totalMin(p)} minutes</b> for ${totalQ(p)} questions. ${esc(lockTxt)}</span></li>
               <li>${ic("check")}<span><b>+${p.marks || 1}</b> for each right answer. <b>${esc(negTxt(p.negative))}</b>${p.negative ? ". Leave a question blank rather than guess blindly." : ". Answer every question, even a guess."}</span></li>
               <li>${ic("timer")}<span>You get a warning at 5 minutes and at 1 minute. At 0:00 the ${secMode ? "section ends" : "test is submitted"} automatically.</span></li>
@@ -334,7 +332,7 @@
               <li>${ic("pencil")}<span>The rough-work pad opens with <kbd>W</kbd>. ${p.calculator ? "This test allows an on-screen calculator, so the pad's calculator is fair game." : "The real test has no calculator: turn on <b>Exam mode</b> in the pad to hide its calculator."}</span></li>
               <li>${ic("keyboard")}<span><kbd>1</kbd>–<kbd>4</kbd> or <kbd>A</kbd>–<kbd>D</kbd> choose (press again to clear), <kbd>Enter</kbd> save &amp; next, <kbd>M</kbd> mark for review, <kbd>Backspace</kbd> clear response, <kbd>←</kbd> <kbd>→</kbd> move.</span></li>
               <li>${ic("restart")}<span>The page hides the header while the test runs. Reloading the page resumes the test with the clock still running.</span></li>
-            </ul>${p.note ? `<p class="mk-note">${ic("bulb")}<span>${esc(p.note)}</span></p>` : ""}</div>
+            </ul>${p.note ? `<p class="mk-note">${ic("bulb")}<span>${esc(p.note)}</span></p>` : ""}</details>
           </div>
           <aside class="pr-side"><div class="pr-card pr-start">
             <h5>Your paper</h5>
@@ -382,16 +380,23 @@
 
     /* ================================================================ EXAM */
     const T = { since: null, iv: null, n: 0 };
+    let palOpen = false;
+    window.addEventListener("beforeunload", (e) => {
+      if (view === "run" && R && !R.done) { e.preventDefault(); e.returnValue = ""; return ""; }
+    });
     let prevAnim = null;
     function enterFocus() {
       if (document.body.classList.contains("mk-focus")) return;
       prevAnim = document.documentElement.dataset.anim || null;
       document.documentElement.dataset.anim = "off";
       document.body.classList.add("mk-focus");
+      document.body.classList.add("in-session");
     }
     function exitFocus() {
       if (!document.body.classList.contains("mk-focus")) return;
       document.body.classList.remove("mk-focus");
+      document.body.classList.remove("in-session");
+      palOpen = false;
       if (prevAnim) document.documentElement.dataset.anim = prevAnim;
       prevAnim = null;
     }
@@ -485,10 +490,10 @@
         <div class="pr-opts">${opts}</div>
         <div class="pr-actions mk-actions">
           <button class="btn" data-act="prev"${(locked() ? i <= f : i <= 0) ? " disabled" : ""}>${ic("back")} Previous</button>
-          <button class="btn" data-act="clear"${a == null ? " disabled" : ""}>Clear response</button>
-          <button class="btn mk-markbtn${marked ? " on" : ""}" data-act="marknext">${swapLabel(["Mark for review &amp; next", "Unmark &amp; next"], marked ? 1 : 0)}</button>
+          <button class="btn t-hide" data-act="clear"${a == null ? " disabled" : ""}>Clear response</button>
+          <button class="btn t-hide mk-markbtn${marked ? " on" : ""}" data-act="marknext">${swapLabel(["Mark for review &amp; next", "Unmark &amp; next"], marked ? 1 : 0)}</button>
           <span class="grow"></span>
-          <button class="btn primary" data-act="next">${swapLabel(["Save &amp; next", "Save &amp; next section", "Save &amp; submit"], ["Save & next", "Save & next section", "Save & submit"].indexOf(nextLbl))} <kbd>Enter</kbd></button>
+          <button class="btn primary t-hide" data-act="next">${swapLabel(["Save &amp; next", "Save &amp; next section", "Save &amp; submit"], ["Save & next", "Save & next section", "Save & submit"].indexOf(nextLbl))} <kbd>Enter</kbd></button>
         </div></div>`;
       const c = counts(f, l);
       const rail = `<aside class="mk-rail">
@@ -505,6 +510,25 @@
       const mainCol = set
         ? `<div class="pr-split mk-split"><div class="pr-card pr-stim"><span class="pr-pin">${ic("pin")}stays in view</span>${QB.setHTML(set)}</div>${qcard}</div>`
         : qcard;
+      const sessRail = `<aside class="session-rail" aria-label="Exam controls">
+        <div class="sr-top"><button type="button" class="sr-end" data-act="submit" title="End the test and submit">${ic("x")} End</button>
+          <div class="mk-rt" id="mkRT" title="${sectional() ? "Time left in this section" : "Time left"}">0:00</div></div>
+        <div class="sr-sec">${nonEmpty().length > 1 ? p.sections.map((sx, si) => {
+          const [f2, l2] = range(si);
+          if (f2 < 0) return "";
+          const c2 = counts(f2, l2), cur = si === R.sec;
+          return `<button type="button" class="sr-tab${cur ? " on" : ""}" data-act="tab" data-s="${si}"${!cur && locked() ? " disabled" : ""} aria-pressed="${cur}"><span>${esc(sx.title)}</span><small>${c2.an + c2.am}/${c2.n}</small></button>`;
+        }).join("") : ""}</div>
+        <div class="sr-mid">
+          <button type="button" data-act="pal" aria-expanded="${palOpen}" class="${palOpen ? "on" : ""}">${ic("list")} Palette</button>
+          <button type="button" data-act="rough" title="Rough-work pad (W)">${ic("pencil")} Rough</button>
+          <button type="button" data-act="clear"${a == null ? " disabled" : ""}>Clear</button>
+          <button type="button" data-act="mark" class="${marked ? "on" : ""}" aria-pressed="${marked}">${ic("flag")} ${marked ? "Unmark" : "Mark"}</button>
+        </div>
+        <button type="button" class="sr-go" data-act="next">${nextLbl.replace("&", "&amp;")}</button></aside>
+        <div class="mk-palpop${palOpen ? " open" : ""}" id="mkPalPop"><h5>${esc(sec.title)} <small>${c.an + c.am} of ${c.n} answered</small></h5>${paletteHTML(f, l)}${legendHTML(c)}
+          ${locked() && !lastSec ? `<button class="btn mk-wide" data-act="nextsec">Finish section ${ic("arrow-right")}</button>` : ""}
+          <button class="btn mk-wide" data-act="quit">Quit without saving</button></div>`;
       const bar = `<div class="mk-bar">
         <div class="mk-title"><b>${esc(p.name)}</b><span>${locked() ? `Section ${nonEmpty().indexOf(s) + 1} of ${nonEmpty().length}` : "Sections open"} · ${esc(negShort(p.negative))}</span></div>
         ${tabsHTML()}<span class="grow"></span>
@@ -512,7 +536,7 @@
         ${timerHTML()}
         <button type="button" class="btn sm mk-quit" data-act="quit" title="Quit without saving">Quit</button>
       </div>`;
-      return `<div class="mk-exam">${bar}<div class="mk-grid"><div class="mk-main">${mainCol}</div>${rail}</div></div>`;
+      return `<div class="mk-exam">${bar}<div class="mk-grid"><div class="mk-main">${mainCol}</div>${rail}</div>${sessRail}</div>`;
     }
 
     function tick() {
@@ -525,6 +549,8 @@
         ring.style.strokeDashoffset = String(RING * clamp(1 - rem / dur, 0, 1));
         box.classList.toggle("over", rem <= 5 * 60000 && rem > 60000);
         box.classList.toggle("crit", rem <= 60000);
+        const rt = document.getElementById("mkRT");
+        if (rt) { rt.textContent = t.textContent; rt.classList.toggle("over", rem <= 5 * 60000 && rem > 60000); rt.classList.toggle("crit", rem <= 60000); }
         ring.style.stroke = rem <= 60000 ? "var(--red)" : rem <= 5 * 60000 ? "var(--amber)" : "var(--page-c, var(--accent))";
       }
       if (rem <= 0) return timeUp();
@@ -747,7 +773,7 @@
       main.innerHTML = `<div class="pr-enter">
         <div class="pr-sbar"><a class="pr-back" href="#">${ic("back")} Mock tests</a><div class="pr-crumb"><b>${esc(m.name || p.name)}</b> <span class="sep">·</span> ${esc(dateTxt(m.at))}</div><span class="grow"></span><span class="pr-chip mode">${esc(negShort(m.negative))}</span></div>
         <h1 class="pr-h1">Your result</h1>
-        <div class="pr-card pr-hero mk-hero${pct >= 80 ? " hot" : ""}">
+        <div class="pr-card pr-hero is-hero mk-hero${pct >= 80 ? " hot" : ""}">
           <div class="pr-score"><b>${scoreTxt(m.score)}</b><span>/ ${m.max}</span><div class="muted small">${verdict}</div></div>
           <div class="pr-stats big">
             <div><b>${m.acc}%</b><span>accuracy</span></div>
@@ -765,7 +791,7 @@
         <div class="pr-card"><h5>Questions <small>tap one for the solution</small></h5>
           <div class="pr-picks mk-filters">${filters.map(([k, t, c], j) => `<button type="button" class="pr-pick${j === 0 ? " on" : ""}" data-act="filter" data-f="${k}">${t}<small>${c}</small></button>`).join("")}</div>
           <div class="pr-qlist" id="mkList">${list}</div></div>
-        <div class="pr-actions pr-final">
+        <div class="pr-actions pr-final mk-final">
           <a class="btn" href="#start/${encodeURIComponent(m.preset)}?seed=${encodeURIComponent(m.seed)}">${ic("restart")} Retake same paper</a>
           <a class="btn" href="#start/${encodeURIComponent(m.preset)}">New paper</a>
           ${nBad + nSkip ? `<button class="btn" data-act="mistakes" data-id="${esc(m.id)}">${swapLabel(["Add wrong to mistake book", "Added to mistake book"], 0)}</button>` : ""}
@@ -814,11 +840,12 @@
         if (act === "clear") return clearResp();
         if (act === "mark") return toggleMark();
         if (act === "marknext") return markNext();
-        if (act === "go") return goTo(+el.dataset.i);
+        if (act === "go") { palOpen = false; return goTo(+el.dataset.i); }
         if (act === "tab") return switchTab(+el.dataset.s);
         if (act === "nextsec") return nextSectionFlow();
         if (act === "submit") return submitFlow();
         if (act === "quit") return quitFlow();
+        if (act === "pal") { palOpen = !palOpen; return paint(false); }
         if (act === "rough") { if (root.RoughPad && RoughPad.toggle) RoughPad.toggle(); return; }
       }
       if (view === "result") {
@@ -867,67 +894,77 @@
     st.textContent = `
 .page.mk { max-width: 1240px; }
 .mk .pr-h1 { margin-bottom: .2em; }
-.mk-group { margin: 1.6rem 0 .6rem; }
-.mk-gh { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; margin-bottom: .7rem; }
+/* calm: flat cards, no lifts, one loud thing (.btn.primary / .is-hero) */
+.mk .pr-card, .mk .mk-list, .mk .pr-qrow, .mk .pr-stim { box-shadow: none; border: 2px solid var(--ink); }
+.mk .pr-card.is-hero { border-width: 3px; box-shadow: 6px 6px 0 var(--ink); }
+.mk .btn:not(.primary), .mk .pr-back, .mk-modal .btn:not(.primary) { box-shadow: none; border: 2px solid var(--ink) !important; transform: none !important; text-transform: none; letter-spacing: 0; font-weight: 800; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: .35rem; }
+.mk .btn:not(.primary):hover, .mk .pr-back:hover, .mk-modal .btn:not(.primary):hover { background: var(--panel-2); color: var(--text); box-shadow: none; transform: none !important; }
+.mk .btn.primary, .mk-modal .btn.primary { min-height: 44px; text-transform: none; letter-spacing: 0; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; }
+.mk .btn.sm { min-height: 44px; }
+.mk h2, .mk h3 { text-transform: none; font-weight: 800; letter-spacing: 0; }
+.mk h5 { font: 700 12px var(--mono); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.mk .lead { max-width: 62ch; }
+.mk-group { margin: 1.8rem 0 .6rem; }
+.mk-gh { display: flex; align-items: baseline; gap: .8rem; flex-wrap: wrap; margin-bottom: .6rem; }
 .mk-gh h2 { margin: 0; border: 0; padding: 0; font-family: var(--display); font-size: var(--fs-xl); }
-.mk-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
-.mk-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow); padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: .55rem; min-width: 0; }
-:root[data-anim="on"] .mk-card { transition: border-color .35s ease, transform .45s cubic-bezier(.22,1,.36,1); }
-.mk-card:hover { border-color: color-mix(in srgb, var(--page-c, var(--accent)) 45%, var(--border)); }
-:root[data-anim="on"] .mk-card:hover { transform: translateY(-2px); }
-.mk-card h3 { margin: 0; font: 800 var(--fs-lg) var(--display); }
-.mk-card-top { display: flex; align-items: center; gap: .5rem; min-height: 1.4rem; }
-.mk-co { font: 800 var(--fs-2xs) var(--display); text-transform: uppercase; letter-spacing: .07em; color: var(--accent); background: var(--accent-soft); border-radius: var(--r-pill); padding: .1rem .55rem; }
-.mk-co.plain { color: var(--muted); background: var(--panel-2); }
-.mk-neg { margin-left: auto; display: inline-flex; align-items: center; gap: .25rem; font-size: var(--fs-2xs); font-weight: 700; color: var(--amber); }
-.mk-neg .ico { width: 13px; height: 13px; }
-.mk-blurb { margin: 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
-.mk-meta { display: flex; flex-wrap: wrap; gap: .3rem .9rem; font-size: var(--fs-sm); color: var(--muted); }
-.mk-meta span { display: inline-flex; align-items: center; gap: .3rem; }
-.mk-meta b { color: var(--text); }
-.mk-meta .ico { width: 15px; height: 15px; }
-.mk-secs { list-style: none; margin: 0; padding: .55rem 0 0; border-top: 1px dashed var(--border); display: grid; gap: .25rem; font-size: var(--fs-sm); }
-.mk-secs li { display: flex; align-items: center; gap: .5rem; min-width: 0; }
-.mk-secs li i { width: 7px; height: 7px; border-radius: 50%; background: var(--sc); flex: none; }
-.mk-secs li b { margin-left: auto; font-variant-numeric: tabular-nums; }
-.mk-secs li span { color: var(--muted); font-size: var(--fs-xs); min-width: 3.6rem; text-align: right; }
-.mk-card-foot { margin-top: auto; display: flex; align-items: center; gap: .5rem; padding-top: .4rem; }
-.mk-best { font-size: var(--fs-sm); }
-.mk-live { border-color: color-mix(in srgb, var(--amber) 45%, var(--border)); }
-.mk-live > .ico { width: 22px; height: 22px; color: var(--amber); flex: none; }
+.mk-list { list-style: none; margin: 0; padding: 0; background: var(--panel); }
+.mk-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: .4rem 1.4rem; align-items: center; padding: .9rem 1.1rem; border-bottom: 2px solid var(--ink); }
+.mk-row:last-child { border-bottom: 0; }
+.mk-row:hover { background: var(--panel-2); }
+.mk-r-main { min-width: 0; }
+.mk-r-main h3 { margin: 0; font: 800 var(--fs-md) var(--display); display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .6rem; }
+.mk-co { font: 700 12px var(--mono); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.mk-neg { font: 700 12px var(--mono); color: var(--muted); }
+.mk-blurb { margin: .15rem 0 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.45; }
+.mk-secs { list-style: none; margin: .35rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: .15rem 1rem; font-size: var(--fs-xs); color: var(--muted); }
+.mk-secs li { display: inline-flex; align-items: center; gap: .35rem; }
+.mk-secs li i { width: 10px; height: 10px; border: 1.5px solid var(--ink); background: var(--sc); flex: none; }
+.mk-secs li b { color: var(--text); font-family: var(--mono); }
+html .mk .mk-secs { border-top: 0; padding-top: 0; }
+html .mk .mk-rank { border-top: 2px solid var(--ink); }
+.mk-r-meta { font: 700 13px var(--mono); text-align: right; white-space: nowrap; }
+.mk-r-meta small { display: block; font: 600 12px var(--mono); color: var(--muted); }
+.mk-live { border-color: var(--ink); background: var(--amber-soft); }
+.mk-live > .ico { width: 22px; height: 22px; flex: none; }
 .mk-hist td { white-space: nowrap; }
 .mk-hist td.pn { white-space: normal; }
 .mk-rules { list-style: none; margin: 0; padding: 0; display: grid; gap: .7rem; }
 .mk-rules li { display: flex; gap: .7rem; align-items: flex-start; line-height: 1.55; }
-.mk-rules li > .ico { width: 18px; height: 18px; flex: none; margin-top: .2rem; color: var(--accent); }
-.mk-note { display: flex; gap: .5rem; align-items: flex-start; margin: 1rem 0 0; padding: .7rem .9rem; border-radius: var(--r-md); background: var(--amber-soft); font-size: var(--fs-sm); }
-.mk-note .ico { width: 17px; height: 17px; flex: none; color: var(--amber); margin-top: .15rem; }
-.mk-alt { width: 100%; justify-content: center; margin-top: .5rem; }
+.mk-rules li > .ico { width: 18px; height: 18px; flex: none; margin-top: .2rem; color: var(--muted); }
+.mk-more { margin-bottom: 1rem; }
+.mk-more > summary { cursor: pointer; font-weight: 800; min-height: 44px; display: flex; align-items: center; }
+.mk-note { display: flex; gap: .5rem; align-items: flex-start; margin: 1rem 0 0; padding: .7rem .9rem; border: 2px solid var(--ink); background: var(--green-soft); font-size: var(--fs-sm); }
+.mk-note .ico { width: 17px; height: 17px; flex: none; margin-top: .15rem; }
+.mk-alt { width: 100%; margin-top: .5rem; }
+.mk .pr-start .pr-go { width: 100%; font-size: var(--fs-md); }
+.mk .pr-start .pr-big b { font: 900 2.6rem var(--display); }
+.mk .pr-chip { box-shadow: none; }
 
 /* exam screen (focus mode: header hidden, motion off) */
-body.mk-focus { --top-h: 0px; }
+body.mk-focus { --top-h: 0px; background-image: none; }
 body.mk-focus #topbar { display: none; }
 body.mk-focus .page.mk { max-width: 1440px; padding-top: 0; }
 .mk-bar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: .6rem 1rem; flex-wrap: wrap; padding: .65rem 0; margin-bottom: 1rem;
-  background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
+  background: var(--bg); border-bottom: 2px solid var(--ink); }
 .mk-title { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
 .mk-title b { font: 800 var(--fs-md) var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mk-title span { font-size: var(--fs-2xs); color: var(--muted); }
+.mk-title span { font: 600 12px var(--mono); color: var(--muted); }
 .mk-tabs { display: flex; gap: .35rem; overflow-x: auto; scrollbar-width: none; min-width: 0; max-width: 100%; }
 .mk-tabs::-webkit-scrollbar { display: none; }
-.mk-tab { border: 1px solid var(--border); background: var(--panel); color: var(--muted); border-radius: var(--r-pill); padding: .28rem .8rem; font: 700 var(--fs-sm) var(--display); white-space: nowrap; display: inline-flex; align-items: center; gap: .4rem; cursor: pointer; flex: none; }
-.mk-tab small { font: 700 var(--fs-2xs) var(--mono); background: var(--panel-2); border-radius: var(--r-pill); padding: 0 .4rem; }
-.mk-tab:hover:not(:disabled) { border-color: color-mix(in srgb, var(--page-c, var(--accent)) 55%, var(--border)); color: var(--text); }
-.mk-tab.cur { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-.mk-tab.cur small { background: var(--panel); }
+.mk-tab { border: 2px solid var(--ink); background: var(--panel); color: var(--text); border-radius: 0; padding: .3rem .8rem; min-height: 44px; font: 800 var(--fs-sm) var(--display); white-space: nowrap; display: inline-flex; align-items: center; gap: .4rem; cursor: pointer; flex: none; }
+.mk-tab small { font: 700 12px var(--mono); color: var(--muted); }
+.mk-tab:hover:not(:disabled) { background: var(--panel-2); }
+.mk-tab.cur { background: var(--ink); color: var(--bg); }
+.mk-tab.cur small { color: inherit; }
 .mk-tab:disabled { cursor: default; opacity: .6; }
 .mk-tab.done { opacity: .75; }
 .mk-tab .ico { width: 13px; height: 13px; }
 .mk-rough { display: inline-flex; align-items: center; gap: .35rem; }
 .mk-rough .ico { width: 15px; height: 15px; }
 .mk-quit { color: var(--muted); }
-.mk-timer { min-width: 8.6rem; }
-.mk-timer .tg { font-size: var(--fs-2xs); }
+.mk-timer { min-width: 8.6rem; box-shadow: none; border: 2px solid var(--ink); background: var(--panel); }
+.mk-timer .t, .session-rail .mk-rt { font-family: var(--mono); font-weight: 700; }
+.mk-timer .tg { font-size: 12px; }
 .pr-timer.crit .t { color: var(--red); }
 .mk-grid { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 1.25rem; align-items: start; }
 .mk-main { min-width: 0; }
@@ -936,26 +973,31 @@ body.mk-focus .page.mk { max-width: 1440px; padding-top: 0; }
 .mk-exam .pr-stim { top: 84px; max-height: calc(100vh - 104px); }
 .mk-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .mk-qcard .pr-qhead { flex-wrap: wrap; }
-.mk-marks { font: 700 var(--fs-2xs) var(--mono); color: var(--muted); border: 1px solid var(--border); border-radius: var(--r-pill); padding: .05rem .5rem; }
+.mk-marks { font: 700 12px var(--mono); color: var(--muted); border: 2px solid var(--ink); padding: .05rem .5rem; }
 .mk-actions .btn { display: inline-flex; align-items: center; gap: .35rem; }
-.mk-markbtn.on { border-color: var(--purple); color: var(--purple); }
+.mk-markbtn.on { background: var(--purple-soft); }
+.mk-exam .pr-opt { box-shadow: none; transform: none; border: 2px solid var(--ink); background: var(--panel); min-height: 52px; }
+.mk-exam .pr-opt:hover:not(:disabled) { background: var(--panel-2); transform: none; box-shadow: none; }
+.mk-exam .pr-opt.sel, .mk-exam .pr-opt.sel:hover { background: var(--ink); color: var(--bg); transform: none; box-shadow: none; }
+.mk-exam .pr-opt.sel .k { background: var(--bg); color: var(--ink); border-color: var(--bg); }
+.mk-exam .pr-icon { min-width: 44px; min-height: 44px; }
 .mk-wide { width: 100%; justify-content: center; display: flex; align-items: center; gap: .35rem; }
 .mk-secbox { display: grid; gap: .5rem; }
 .mk-pal { display: grid; grid-template-columns: repeat(5, 1fr); gap: .4rem; }
-.mk-pal button { aspect-ratio: 1.25; border-radius: var(--r-sm); border: 1px solid var(--border); background: var(--panel); font: 700 var(--fs-xs) var(--display); color: var(--muted); position: relative; cursor: pointer; padding: 0; }
-.mk-pal button:hover { border-color: var(--accent); }
-.mk-pal .na, .mk-sw.na { background: var(--red-soft); border-color: color-mix(in srgb, var(--red) 50%, transparent); color: var(--red); }
-.mk-pal .an, .mk-sw.an { background: var(--green-soft); border-color: color-mix(in srgb, var(--green) 50%, transparent); color: var(--green); }
-.mk-pal .mr, .mk-sw.mr { background: var(--purple-soft); border-color: color-mix(in srgb, var(--purple) 55%, transparent); color: var(--purple); border-radius: var(--r-pill); }
-.mk-pal .am, .mk-sw.am { background: var(--purple-soft); border-color: color-mix(in srgb, var(--purple) 55%, transparent); color: var(--purple); border-radius: var(--r-pill); }
-.mk-pal .am::after, .mk-sw.am::after { content: ""; position: absolute; right: 2px; bottom: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--green); border: 1.5px solid var(--panel); }
-.mk-pal .cur { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mk-pal button { aspect-ratio: 1.25; min-height: 44px; border-radius: 0; border: 2px solid var(--ink); background: var(--panel); font: 700 var(--fs-xs) var(--mono); color: var(--text); position: relative; cursor: pointer; padding: 0; }
+.mk-pal button:hover { background: var(--panel-2); }
+.mk-pal .na, .mk-sw.na { background: var(--red-soft); color: var(--text); }
+.mk-pal .an, .mk-sw.an { background: var(--green-soft); color: var(--text); }
+.mk-pal .mr, .mk-sw.mr { background: var(--purple-soft); color: var(--text); border-radius: 50%; }
+.mk-pal .am, .mk-sw.am { background: var(--purple-soft); color: var(--text); border-radius: 50%; }
+.mk-pal .am::after, .mk-sw.am::after { content: ""; position: absolute; right: 2px; bottom: 2px; width: 8px; height: 8px; border-radius: 50%; background: var(--green); border: 1.5px solid var(--ink); }
+.mk-pal .cur { outline: 3px solid var(--accent); outline-offset: 1px; }
 .mk-legend { display: grid; grid-template-columns: 1fr; gap: .3rem; margin-top: .8rem; font-size: var(--fs-xs); color: var(--muted); }
 .mk-legend span { display: flex; align-items: center; gap: .5rem; }
-.mk-legend b { margin-left: auto; color: var(--text); font-variant-numeric: tabular-nums; }
-.mk-sw { display: inline-block; width: 16px; height: 13px; border-radius: 4px; border: 1px solid var(--border); background: var(--panel); position: relative; flex: none; }
+.mk-legend b { margin-left: auto; color: var(--text); font-family: var(--mono); }
+.mk-sw { display: inline-block; width: 16px; height: 13px; border: 1.5px solid var(--ink); background: var(--panel); position: relative; flex: none; }
 .mk-sw.am::after { width: 6px; height: 6px; right: -2px; bottom: -2px; }
-.mk-modal .pr-modal-box { width: min(560px, calc(100vw - 2rem)); }
+.mk-modal .pr-modal-box { width: min(560px, calc(100vw - 2rem)); box-shadow: none; border: 3px solid var(--ink); }
 .mk-ctable { margin-bottom: .7rem; }
 .mk-ctable td, .mk-ctable th { padding: .35rem .5rem; }
 .mk-modal p { margin: .4rem 0 1rem; }
@@ -963,47 +1005,99 @@ body.mk-focus .page.mk { max-width: 1440px; padding-top: 0; }
 
 /* result */
 .mk-hero { row-gap: 1rem; }
-.mk-rank { flex-basis: 100%; display: flex; align-items: center; gap: .55rem; padding-top: .8rem; border-top: 1px dashed var(--border); font-size: var(--fs-sm); color: var(--muted); }
+.mk-rank { flex-basis: 100%; display: flex; align-items: center; gap: .55rem; padding-top: .8rem; border-top: 2px solid var(--ink); font-size: var(--fs-sm); color: var(--muted); }
 .mk-rank b { color: var(--text); }
-.mk-rank .ico { width: 18px; height: 18px; color: var(--amber); flex: none; }
+.mk-rank .ico { width: 18px; height: 18px; flex: none; }
+.mk .pr-score b, .mk .pr-stats b { font-family: var(--mono); }
 .mk-two { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
 .mk-two > .pr-card { margin-bottom: 1rem; }
 .mk-heat { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .45rem; }
-.mk-hc { display: grid; grid-template-columns: 1fr auto; gap: 0 .4rem; padding: .5rem .65rem; border-radius: var(--r-sm); border: 1px solid var(--border); color: var(--text); text-decoration: none !important; min-width: 0; }
+.mk-hc { display: grid; grid-template-columns: 1fr auto; gap: 0 .4rem; padding: .5rem .65rem; min-height: 44px; border: 2px solid var(--ink); color: var(--text); text-decoration: none !important; min-width: 0; background: var(--panel); }
 .mk-hc .nm { font-size: var(--fs-xs); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mk-hc .v { font: 800 var(--fs-sm) var(--display); text-align: right; }
-.mk-hc .s { grid-column: 1 / -1; font-size: var(--fs-2xs); color: var(--muted); }
-.mk-hc.g { background: color-mix(in srgb, var(--green) var(--h, 18%), var(--panel)); border-color: color-mix(in srgb, var(--green) 40%, transparent); } .mk-hc.g .v { color: var(--green); }
-.mk-hc.a { background: color-mix(in srgb, var(--amber) var(--h, 18%), var(--panel)); border-color: color-mix(in srgb, var(--amber) 40%, transparent); } .mk-hc.a .v { color: var(--amber); }
-.mk-hc.r { background: color-mix(in srgb, var(--red) var(--h, 18%), var(--panel)); border-color: color-mix(in srgb, var(--red) 40%, transparent); } .mk-hc.r .v { color: var(--red); }
+.mk-hc .v { font: 700 var(--fs-sm) var(--mono); text-align: right; }
+.mk-hc .s { grid-column: 1 / -1; font: 600 12px var(--mono); color: var(--muted); }
+.mk-hc.g { background: var(--green-soft); }
+.mk-hc.a { background: var(--amber-soft); }
+.mk-hc.r { background: var(--red-soft); }
 .mk-hc.none { border-style: dashed; } .mk-hc.none .v { color: var(--muted); font-weight: 600; font-size: var(--fs-xs); }
-.mk-hc:hover { border-color: var(--accent); }
-.mk-heat-key { display: flex; flex-wrap: wrap; gap: .3rem .9rem; margin-top: .7rem; font-size: var(--fs-2xs); color: var(--muted); }
-.mk-heat-key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: .3rem; vertical-align: -1px; border: 1px solid var(--border); }
-.mk-heat-key i.g { background: color-mix(in srgb, var(--green) 30%, var(--panel)); } .mk-heat-key i.a { background: color-mix(in srgb, var(--amber) 30%, var(--panel)); }
-.mk-heat-key i.r { background: color-mix(in srgb, var(--red) 30%, var(--panel)); } .mk-heat-key i.none { border-style: dashed; }
+.mk-hc:hover { background-color: var(--panel-2); }
+.mk-heat-key { display: flex; flex-wrap: wrap; gap: .3rem .9rem; margin-top: .7rem; font-size: var(--fs-xs); color: var(--muted); }
+.mk-heat-key i { display: inline-block; width: 10px; height: 10px; margin-right: .3rem; vertical-align: -1px; border: 1.5px solid var(--ink); }
+.mk-heat-key i.g { background: var(--green-soft); } .mk-heat-key i.a { background: var(--amber-soft); }
+.mk-heat-key i.r { background: var(--red-soft); } .mk-heat-key i.none { border-style: dashed; }
 .mk-sinks { display: grid; gap: .35rem; }
-.mk-sink { display: grid; grid-template-columns: auto auto minmax(0, 1fr) 70px auto; gap: .6rem; align-items: center; padding: .45rem .6rem; border: 1px solid var(--border); border-radius: var(--r-sm); color: var(--text); text-decoration: none !important; }
-.mk-sink:hover { border-color: var(--accent); }
-.mk-sink .n { font: 800 var(--fs-sm) var(--display); color: var(--accent); }
+.mk-sink { display: grid; grid-template-columns: auto auto minmax(0, 1fr) 70px auto; gap: .6rem; align-items: center; padding: .45rem .6rem; min-height: 44px; border: 2px solid var(--ink); color: var(--text); text-decoration: none !important; }
+.mk-sink:hover { background: var(--panel-2); }
+.mk-sink .n { font: 700 var(--fs-sm) var(--mono); }
 .mk-sink .t { min-width: 0; font-size: var(--fs-xs); font-weight: 700; }
 .mk-sink .t small { display: block; font-weight: 500; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mk-sink .bar { height: 6px; border-radius: var(--r-pill); background: var(--panel-2); overflow: hidden; }
-.mk-sink .bar i { display: block; height: 100%; background: var(--amber); border-radius: var(--r-pill); }
+.mk-sink .bar { height: 8px; border: 1.5px solid var(--ink); background: var(--panel); overflow: hidden; }
+.mk-sink .bar i { display: block; height: 100%; background: var(--ink); }
 .mk-sink .tm { font: 700 var(--fs-xs) var(--mono); text-align: right; white-space: nowrap; }
-.mk-sink .tm small { display: block; font-weight: 400; color: var(--muted); font-size: var(--fs-2xs); }
+.mk-sink .tm small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
 .mk-filters { margin-bottom: .8rem; }
+.mk .pr-pick { border: 2px solid var(--ink); background: var(--panel); color: var(--text); box-shadow: none; min-height: 44px; border-radius: 0; }
+.mk .pr-pick:hover:not(:disabled) { background: var(--panel-2); color: var(--text); }
+.mk .pr-pick.on, .mk .pr-pick.on:hover { background: var(--ink); color: var(--bg); box-shadow: none; }
+.mk .pr-pick.on small { color: inherit; }
 .pr-qrow[hidden] { display: none; }
-.mk-flag { color: var(--purple); display: inline-flex; } .mk-flag .ico { width: 14px; height: 14px; }
+.mk-flag { display: inline-flex; } .mk-flag .ico { width: 14px; height: 14px; }
 .mk-stimd { margin: .5rem 0; }
-.mk-stimd > summary { cursor: pointer; font-size: var(--fs-sm); color: var(--accent); display: inline-flex; align-items: center; gap: .3rem; }
+.mk-stimd > summary { cursor: pointer; font-size: var(--fs-sm); display: inline-flex; align-items: center; gap: .3rem; min-height: 44px; }
 .mk-stimd > summary .ico { width: 13px; height: 13px; }
-.mk-stim-inline { position: static; max-height: none; margin-top: .5rem; border: 1px solid var(--border); border-radius: var(--r-md); }
+.mk-stim-inline { position: static; max-height: none; margin-top: .5rem; border: 2px solid var(--ink); }
+.mk-final { margin-top: 1rem; }
+
+/* tablet session rail (contract: aside.session-rail on the html[data-hand] side) */
+.session-rail { display: none; }
+.mk-palpop { display: none; }
+html[data-device="tablet"] body.in-session .session-rail {
+  display: flex; flex-direction: column; gap: .5rem; position: fixed; top: 0; bottom: 0; right: 0; z-index: 60;
+  width: var(--rail-w-session, 132px); padding: .6rem; background: var(--panel); border-left: 3px solid var(--ink); box-sizing: border-box; }
+html[data-device="tablet"][data-hand="left"] body.in-session .session-rail { right: auto; left: 0; border-left: 0; border-right: 3px solid var(--ink); }
+html[data-device="tablet"] body.in-session .page.mk { max-width: none; padding-right: calc(var(--rail-w-session, 132px) + 1rem); }
+html[data-device="tablet"][data-hand="left"] body.in-session .page.mk { padding-right: 1rem; padding-left: calc(var(--rail-w-session, 132px) + 1rem); }
+.session-rail .sr-top { display: grid; gap: .5rem; }
+.session-rail .sr-mid { display: grid; gap: .5rem; align-content: end; margin-top: auto; overflow-y: auto; min-height: 0; }
+.session-rail .sr-sec { display: grid; gap: .35rem; align-content: start; overflow-y: auto; min-height: 0; }
+.session-rail button { min-height: 52px; border: 2px solid var(--ink); background: var(--panel); color: var(--text); font: 800 var(--fs-sm) var(--display); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: .35rem; padding: .25rem .4rem; border-radius: 0; text-align: center; line-height: 1.15; }
+.session-rail button:hover:not(:disabled) { background: var(--panel-2); }
+.session-rail button:disabled { opacity: .45; cursor: default; }
+.session-rail button.on, .session-rail button.on:hover:not(:disabled) { background: var(--ink); color: var(--bg); }
+.session-rail .sr-tab { min-height: 44px; font-size: 13px; flex-direction: column; gap: 0; }
+.session-rail .sr-tab small { font: 700 11px var(--mono); }
+.session-rail .sr-end { color: var(--red); }
+.session-rail .mk-rt { display: flex; align-items: center; justify-content: center; min-height: 52px; border: 2px solid var(--ink); font-size: 1.35rem; background: var(--panel); }
+.session-rail .mk-rt.over { background: var(--amber-soft); }
+.session-rail .mk-rt.crit { background: var(--red-soft); }
+.session-rail button.sr-go { min-height: 112px; background: var(--accent); color: #fff; border: 3px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); font-size: 1.05rem; font-weight: 900; flex: none; flex-direction: column; }
+[data-theme="dark"] .session-rail button.sr-go { color: #22121A; }
+.session-rail .ico { width: 18px; height: 18px; }
+html[data-device="tablet"] body.in-session .mk-palpop.open {
+  display: block; position: fixed; top: .6rem; right: calc(var(--rail-w-session, 132px) + .6rem); z-index: 61; width: min(340px, calc(100vw - 180px)); max-height: calc(100vh - 1.2rem); overflow-y: auto;
+  background: var(--panel); border: 3px solid var(--ink); padding: 1rem; box-sizing: border-box; }
+html[data-device="tablet"][data-hand="left"] body.in-session .mk-palpop.open { right: auto; left: calc(var(--rail-w-session, 132px) + .6rem); }
+.mk-palpop .mk-pal { grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); }
+.mk-palpop .btn { margin-top: .6rem; }
+html[data-device="tablet"] body.in-session .mk-bar .mk-tabs,
+html[data-device="tablet"] body.in-session .mk-bar .mk-timer,
+html[data-device="tablet"] body.in-session .mk-bar .mk-rough,
+html[data-device="tablet"] body.in-session .mk-bar .mk-quit,
+html[data-device="tablet"] body.in-session .mk-bar > .grow,
+html[data-device="tablet"] body.in-session .mk-rail,
+html[data-device="tablet"] body.in-session .mk-actions .t-hide { display: none; }
+html[data-device="tablet"] body.in-session .mk-grid { grid-template-columns: minmax(0, 1fr); }
+html[data-device="tablet"] body.in-session .mk-bar { position: static; border-bottom: 0; padding: .75rem 0 0; }
+html[data-device="tablet"] body.in-session .mk-exam .pr-qtext { font-size: 1.3rem; }
+@media (orientation: landscape) { html[data-device="tablet"] body.in-session .mk-qcard { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .5rem 1.5rem; align-items: start; }
+  html[data-device="tablet"] body.in-session .mk-qcard > .pr-qhead, html[data-device="tablet"] body.in-session .mk-qcard > .pr-setnav, html[data-device="tablet"] body.in-session .mk-qcard > .mk-actions { grid-column: 1 / -1; }
+  html[data-device="tablet"] body.in-session .mk-qcard .pr-opts { grid-column: 2; grid-row: 2 / span 2; }
+  html[data-device="tablet"] body.in-session .mk-qcard .pr-qtext { grid-column: 1; grid-row: 2 / span 2; } }
 
 @media (max-width: 1100px) {
   .mk-grid, .mk-split, .mk-two { grid-template-columns: minmax(0, 1fr); }
   .mk-rail, .mk-exam .pr-stim { position: static; max-height: none; }
-  .mk-pal { grid-template-columns: repeat(auto-fill, minmax(42px, 1fr)); }
+  .mk-pal { grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); }
   .mk-legend { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
 }
 @media (max-width: 640px) {
@@ -1016,11 +1110,15 @@ body.mk-focus .page.mk { max-width: 1440px; padding-top: 0; }
   .mk-actions .btn { flex: 1 1 auto; justify-content: center; }
   .mk-actions .grow { display: none; }
   .mk-actions .btn.primary { flex-basis: 100%; }
-  .mk-cards { grid-template-columns: minmax(0, 1fr); }
+  .mk-setup-t th:nth-child(4), .mk-setup-t td:nth-child(4) { display: none; }
+  .mk-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .mk-r-meta { text-align: left; grid-column: 1; grid-row: 2; }
+  .mk-row > .btn, .mk-row > .mk-start { grid-column: 2; grid-row: 1 / span 2; }
   .mk-sink { grid-template-columns: auto auto minmax(0, 1fr) auto; }
   .mk-sink .bar { display: none; }
   .mk-hist th:nth-child(4), .mk-hist td:nth-child(4), .mk-hist th:nth-child(6), .mk-hist td:nth-child(6) { display: none; }
-}`;
+}
+`;
     document.head.appendChild(st);
   }
 
