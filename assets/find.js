@@ -149,6 +149,6 @@
     b.title = "Find anything (Ctrl K)"; b.setAttribute("aria-label", "Find anything");
     b.innerHTML = ICO(LENS);
     b.onclick = open;
-    (document.querySelector(".fx-slot") || theme).before(b);
+    (document.querySelector(".tb-slot") || theme).before(b);
   }
 })();

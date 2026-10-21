@@ -21,8 +21,6 @@
     ".rw-drawer{position:fixed;top:var(--rw-top,56px);right:0;bottom:0;width:380px;max-width:100vw;background:var(--panel);color:var(--text);border-left:1px solid var(--border);",
     "box-shadow:-8px 0 24px rgba(0,0,0,.06);transform:translateX(105%);visibility:hidden;pointer-events:none;z-index:40;display:flex;flex-direction:column;padding:1rem;box-sizing:border-box;font-family:var(--sans)}",
     ".rw-drawer.show{transform:none;visibility:visible;pointer-events:auto}",
-    ":root[data-anim=\"on\"] .rw-drawer{transition:transform .5s cubic-bezier(.22,1,.36,1),visibility 0s linear .5s}",
-    ":root[data-anim=\"on\"] .rw-drawer.show{transition:transform .5s cubic-bezier(.22,1,.36,1),visibility 0s}",
     "[data-theme=\"dark\"] .rw-drawer{box-shadow:-8px 0 24px rgba(0,0,0,.35)}",
     ".rw-drawer [hidden]{display:none!important}",
     ".rw-ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}",
@@ -60,7 +58,6 @@
     ".rw-sw::after{content:\"\";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--muted)}",
     ".rw-sw[aria-checked=\"true\"]{background:var(--accent-soft);border-color:var(--accent)}",
     ".rw-sw[aria-checked=\"true\"]::after{left:16px;background:var(--accent)}",
-    ":root[data-anim=\"on\"] .rw-sw::after{transition:left .3s cubic-bezier(.22,1,.36,1),background .3s}",
     ".rw-note-off{margin:0 0 .5rem;font-size:var(--fs-2xs);color:var(--muted)}"
   ].join("\n");
   var st = doc.createElement("style"); st.id = "rwStyle"; st.textContent = css; doc.head.appendChild(st);
@@ -315,7 +312,7 @@
   /* ---------- header button + keys ---------- */
   function mountBtn() {
     if (doc.getElementById("rwBtn")) return true;
-    var slot = doc.querySelector("#topbar .fx-slot") || doc.querySelector(".fx-slot");
+    var slot = doc.querySelector("#topbar .tb-slot") || doc.querySelector(".tb-slot");
     if (!slot) return false;
     btn = doc.createElement("button");
     btn.className = "icon-btn"; btn.id = "rwBtn"; btn.type = "button";

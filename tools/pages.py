@@ -30,29 +30,24 @@ HEAD = '''<!doctype html>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap">
 <link rel="stylesheet" href="assets/style.css">
-<link rel="stylesheet" href="assets/fx/fx.css">
 <link rel="stylesheet" href="assets/practice.css">
 <link rel="stylesheet" href="assets/brutal.css">
-<script>try{{var h=document.documentElement,t=localStorage.getItem('theme');if(t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches)h.dataset.theme='dark';var a=localStorage.getItem('anim');h.dataset.anim=a==='on'||(a!=='off'&&!matchMedia('(prefers-reduced-motion: reduce)').matches)?'on':'off'}}catch(e){{}}</script>
+<script>try{{var h=document.documentElement,t=localStorage.getItem('theme');if(t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches)h.dataset.theme='dark';}}catch(e){{}}</script>
 </head>
 <body>
 <header id="topbar"></header>
 '''
 PAGE = '<main class="page" id="content"></main>\n'
 DOC = '<div class="layout">\n  <aside class="sidebar" id="sidebar"></aside>\n  <main class="content" id="content"></main>\n</div>\n'
-FX = ["assets/fx/fx-core.js", "assets/fx/fx-page.js", "assets/fx/fx-header.js", "assets/fx/fx-sidebar.js",
-      "assets/fx/fx-cursor.js", "assets/fx/fx-celebrate.js"]
 TAIL = ["data/progress.js", "assets/find.js", "assets/search.js", "assets/rough.js"]
 
 
 def page(name, title, body, data, scripts_after, init):
-    """data: scripts loaded after catalog.js (page data); scripts_after: the page's own script(s), loaded before the fx files."""
+    """data: scripts loaded after catalog.js (page data); scripts_after: the page's own script(s)."""
     scripts = ["assets/site.js", "assets/common.js", "data/catalog.js"] + data + scripts_after
     h = HEAD.format(title=title) + body
     h += "".join(f'<script src="{s}"></script>\n' for s in scripts)
-    # the page's init script comes before the fx files (as in the Study Hub), so the content exists when they start
     h += f"<script>\n  {init}\n</script>\n"
-    h += "".join(f'<script src="{s}"></script>\n' for s in FX)
     h += "".join(f'<script src="{s}"></script>\n' for s in TAIL if s not in scripts)
     h += "</body>\n</html>\n"
     open(os.path.join(ROOT, name), "w", encoding="utf-8", newline="\n").write(h)

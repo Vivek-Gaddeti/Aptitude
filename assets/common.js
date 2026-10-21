@@ -10,7 +10,8 @@
    html[data-device]  "tablet" | "desktop" | "phone"   (apt:layout = auto | desktop | tablet)
    html[data-hand]    "right" | "left"                 (apt:hand: which side the thumb rails sit on)
    html[data-text]    "md" | "lg"                      (apt:text: lg scales the root font to 112.5%)
-   html[data-anim]    "on" | "off"                     (localStorage.anim: OFF unless the person turned effects on) */
+   There is no motion setting: the only motion is the "stamp" feedback (press / stamp / thunk / bars in brutal.css) and
+   it is switched off by prefers-reduced-motion. window.stamp(el) restarts the stamp on a toggle that just changed state. */
 (function () {
   var root = document.documentElement;
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -25,10 +26,11 @@
     return w < 700 ? "phone" : "desktop";
   }
   function apply() {
-    root.dataset.device = device();
+    var d = device(), prev = root.dataset.device;
+    root.dataset.device = d;
     root.dataset.hand = get("apt:hand") === "left" ? "left" : "right";
     root.dataset.text = get("apt:text") === "lg" ? "lg" : "md";
-    root.dataset.anim = get("anim") === "on" ? "on" : "off";
+    if (prev && prev !== d && document.body) document.body.classList.remove("sidebar-open");   // a drawer left open must not follow a layout change
   }
   apply();
   var raf = 0;
@@ -116,6 +118,7 @@
     laugh: '<circle cx="12" cy="12" r="9"/><path d="M7.8 13.5c.9 2.3 2.4 3.5 4.2 3.5s3.3-1.2 4.2-3.5z"/>' + DOT(9, 9.5) + DOT(15, 9.5),
     up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
     sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+    sidebar: '<rect x="3.5" y="4.5" width="17" height="15"/><path d="M9.5 4.5v15"/>',
     restart: '<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 8.9"/><path d="M4.5 4.2v4.7h4.7"/>',
   };
   const icon = (name, cls = "") => ICONS[name] ? `<svg class="ico${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>` : "";
@@ -220,6 +223,16 @@
     if (!toastEl) { toastEl = document.createElement("div"); toastEl.className = "toast"; document.body.appendChild(toastEl); }
     toastEl.innerHTML = icon(ic) + `<span>${esc(msg)}</span>`; toastEl.classList.add("show");
     clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove("show"), ms);
+  }
+
+  /* stamp(el): the 100 ms "ka-chunk" on a toggle that just changed state (class .is-stamped, keyframes in brutal.css).
+     The state change itself (icon, label, colour) is instant; this is only the feedback. No-op under reduced motion. */
+  function stamp(el) {
+    if (!el || (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
+    el.classList.remove("is-stamped");
+    void el.offsetWidth;
+    el.classList.add("is-stamped");
+    el.addEventListener("animationend", () => el.classList.remove("is-stamped"), { once: true });
   }
 
   /* ------------------------------------------------------------- Fixed-width button labels
@@ -788,8 +801,8 @@
   // per-link colours by link index
   // [colour for the pill/icons, readable shade for text & buttons in light mode, readable shade in dark mode]
   // neo-brutalist palette: Dashboard raspberry, Quant pink, Reasoning green, Verbal yellow, DI blue, Practice orange, Revision lilac
-  const NAV_COLORS = [["#FF6F9C", "#D6245F", "#FF6F9C"], ["#FF8AB0", "#B8124A", "#FF8AB0"], ["#3DDC84", "#0B7A43", "#3DDC84"],
-    ["#FFD23F", "#8A5A00", "#FFD23F"], ["#8EC5FF", "#1F5FA8", "#8EC5FF"], ["#FF9F5A", "#A8460B", "#FF9F5A"], ["#B79CFF", "#5B3CC4", "#B79CFF"]];
+  const NAV_COLORS = [["var(--f-rasp)", "#D6245F", "#FF6B93"], ["var(--f-pink)", "#B8124A", "#F48FB1"], ["var(--f-green)", "#0B7A43", "#5BD98C"],
+    ["var(--f-yellow)", "#8A5A00", "#F2C94C"], ["var(--f-blue)", "#1F5FA8", "#82B4F5"], ["var(--f-orange)", "#A8460B", "#F5A26B"], ["var(--f-lilac)", "#5B3CC4", "#B9A3F5"]];
   const navIcon = (label) => { const ic = NAV_ICONS[label.replace("↗", "").trim()]; return ic ? `<svg class="ni ni-${ic[1]}" viewBox="0 0 24 24" aria-hidden="true">${NAV_SVG[ic[0]]}</svg>` : ""; };
   const dueCount = () => Object.values(Store.load().items).filter((it) => Store.isDue(it)).length;
   const badgeHTML = (n) => (n ? `<span class="nav-badge pulse">${n > 99 ? "99+" : n}</span>` : "");
@@ -819,8 +832,8 @@
           menu.hidden = false;
           menu.style.left = Math.max(8, Math.min(r.left, innerWidth - menu.offsetWidth - 8)) + "px";
           menu.style.top = r.bottom + 6 + "px";
-          requestAnimationFrame(() => menu.classList.add("show"));
-        } else { menu.classList.remove("show"); t = setTimeout(() => (menu.hidden = true), 200); }
+          menu.classList.add("show");
+        } else { menu.classList.remove("show"); menu.hidden = true; }
       };
       const later = () => { clearTimeout(t); t = setTimeout(() => open(false), 220); };
       const hover = matchMedia("(hover: hover)");
@@ -836,23 +849,28 @@
       window.addEventListener("scroll", () => !menu.hidden && open(false), { passive: true });
     });
   }
-  /* ---- Settings: Theme, Layout, Rail side, Text size, Effects (one popover, opened from the header or the tablet rail) ---- */
+  /* ---- Settings: Theme, Layout, Rail side, Text size (one popover, opened from the header or the tablet rail) ---- */
   const SETTINGS = [
     ["Theme", "theme", [["light", "Light"], ["dark", "Dark"]]],
     ["Layout", "layout", [["auto", "Auto"], ["desktop", "Desktop"], ["tablet", "Tablet"]], "Tablet puts the menu in a thumb rail"],
     ["Rail side", "hand", [["right", "Right"], ["left", "Left"]], "Which side the tablet rails sit on"],
     ["Text size", "text", [["md", "Normal"], ["lg", "Large"]]],
-    ["Effects", "anim", [["off", "Off"], ["on", "On"]], "Fades, confetti and smooth boxes"],
   ];
   const settingVal = (k) => {
     const R = document.documentElement, g = (x) => { try { return localStorage.getItem(x); } catch (e) { return null; } };
     return k === "theme" ? (R.dataset.theme === "dark" ? "dark" : "light") : k === "layout" ? (g("apt:layout") || "auto")
-      : k === "hand" ? R.dataset.hand : k === "text" ? R.dataset.text : R.dataset.anim === "on" ? "on" : "off";
+      : k === "hand" ? R.dataset.hand : R.dataset.text;
   };
+  // light <-> dark is instant: transitions are held off for the frame in which the colours change
+  function setTheme(v) {
+    const R = document.documentElement;
+    R.classList.add("no-tr"); R.dataset.theme = v;
+    try { localStorage.setItem("theme", v); } catch (e) {}
+    void R.offsetWidth; requestAnimationFrame(() => R.classList.remove("no-tr"));
+  }
   function setSetting(k, v) {
     const R = document.documentElement;
-    if (k === "theme") { R.dataset.theme = v; try { localStorage.setItem("theme", v); } catch (e) {} }
-    else if (k === "anim") { try { localStorage.setItem("anim", v); } catch (e) {} R.dataset.anim = v; document.dispatchEvent(new CustomEvent("fx:settings")); }
+    if (k === "theme") setTheme(v);
     else AptPrefs.set(k === "layout" ? "apt:layout" : k === "hand" ? "apt:hand" : "apt:text", v);
   }
   let setMenu = null, setBtn = null;
@@ -913,12 +931,10 @@
       }).join("")}</nav>
       ${S.links.map(([, , sub], i) => sub ? `<div class="nav-menu" role="menu" data-menu="${i}" style="--c:${NAV_COLORS[i % NAV_COLORS.length][0]}" hidden>${sub.map(([href, label, note]) => `<a role="menuitem" href="${href}" class="${href === active ? "active" : ""}">${navIcon(label)}<span><b>${label}</b>${note ? `<small>${note}</small>` : ""}</span></a>`).join("")}</div>` : "").join("")}
       ${streak > 0 ? `<span class="d-streak" title="${streak}-day study streak"><span class="f">${icon("flame")}</span><span class="sn">${streak}</span></span>` : ""}
-      <span class="fx-slot"><button class="icon-btn" id="setBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="Settings" aria-label="Settings">${icon("sliders")}</button></span>
+      <span class="tb-slot"><button class="icon-btn" id="setBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="Settings" aria-label="Settings">${icon("sliders")}</button></span>
       <button class="icon-btn" id="themeBtn" title="Toggle dark mode" aria-label="Toggle theme">${THEME_SVG}</button>`;
     $("#themeBtn").onclick = () => {
-      const cur = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-      document.documentElement.dataset.theme = cur;
-      try { localStorage.setItem("theme", cur); } catch (e) {}
+      setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
     };
     const subPages = [];
     S.links.forEach(([href, , sub]) => sub && sub.forEach(([x, l]) => { if (!S.links.some(([y]) => y === x)) subPages.push([x, l]); }));
@@ -976,7 +992,7 @@
         return item(href, lab, navIcon(label), `style="--c:${C[0]}"`, on) .replace("</a>", (href === "revision.html" ? badgeHTML(due) : "") + "</a>");
       }).join("")}</div>
       <div class="gr-tools">
-        ${document.getElementById("sidebar") ? `<button type="button" class="gr-item" id="grTopics" aria-label="Topics list">${icon("menu")}<span>Topics</span></button>` : ""}
+        ${document.getElementById("sidebar") ? `<button type="button" class="gr-item" id="grTopics" aria-label="Topics list" aria-expanded="false">${icon("menu")}<span>Topics</span></button>` : `<span class="gr-item gr-slot" aria-hidden="true"></span>`}
         <button type="button" class="gr-item" id="grFind" aria-label="Search">${icon("search")}<span>Search</span></button>
         <button type="button" class="gr-item gr-rough" id="grRough" aria-label="Rough work">${icon("pencil")}<span>Rough</span></button>
         <button type="button" class="gr-item" id="grMore" aria-haspopup="dialog" aria-expanded="false" aria-label="Settings and more">${icon("sliders")}<span>More</span></button>
@@ -985,7 +1001,7 @@
     rail.querySelector("#grFind").onclick = () => window.FindBox && FindBox.open();
     rail.querySelector("#grRough").onclick = () => window.RoughPad && RoughPad.toggle();
     const tp = rail.querySelector("#grTopics");
-    if (tp) tp.onclick = () => document.body.classList.toggle("sidebar-open");
+    if (tp) tp.onclick = () => toggleTopics();
     rail.querySelector("#grMore").onclick = (e) => { e.stopPropagation(); openSettings(e.currentTarget, subPages); };
   }
 
@@ -1021,6 +1037,7 @@
       setSwap(btn, nb.querySelector(".swap").dataset.s);
     });
     bar.querySelector(".due").textContent = fresh.querySelector(".due").textContent;
+    stamp(b);                                                         // after the class update above, which would otherwise wipe .is-stamped
   });
   function relDay(t) {
     const days = Math.round((new Date(today(t)) - new Date(today())) / DAY);
@@ -1039,6 +1056,142 @@
     clearTimeout(noteT);
     noteT = setTimeout(() => Store.setNote(t.dataset.note, t.value), 400);
   });
+
+
+  /* ------------------------------------------------------------- Topics sidebar (lessons, strategy)
+     desktop: a column you can drag to resize (200 to 420 px, apt:sidebarW) and collapse (apt:sidebarClosed), instant, both remembered
+     tablet / phone / narrow window: an overlay drawer (body.sidebar-open) opened by Topics on the rail or the menu button */
+  const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const lsSet = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
+  const sbDrawerMode = () => document.documentElement.dataset.device !== "desktop" || innerWidth <= 900;
+  /* Resizable / collapsible side column, shared by the lesson sidebar and the formula sheet's table of contents.
+     SidebarCtl.make({ wKey, cKey, cssVar, closedClass, min, max, def, label, hostClass }) returns { setWidth, setClosed, toggle, restore, resizer, isClosed }.
+     width lives in a CSS variable on <html>, the closed state is a class on <body>; both remembered in localStorage (wKey, cKey). */
+  function makeSidebarCtl(o) {
+    const MIN = o.min || 200, MAX = o.max || 420, DEF = o.def || 270, cls = o.resizerClass || "sb-resizer";
+    let rz = null;
+    function setWidth(w, save) {
+      w = Math.max(MIN, Math.min(MAX, Math.round(w)));
+      document.documentElement.style.setProperty(o.cssVar, w + "px");
+      if (rz) rz.setAttribute("aria-valuenow", w);
+      if (save) lsSet(o.wKey, w === DEF ? null : String(w));
+      return w;
+    }
+    function setClosed(c, save = true) {
+      document.body.classList.toggle(o.closedClass, !!c);
+      if (save) lsSet(o.cKey, c ? "1" : null);
+    }
+    const isClosed = () => document.body.classList.contains(o.closedClass);
+    const toggle = () => setClosed(!isClosed());
+    function restore() {
+      const w = parseInt(lsGet(o.wKey), 10);
+      setWidth(w >= MIN && w <= MAX ? w : DEF, false);
+      setClosed(lsGet(o.cKey) === "1", false);
+    }
+    function resizer(panel) {
+      rz = document.createElement("div");
+      rz.className = cls; rz.tabIndex = 0; rz.setAttribute("role", "separator"); rz.setAttribute("aria-orientation", "vertical");
+      rz.setAttribute("aria-label", o.label || "Resize sidebar"); rz.title = "Drag to resize, double-click to reset";
+      rz.setAttribute("aria-valuemin", MIN); rz.setAttribute("aria-valuemax", MAX);
+      panel.parentNode.insertBefore(rz, panel.nextSibling);
+      const cur = () => parseInt(getComputedStyle(document.documentElement).getPropertyValue(o.cssVar), 10) || DEF;
+      rz.setAttribute("aria-valuenow", cur());
+      rz.addEventListener("pointerdown", (e) => {
+        if (e.button) return;
+        e.preventDefault(); rz.setPointerCapture(e.pointerId); rz.classList.add("drag"); document.body.classList.add("sb-dragging");
+      });
+      rz.addEventListener("pointermove", (e) => { if (rz.hasPointerCapture(e.pointerId)) setWidth(e.clientX - panel.getBoundingClientRect().left, false); });
+      const end = (e) => {
+        if (!rz.classList.contains("drag")) return;
+        rz.classList.remove("drag"); document.body.classList.remove("sb-dragging");
+        try { rz.releasePointerCapture(e.pointerId); } catch (x) {}
+        setWidth(cur(), true);
+      };
+      rz.addEventListener("pointerup", end); rz.addEventListener("pointercancel", end);
+      rz.addEventListener("dblclick", () => { setWidth(DEF, true); });
+      rz.addEventListener("keydown", (e) => {
+        const d = e.key === "ArrowLeft" ? -16 : e.key === "ArrowRight" ? 16 : 0;
+        if (d) { e.preventDefault(); setWidth(cur() + d, true); }
+        else if (e.key === "Home") { e.preventDefault(); setWidth(MIN, true); }
+        else if (e.key === "End") { e.preventDefault(); setWidth(MAX, true); }
+        else if (e.key === "Enter") { e.preventDefault(); setWidth(DEF, true); }
+      });
+      return rz;
+    }
+    return { setWidth, setClosed, toggle, restore, resizer, isClosed };
+  }
+  const SB = makeSidebarCtl({ wKey: "apt:sidebarW", cKey: "apt:sidebarClosed", cssVar: "--sbw", closedClass: "sb-closed", min: 200, max: 420, def: 270, label: "Resize topics sidebar" });
+  const sbSetWidth = SB.setWidth, sbSetClosed = SB.setClosed, sbRestore = SB.restore, sbResizer = SB.resizer;
+  function toggleTopics() {
+    if (!document.getElementById("sidebar")) return;
+    if (sbDrawerMode()) document.body.classList.toggle("sidebar-open");
+    else SB.toggle();
+  }
+  function closeDrawer() { document.body.classList.remove("sidebar-open"); }
+  window.SidebarCtl = { make: makeSidebarCtl, desktop: () => !sbDrawerMode(), lsGet, lsSet };
+  // keep the rail's Topics button honest about the drawer
+  document.addEventListener("DOMContentLoaded", () => {
+    new MutationObserver(() => { const b = document.getElementById("grTopics"); if (b) b.setAttribute("aria-expanded", document.body.classList.contains("sidebar-open")); })
+      .observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  });
+
+  /* ------------------------------------------------------------- Keyboard shortcuts (every page) */
+  const KEYS = [["←  →", "Previous / next section (lessons) or answered question (practice)"], ["1 – 4", "Answer with option 1–4 (or A – D)"], ["Enter", "Next question"], ["S", "Show the solution (practice) / mark learned (lessons)"], ["M", "Mark a question for review"], ["F", "Bookmark a question"], ["W", "Rough-work pad"], ["Ctrl K", "Find anything"], ["/", "Search the topics list"], ["[", "Hide or show the topics list"], ["T", "Toggle dark mode"], ["G", "Back to top"], ["?", "Show this list"], ["Esc", "Close"]];
+  let sheet = null, sheetFrom = null;
+  function toggleSheet() {
+    if (sheet) { sheet.remove(); sheet = null; if (sheetFrom && sheetFrom.isConnected) sheetFrom.focus(); return; }
+    sheetFrom = document.activeElement;
+    sheet = document.createElement("div");
+    sheet.className = "d-sheet-bg";
+    sheet.innerHTML = `<div class="d-sheet" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" tabindex="-1"><h3>${icon("keyboard")} Keyboard shortcuts</h3><table>${KEYS.map(([k, d]) => `<tr><td>${k.split(/\s+/).map((x) => `<kbd>${x}</kbd>`).join(" ")}</td><td>${d}</td></tr>`).join("")}</table><p class="small muted" style="margin:.8rem 0 0">Shortcuts are ignored while you're typing in a box.</p></div>`;
+    sheet.onclick = (e) => { if (e.target === sheet) toggleSheet(); };
+    document.body.appendChild(sheet);
+    sheet.firstChild.focus();
+  }
+  function initShortcuts() {
+    const typing = (t) => !!(t && ((t.closest && t.closest("input,textarea,select,[contenteditable='true']")) || t.isContentEditable));
+    const navLink = (dir) => {
+      const rows = document.querySelectorAll("#content .btn-row"), row = rows[rows.length - 1];
+      if (!row) return null;
+      return [...row.querySelectorAll("a.btn")].find((a) => dir < 0 ? /^\s*←/.test(a.textContent) && !a.classList.contains("sm") : /→\s*$/.test(a.textContent));
+    };
+    const press = (sel) => { const b = document.querySelector(sel); if (b) { b.click(); return true; } return false; };
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !e.defaultPrevented) {
+        if (sheet) { toggleSheet(); return; }
+        if (document.body.classList.contains("sidebar-open")) { closeDrawer(); const b = document.getElementById("grTopics") || document.getElementById("menuBtn"); b && b.focus(); }
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target) || e.defaultPrevented) return;
+      const k = e.key;
+      if (k === "?") { e.preventDefault(); toggleSheet(); return; }
+      if (sheet) return;
+      if (k === "[") { if (document.getElementById("sidebar")) { e.preventDefault(); toggleTopics(); } return; }
+      if (k === "ArrowLeft" || k === "ArrowRight") {
+        if (e.target.closest && e.target.closest("input[type=range], .viz, .stepper, .st-panel, .sb-resizer")) return;
+        const a = navLink(k === "ArrowLeft" ? -1 : 1);
+        if (a) { e.preventDefault(); a.click(); }
+        return;
+      }
+      const low = k.toLowerCase();
+      if (e.shiftKey && low !== "?") return;
+      if (low === "s") press(".doc-actions [data-act=done]");
+      else if (low === "r") press(".doc-actions [data-act=revise]");
+      else if (low === "b") press(".doc-actions [data-act=star]");
+      else if (low === "t") press("#themeBtn");
+      else if (low === "g") toTop && toTop.click();
+      else if (k === "/") {
+        const q = document.querySelector("#docSearch, #fq, #content input[type=search]");
+        if (q) {
+          e.preventDefault();
+          if (q.id === "docSearch") { if (sbDrawerMode()) document.body.classList.add("sidebar-open"); else if (document.body.classList.contains("sb-closed")) sbSetClosed(false); }
+          q.focus(); q.select();
+        }
+      }
+    });
+  }
+  // registered once the page's own scripts have added theirs, so a page that handles a key itself (and calls preventDefault) wins
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initShortcuts); else initShortcuts();
 
   /* ------------------------------------------------------------- Sticky "Practise this topic" + Back to top */
   let stickyEl = null, stickyHref = "";
@@ -1070,7 +1223,7 @@
     toTop.type = "button"; toTop.className = "to-top"; toTop.hidden = true;
     toTop.setAttribute("aria-label", "Back to top"); toTop.title = "Back to top";
     toTop.innerHTML = icon("up");
-    toTop.onclick = () => window.scrollTo({ top: 0, behavior: document.documentElement.dataset.anim === "on" ? "smooth" : "auto" });
+    toTop.onclick = () => window.scrollTo({ top: 0, behavior: "auto" });
     document.addEventListener("DOMContentLoaded", () => document.body.appendChild(toTop));
     if (document.body) document.body.appendChild(toTop);
     let t = 0;
@@ -1090,8 +1243,13 @@
     const FOLD_KEY = "sbfold:" + kind;
     const getFolds = () => { try { return JSON.parse(localStorage.getItem(FOLD_KEY) || "[]"); } catch (e) { return []; } };
     const setFolds = (f) => { try { localStorage.setItem(FOLD_KEY, JSON.stringify(f)); } catch (e) {} };
-    // click a group title to fold / unfold it (animated in CSS, no re-render)
+    main.addEventListener("click", (e) => { if (e.target.closest(".sb-open")) { sbSetClosed(false); const r = sb.querySelector("#docSearch"); r && r.focus(); } });
+    // click a group title to fold / unfold it (instant, no re-render)
+    sbRestore();
+    sbResizer(sb);
     sb.addEventListener("click", (e) => {
+      if (e.target.closest(".sb-close")) { sbSetClosed(true); const o = main.querySelector(".sb-open"); o && o.focus(); return; }
+      if (e.target.closest("a.item") && sbDrawerMode()) closeDrawer();         // picking a topic closes the drawer (also when it is the current one)
       const t = e.target.closest(".group-title");
       if (!t) return;
       const grp = t.closest(".sb-group"), g = grp.dataset.g, folded = !grp.classList.contains("folded");
@@ -1100,11 +1258,11 @@
     });
 
     const byId = Object.fromEntries(secs.map((s) => [s.id, s]));
-    window.__doc = { secs, kind, byId, title: cfg.title };                // used by assets/fx/fx-sidebar.js for hover previews
+    window.__doc = { secs, kind, byId, title: cfg.title };                
     function sidebar() {
       const total = secs.length, done = secs.filter((s) => Store.item(kind + ":" + s.id).status).length;
       const hashId = (location.hash || "").slice(1), curId = byId[hashId] ? hashId : secs[0].id, ci = secs.findIndex((s) => s.id === curId);
-      let h = `<input type="search" class="search" id="docSearch" placeholder="Search ${cfg.noun || "topics"}…  ( / )" value="${esc(filter)}">
+      let h = `<div class="sb-top"><input type="search" class="search" id="docSearch" placeholder="Search ${cfg.noun || "topics"}…" value="${esc(filter)}"><button type="button" class="sb-close" aria-label="Hide topics" title="Hide topics  ( [ )">${icon("sidebar")}</button></div>
         <div class="sb-progress"><div class="small muted row-between"><span>Progress</span><span>${done}/${total}</span></div><div class="bar"><span style="width:${(done / total) * 100}%"></span></div></div>
         <p class="small muted sb-nomatch empty-state" hidden>No matches.</p>`;
       // the current item and its neighbours read a little stronger; learned items soften and get a small ✓
@@ -1156,6 +1314,7 @@
       const practice = hasPractice ? { href: `practice.html#topic/${kind}/${s.id}`, label: "Practise " + s.title } : null;
       const aopts = Object.assign({}, cfg.actionOpts || {}, practice ? { practice } : {});
       main.innerHTML = `
+        <button type="button" class="btn sb-open" aria-label="Show topics" title="Show topics  ( [ )">${icon("sidebar")} Topics</button>
         <div class="crumbs">${esc(cfg.title || "")}${s.group ? " / " + esc(s.group) : ""}</div>
         <h1>${esc(s.title)}</h1>
         ${s.sub ? `<p class="lead">${fmt(s.sub)}</p>` : ""}
@@ -1187,5 +1346,5 @@
 
   if (document.getElementById("topbar")) topbar(location.pathname.split("/").pop() || "index.html");
 
-  Object.assign(window, { icon, learnSections, soonPage, codeSource: (i) => CODE[i], startStepper, stopStepper, swapLabel, setSwap, $, $$, esc, fmt, hlPy, R, Store, toast, codeBlock, renderBlocks, D, topbar, actionBar, notesBox, DocPage, today, relDay, DAY });
+  Object.assign(window, { stamp, toggleTopics, icon, learnSections, soonPage, codeSource: (i) => CODE[i], startStepper, stopStepper, swapLabel, setSwap, $, $$, esc, fmt, hlPy, R, Store, toast, codeBlock, renderBlocks, D, topbar, actionBar, notesBox, DocPage, today, relDay, DAY });
 })();

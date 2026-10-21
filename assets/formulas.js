@@ -3,7 +3,7 @@
 (function () {
   const SEC_ORDER = ["quant", "reasoning", "verbal", "di"];
   const SEC_NAME = { quant: "Quant", reasoning: "Reasoning", verbal: "Verbal", di: "DI", tables: "Tables" };
-  const SEC_COLOR = { quant: "#FF8AB0", reasoning: "#3DDC84", verbal: "#FFD23F", di: "#8EC5FF", tables: "#FF9F5A" };
+  const SEC_COLOR = { quant: "var(--f-pink)", reasoning: "var(--f-green)", verbal: "var(--f-yellow)", di: "var(--f-blue)", tables: "var(--f-orange)" };
 
   const CSS = `
 #content.ch-page { max-width: 1240px; }
@@ -70,9 +70,6 @@
 .ch-tnote { margin: .6rem 0 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
 .ch-empty, .ch-empty-all { text-align: center; color: var(--muted); padding: 2.5rem 1rem; border: 1px dashed var(--border); border-radius: var(--radius); }
 mark.ch-hl { background: var(--hl); color: #1d1d1f; border-radius: 3px; padding: 0 .06em; }
-[data-anim="on"] .ch-card { transition: border-color .4s ease-out, box-shadow .4s ease-out; }
-[data-anim="on"] .ch-card:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
-[data-anim="on"] .ch-chip, [data-anim="on"] .ch-toc a, [data-anim="on"] .ch-print { transition: background .35s ease-out, color .35s ease-out, border-color .35s ease-out; }
 @media (max-width: 900px) {
   .ch-body { grid-template-columns: minmax(0, 1fr); }
   .ch-toc { display: none; }
@@ -84,29 +81,46 @@ mark.ch-hl { background: var(--hl); color: #1d1d1f; border-radius: 3px; padding:
 .ch-page h2, .ch-page h3, .ch-page h4 { text-transform: none; letter-spacing: 0; }
 .ch-toc h2 { font: 700 12px var(--mono); text-transform: uppercase; letter-spacing: .04em; border: 0; padding: 0; }
 .ch-sechead { text-transform: none; border: 0; padding: 0; }
-.ch-sechead::before { border-radius: 0; width: .7rem; height: .7rem; border: 1.5px solid var(--ink); background: var(--dot); }
-.ch-card { box-shadow: none; border: 2px solid var(--ink); border-radius: 0; }
-.ch-search input { border: 2px solid var(--ink); border-radius: 0; min-height: 44px; box-shadow: none; }
-.ch-search input:focus { border-color: var(--ink); box-shadow: none; outline: 3px solid var(--accent); }
+.ch-sechead::before { border-radius: 0; width: .7rem; height: .7rem; border: 1.5px solid var(--line); background: var(--dot); }
+.ch-card { box-shadow: none; border: 2px solid var(--line); border-radius: 0; }
+.ch-search input { border: 2px solid var(--line-control); border-radius: 0; min-height: 44px; box-shadow: none; }
+.ch-search input:focus { border-color: var(--ink); box-shadow: none; outline: 2px solid var(--ink); }
 .ch-search kbd { border-radius: 0; }
-.ch-chip, .ch-print { border: 2px solid var(--ink); border-radius: 0; box-shadow: none; min-height: 44px; color: var(--text); text-transform: none; letter-spacing: 0; font-weight: 800; transform: none; }
+.ch-chip, .ch-print { border: 2px solid var(--line-control); border-radius: 0; box-shadow: none; min-height: 44px; color: var(--text); text-transform: none; letter-spacing: 0; font-weight: 800; transform: none; }
 .ch-chip:hover, .ch-print:hover { background: var(--panel-2); transform: none; box-shadow: none; }
 .ch-chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .ch-toc a { min-height: 44px; display: flex; align-items: center; border-radius: 0; color: var(--text); }
 .ch-toc a.on { background: var(--ink); color: var(--bg); }
-.ch-tag { border-radius: 0; font-family: var(--mono); font-size: 12px; color: var(--muted); background: none; border: 1.5px solid var(--ink); }
+.ch-tag { border-radius: 0; font-family: var(--mono); font-size: 12px; color: var(--muted); background: none; border: 1.5px solid var(--line); }
 .ch-pr { color: var(--text); min-height: 44px; }
 .ch-f { background: none; border: 0; border-radius: 0; padding: .2rem 0; font-family: var(--mono); }
 .ch-card[data-sec="verbal"] .ch-f { font-family: var(--sans); }
 .ch-note code, .ch-card li code { border-radius: 0; }
 .ch-lists .t h4, .ch-lists .x h4 { color: var(--text); }
 .ch-lists li::before { border-radius: 0; }
-.ch-empty, .ch-empty-all { border-radius: 0; border: 2px dashed var(--ink); }
+.ch-empty, .ch-empty-all { border-radius: 0; border: 2px dashed var(--line); }
 .ch-tbl.zebra-cols td:nth-child(2n) { color: var(--text); font-weight: 700; }
+/* resizable / collapsible table of contents (desktop only; same behaviour as the lesson sidebar) */
+.ch-toc-close, .ch-toc-open, .ch-toc-rz { display: none; }
+@media (min-width: 901px) {
+  html[data-device="desktop"] .ch-body { grid-template-columns: var(--tocw, 216px) minmax(0, 1fr); }
+  html[data-device="desktop"] .ch-toc { grid-column: 1; grid-row: 1; }
+  html[data-device="desktop"] .ch-cards { grid-column: 2; grid-row: 1; }
+  html[data-device="desktop"] .ch-toc-close { display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; margin: 0 0 .6rem auto; background: var(--panel); border: 2px solid var(--line-control); color: var(--text); cursor: pointer; }
+  html[data-device="desktop"] .ch-toc-close:hover { background: var(--panel-2); }
+  .ch-toc-close .ico, .ch-toc-open .ico { width: 20px; height: 20px; }
+  html[data-device="desktop"] .ch-toc-rz { display: block; grid-column: 1; grid-row: 1; justify-self: end; align-self: start; position: sticky; top: var(--top-h, 60px); height: calc(100vh - var(--top-h, 60px)); width: 12px; margin-right: calc(-.8rem - 6px); z-index: 45; cursor: col-resize; touch-action: none; outline: none; }
+  html[data-device="desktop"] .ch-toc-rz::after { content: ""; position: absolute; left: 5px; top: 0; bottom: 0; width: 3px; background: transparent; }
+  html[data-device="desktop"] .ch-toc-rz:hover::after, html[data-device="desktop"] .ch-toc-rz:focus-visible::after, html[data-device="desktop"] .ch-toc-rz.drag::after { background: var(--accent); }
+  html[data-device="desktop"] body.toc-closed .ch-body { grid-template-columns: minmax(0, 1fr); }
+  html[data-device="desktop"] body.toc-closed .ch-toc, html[data-device="desktop"] body.toc-closed .ch-toc-rz { display: none; }
+  html[data-device="desktop"] body.toc-closed .ch-cards { grid-column: 1; }
+  html[data-device="desktop"] body.toc-closed .ch-toc-open { display: inline-flex; align-items: center; gap: .5rem; }
+}
 @media print {
   @page { margin: 12mm; }
   html, body { background: #fff !important; color: #000 !important; }
-  #topbar, .ch-toc, .ch-bar, .ch-pr, .ch-empty, .ch-empty-all, .ch-print, #roughBtn, #roughPad, .rough-btn, .rough-pad, [id^="fx"], .fx-layer, canvas { display: none !important; }
+  #topbar, .ch-toc, .ch-toc-rz, .ch-bar, .ch-pr, .ch-empty, .ch-empty-all, .ch-print, #roughBtn, #roughPad, .rough-btn, .rough-pad, [id^="fx"], .fx-layer, canvas { display: none !important; }
   #content.ch-page { max-width: none; padding: 0; margin: 0; }
   .ch-head { margin-bottom: 6mm; }
   .ch-head h1 { font-size: 18pt; }
@@ -200,9 +214,10 @@ mark.ch-hl { background: var(--hl); color: #1d1d1f; border-radius: 3px; padding:
       <div class="ch-bar">
         <label class="ch-search">${icon("search")}<input id="chQ" type="search" placeholder="Search formulas, rules, topics" autocomplete="off" spellcheck="false" aria-label="Search the cheat sheet"><kbd>/</kbd></label>
         <div class="ch-chips" role="group" aria-label="Section">${chipDefs.map(([k, l]) => `<button type="button" class="ch-chip" data-k="${k}" aria-pressed="${k === "all"}">${l}<i>${counts[k]}</i></button>`).join("")}</div>
+        <button type="button" class="btn ch-toc-open" aria-label="Show topics" title="Show topics  ( [ )">${icon("sidebar")} Topics</button>
         <button type="button" class="ch-print" id="chPrint">${PRINT_ICO}<span>Print</span></button>
       </div>
-      <div class="ch-body"><nav class="ch-toc" aria-label="Topics">${toc}</nav>
+      <div class="ch-body"><nav class="ch-toc" aria-label="Topics"><button type="button" class="ch-toc-close" aria-label="Hide topics" title="Hide topics  ( [ )">${icon("sidebar")}</button>${toc}</nav>
         <div class="ch-cards" id="chCards">${cards}<div class="ch-empty" hidden>Nothing matches that search. Try a shorter word, like "ratio" or "tense".</div>
         ${counts.all ? "" : '<div class="ch-empty-all">No cheat sheet data loaded.</div>'}</div></div>`;
 
@@ -272,6 +287,19 @@ mark.ch-hl { background: var(--hl); color: #1d1d1f; border-radius: 3px; padding:
         es.forEach((en) => { if (en.isIntersecting) { tocEl.querySelectorAll("a.on").forEach((a) => a.classList.remove("on")); const a = tocEl.querySelector(`a[data-card="${en.target.id}"]`); if (a) a.classList.add("on"); } });
       }, { rootMargin: "-90px 0px -70% 0px" });
       cardEls.forEach((c) => io.observe(c));
+    }
+    /* resize handle + collapse / reopen (desktop only), shared helpers from common.js */
+    if (window.SidebarCtl) {
+      const ctl = SidebarCtl.make({ wKey: "apt:tocW", cKey: "apt:tocClosed", cssVar: "--tocw", closedClass: "toc-closed", min: 180, max: 420, def: 216, label: "Resize topics list", resizerClass: "ch-toc-rz" });
+      ctl.restore();
+      ctl.resizer(tocEl);
+      root.querySelector(".ch-toc-close").addEventListener("click", () => { ctl.setClosed(true); const o = root.querySelector(".ch-toc-open"); o && o.focus(); });
+      root.querySelector(".ch-toc-open").addEventListener("click", () => { ctl.setClosed(false); const c = root.querySelector(".ch-toc-close"); c && c.focus(); });
+      document.addEventListener("keydown", (e) => {
+        if (e.key !== "[" || e.ctrlKey || e.metaKey || e.altKey || !SidebarCtl.desktop()) return;
+        const t = e.target; if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+        e.preventDefault(); ctl.toggle();
+      });
     }
     apply();
   }
