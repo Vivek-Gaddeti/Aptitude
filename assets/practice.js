@@ -19,6 +19,7 @@
   const swapLabel = window.swapLabel || ((l, s = 0) => `<span class="swap" data-s="${s}">${l.map((x) => `<span>${x}</span>`).join("")}</span>`);
 
   const SK = "apt:prac:sess", LK = "apt:prac:setup", SPK = "apt:prac:speed";
+  const LSK = "apt:lastSetup", SESK = "apt:session", SLK = "apt:prac:sessL";   // last setup, resumable-session record (read by the dashboard), localStorage mirror of the session
   const DIFFS = ["Easy", "Medium", "Hard"], DCLS = { Easy: "easy", Medium: "med", Hard: "hard" };
   const SEC_VAR = { quant: "--c-quant", reasoning: "--c-reason", verbal: "--c-verbal", di: "--c-di" };
   const SEC_ALL = [["quant", "Quant"], ["reasoning", "Reasoning"], ["verbal", "Verbal"], ["di", "DI"]];
@@ -79,6 +80,10 @@
 
   /* ---------------------------------------------------------------- state */
   let S = ss.get(SK);          // the session (or null)
+  if (!S) {                    // a new tab: pick up a set that was left unfinished in the last 24 h
+    const m = ls.get(SLK);
+    if (m && !m.done && m.items && m.items.length && Date.now() - (m.at || m.started || 0) < 864e5) S = m;
+  }
   let view = "";               // "setup" | "run" | "review"
   let SETUP = null;            // the setup choices shown on screen
   const qc = new Map();
@@ -88,7 +93,16 @@
     qc.set(id, q);
     return q;
   };
-  const persist = () => { if (S) { ss.set(SK, S); syncDaily(); } };
+  const persist = () => {
+    if (S) { ss.set(SK, S); if (!S.done) { S.at = Date.now(); ls.set(SLK, S); } else ls.del(SLK); syncDaily(); }
+    syncResume();
+  };
+  /* apt:session = { route, title, idx (1-based), total, at } while a set is in progress; gone when it ends */
+  function syncResume() {
+    if (S && !S.done && S.items.length && view === "run") ls.set(SESK, { route: S.mode === "daily" ? "daily" : "run", title: sessionLabel(), idx: S.idx + 1, total: S.mode === "drill" ? S.items.length : total(), at: Date.now() });
+    else if (!S || S.done) ls.del(SESK);
+  }
+  const dropSession = () => { S = null; ss.del(SK); ls.del(SLK); ls.del(SESK); };
   const total = () => S.items.length;
   const cur = () => getQ(S.items[S.idx]);
   const isTest = () => S.cfg.feedback === "test";
@@ -105,6 +119,8 @@
     stopTick();
     stopSpeed();
     closeModal(true);
+    POP = null;
+    document.body.classList.remove("in-session");
     const h = (location.hash || "").replace(/^#\/?/, ""), parts = h.split("/");
     main.classList.add("pr");
     document.title = "Practice · " + ((window.SITE && SITE.brand) || "Aptitude Hub");
@@ -135,7 +151,7 @@
   /* ================================================================ SETUP */
   function loadCfg() {
     const d = { sec: "quant", topics: [], patterns: [], diff: DIFFS.slice(), count: 20, source: "mix", feedback: "instant", timing: "target" };
-    return Object.assign(d, ls.get(LK) || {});
+    return Object.assign(d, ls.get(LSK) || ls.get(LK) || {});
   }
   function sanitize(c, ix) {
     const secs = SEC_ALL.map((x) => x[0]).filter((s) => ix.secHas(s));
@@ -158,14 +174,17 @@
     return c;
   }
   function seg(field, opts, val) {
-    return `<div class="pr-segc" role="group">${opts.map(([v, l, dis]) => `<button type="button" class="${String(val) === String(v) ? "on" : ""}" data-act="set" data-f="${field}" data-v="${v}"${dis ? " disabled" : ""}>${l}</button>`).join("")}</div>`;
+    return `<div class="pr-segc" role="group">${opts.map(([v, l, dis]) => `<button type="button" class="${String(val) === String(v) ? "on" : ""}" data-act="set" data-f="${field}" data-v="${v}" aria-pressed="${String(val) === String(v)}"${dis ? " disabled" : ""}>${l}</button>`).join("")}</div>`;
   }
   function patStats(key) {
     const it = Store ? Store.item("pat:" + key) : {};
     return { n: it.n || 0, c: it.c || 0, avg: it.n ? (it.ts || 0) / it.n : 0 };
   }
+  const UI = { pats: false, more: false, why: false };      // which folds on the setup screen are open (survives re-renders)
+  const SRC_L = { bank: "bank", gen: "generated", mix: "bank + generated" }, TIM_L = { none: "untimed", target: "target time per question", total: "total timer" };
   function setupView(pre) {
     view = "setup";
+    document.body.classList.remove("in-session");
     const ix = contentIndex();
     const cfg = sanitize(Object.assign(loadCfg(), pre || {}), ix);
     SETUP = cfg;
@@ -177,41 +196,34 @@
     const nQ = Math.min(cfg.count, avail);
     const live = !!(S && !S.done && S.items.length);
 
-    // sections
+    // 1 · section: segmented buttons, the selected one takes the section colour
     const secChips = SEC_ALL.map(([s]) => {
       const on = ix.secHas(s), sel = s === cfg.sec;
-      return `<button type="button" class="pr-pick sec${sel ? " on" : ""}" style="--sc:var(${SEC_VAR[s]})" data-act="sec" data-v="${s}"${on ? "" : ` disabled title="Coming soon"`}><i></i>${esc(secName(s))}${on ? "" : '<small>soon</small>'}</button>`;
+      return `<button type="button" class="pr-sec${sel ? " on" : ""}" style="--sc:var(${SEC_VAR[s]})" data-act="sec" data-v="${s}" aria-pressed="${sel}"${on ? "" : ` disabled title="Coming soon"`}>${esc(secName(s))}${on ? "" : "<small>soon</small>"}</button>`;
     }).join("");
-    // topics
-    const topicChips = topicsAll.map((t) => {
+    // 2 · topic: chips grouped by catalogue group
+    const groups = [];
+    topicsAll.forEach((t) => { const g = t.group || ""; let G = groups.find((x) => x.name === g); if (!G) groups.push((G = { name: g, list: [] })); G.list.push(t); });
+    const topicChips = groups.map((G) => `<div class="pr-grp">${G.name && groups.length > 1 ? `<div class="pr-lab">${esc(G.name)}</div>` : ""}<div class="pr-picks">${G.list.map((t) => {
       const on = ix.topicHas(cfg.sec, t.id), sel = cfg.topics.includes(t.id);
-      return `<button type="button" class="pr-pick${sel ? " on" : ""}" data-act="topic" data-v="${t.id}"${on ? "" : ` disabled title="Coming soon"`}>${esc(t.title)}</button>`;
-    }).join("");
-    // patterns of the chosen topics
+      return `<button type="button" class="pr-pick${sel ? " on" : ""}" data-act="topic" data-v="${t.id}" aria-pressed="${sel}"${on ? "" : ` disabled title="Coming soon"`}>${esc(t.title)}</button>`;
+    }).join("")}</div></div>`).join("");
+
+    // patterns of the chosen topics (picker + drill links in one list)
     const multiT = cfg.topics.length > 1;
-    const patChips = cfg.topics.map((tid) => {
+    const patTotal = cfg._keys.length, patSel = cfg.patterns.length || patTotal;
+    const patRows = cfg.topics.map((tid) => {
       const t = topicInfo(cfg.sec, tid);
       if (!t) return "";
-      return (multiT ? `<div class="pr-sub">${esc(t.title)}</div>` : "") + `<div class="pr-picks">` + t.patterns.map((p) => {
-        const k = cfg.sec + "/" + tid + "/" + p.id, on = ix.has(k), sel = on && (!cfg.patterns.length || cfg.patterns.includes(k)), b = ix.bank[k];
-        return `<button type="button" class="pr-pick${sel ? " on" : ""}" data-act="pat" data-v="${k}"${on ? "" : " disabled"}>${esc(p.title)}<small>${on ? (b ? b.n : 0) + (ix.gens[k] ? " + gen" : "") : "soon"}</small></button>`;
+      return `<div class="pr-pgrp"><div class="pr-phead"><h3>${esc(t.title)}</h3><a class="pr-learn" href="${learnHref(cfg.sec, tid)}">Learn this topic</a></div>` + t.patterns.map((p) => {
+        const k = cfg.sec + "/" + tid + "/" + p.id, on = ix.has(k), sel = on && (!cfg.patterns.length || cfg.patterns.includes(k)), b = ix.bank[k], st = patStats(k);
+        const acc = st.n ? Math.round((st.c / st.n) * 100) : null;
+        return `<div class="pr-prow${on ? "" : " soon"}"><button type="button" class="pr-pick pr-patb${sel ? " on" : ""}" data-act="pat" data-v="${k}" aria-pressed="${sel}"${on ? "" : " disabled"}>${esc(p.title)}</button>
+          <span class="pr-pmeta">${on ? `${b ? b.n : 0}${ix.gens[k] ? " + gen" : ""} Q${acc == null ? "" : ` · ${acc}% of ${st.n}`}` : "soon"}</span>
+          ${on ? `<a class="pr-drill" href="#drill/${k}">Drill</a>` : '<span></span>'}</div>`;
       }).join("") + `</div>`;
     }).join("");
-    // pattern table
-    const table = cfg.topics.map((tid) => {
-      const t = topicInfo(cfg.sec, tid);
-      if (!t) return "";
-      return `<div class="pr-tbl-wrap">${multiT || true ? `<div class="pr-tbl-h"><b>${esc(t.title)}</b><a class="btn sm" href="${learnHref(cfg.sec, tid)}">${ic("book")} Learn this topic</a></div>` : ""}
-        <table class="pr-table"><thead><tr><th>Pattern</th><th>Bank (E / M / H)</th><th>Accuracy</th><th>Avg time</th><th></th></tr></thead><tbody>` + t.patterns.map((p) => {
-        const k = cfg.sec + "/" + tid + "/" + p.id, b = ix.bank[k], g = ix.gens[k], st = patStats(k), on = ix.has(k);
-        const acc = st.n ? Math.round((st.c / st.n) * 100) : null;
-        return `<tr class="${on ? "" : "soon"}"><td class="pn">${esc(p.title)}${g ? ' <span class="pr-tag">gen</span>' : ""}</td>
-          <td class="num">${b ? `${b.Easy} / ${b.Medium} / ${b.Hard}` : on ? "0" : "-"}</td>
-          <td>${acc == null ? '<span class="muted">-</span>' : `<span class="pr-mini"><i style="width:${acc}%"></i></span> ${acc}% <span class="muted small">(${st.n})</span>`}</td>
-          <td class="num">${st.n ? mmss(st.avg) : "-"}</td>
-          <td class="act">${on ? `<a class="btn sm" href="#drill/${k}">Drill</a>` : '<span class="muted small">soon</span>'}</td></tr>`;
-      }).join("") + `</tbody></table></div>`;
-    }).join("");
+    const topicLbl = cfg.topics.length === 1 ? topicTitle(cfg.sec, cfg.topics[0]) : cfg.topics.length + " topics";
 
     const resume = live
       ? `<div class="pr-card pr-resume"><div><b>Set in progress</b><div class="muted small">${esc(sessionLabel())} · question ${S.idx + 1}${S.mode === "drill" ? "" : " of " + total()} · ${answeredCount()} answered</div></div>
@@ -227,64 +239,49 @@
     if (!bankN && !genN) hint.push("Nothing matches these choices.");
 
     main.innerHTML = `
-      <div class="pr-enter">
+      <div class="pr-enter pr-setupwrap">
       <h1 class="pr-h1">Practice</h1>
-      <p class="lead">Choose what to practise, then start. Every answer you give is remembered, so the weak spots find you.</p>
-      ${tilesHTML(ix)}
+      <p class="lead">Pick a topic and start. Every answer is remembered, so your weak spots find you.</p>
+      ${quickHTML(ix)}
       ${resume}
-      <div class="pr-setup">
-        <div class="pr-card pr-build">
-          <div class="pr-field"><h5>Section</h5><div class="pr-picks">${secChips}</div></div>
-          <div class="pr-field"><h5>Topics <small>pick one or more</small></h5><div class="pr-picks">${topicChips || '<span class="muted">No topics yet.</span>'}</div></div>
-          <div class="pr-field"><h5>Patterns <small>${cfg.patterns.length ? cfg.patterns.length + " chosen" : "all"}</small>${cfg.patterns.length ? '<button type="button" class="pr-link" data-act="pat-all">Select all</button>' : ""}</h5>${patChips || '<span class="muted">Choose a topic first.</span>'}</div>
-          <div class="pr-row">
-            <div class="pr-field"><h5>Difficulty</h5><div class="pr-picks">${DIFFS.map((d) => `<button type="button" class="pr-pick d-${DCLS[d]}${cfg.diff.includes(d) ? " on" : ""}" data-act="diff" data-v="${d}">${d}</button>`).join("")}</div></div>
-            <div class="pr-field"><h5>Questions</h5>${seg("count", [[10, "10"], [20, "20"], [30, "30"]], cfg.count)}</div>
-          </div>
-          <div class="pr-row">
-            <div class="pr-field"><h5>Source</h5>${seg("source", [["bank", "Bank"], ["gen", "Generated"], ["mix", "Mix"]], cfg.source)}</div>
-            <div class="pr-field"><h5>Feedback</h5>${seg("feedback", [["instant", "Instant"], ["test", "Test"]], cfg.feedback)}</div>
-          </div>
-          <div class="pr-field"><h5>Timing</h5>${seg("timing", [["none", "Untimed"], ["target", "Target per question"], ["total", "Total timer"]], cfg.timing)}</div>
-          ${hint.length ? `<p class="pr-hint">${ic("bulb")} ${esc(hint.join(" "))}</p>` : ""}
-        </div>
-        <aside class="pr-side"><div class="pr-card pr-start">
-          <h5>Your set</h5>
-          <div class="pr-big"><b>${nQ}</b><span>question${nQ === 1 ? "" : "s"}</span></div>
-          <ul class="pr-sum">
-            <li>${esc(secName(cfg.sec))} · ${cfg.topics.length} topic${cfg.topics.length === 1 ? "" : "s"}</li>
-            <li>${cfg.patterns.length || cfg._keys.length} pattern${(cfg.patterns.length || cfg._keys.length) === 1 ? "" : "s"} · ${cfg.diff.length === 3 ? "all levels" : cfg.diff.join(", ")}</li>
-            <li>${bankN} in the bank${genN ? " + unlimited generated" : ""}</li>
-            <li>${cfg.feedback === "instant" ? "Answers explained as you go" : "Test: results at the end"} · ${cfg.timing === "none" ? "untimed" : cfg.timing === "target" ? "target per question" : "total timer"}</li>
-          </ul>
-          <button class="btn primary pr-go" data-act="start"${nQ ? "" : " disabled"}>Start <kbd>Enter</kbd></button>
-        </div></aside>
-      </div>
-      <div class="pr-card pr-patcard"><h5>Patterns in ${cfg.topics.length > 1 ? "these topics" : esc(cfg.topics.length ? topicTitle(cfg.sec, cfg.topics[0]) : "this topic")}</h5>${table || '<p class="muted">Pick a topic to see its patterns.</p>'}</div>
-      </div>`;
+      <div class="pr-card pr-build">
+        <div class="pr-field"><h2 class="pr-step"><span>1</span> Section</h2><div class="pr-secs" role="group" aria-label="Section">${secChips}</div></div>
+        <div class="pr-field"><h2 class="pr-step"><span>2</span> Topic <small>pick one or more</small></h2>${topicChips || '<span class="muted">No topics yet.</span>'}</div>
+        <details class="pr-fold" id="prPats"${UI.pats ? " open" : ""}><summary>Patterns: ${cfg.patterns.length ? `${patSel} of ${patTotal}` : `all ${patTotal}`} in ${esc(multiT ? "these topics" : topicLbl)}</summary>
+          <div class="pr-foldbody">${cfg.patterns.length ? '<button type="button" class="pr-link" data-act="pat-all">Select all patterns</button>' : ""}${patRows || '<p class="muted">Pick a topic first.</p>'}</div></details>
+        <details class="pr-fold" id="prMore"${UI.more ? " open" : ""}><summary>More options</summary>
+          <div class="pr-foldbody pr-opts-grid">
+            <div class="pr-field"><div class="pr-lab">Difficulty</div><div class="pr-picks">${DIFFS.map((d) => `<button type="button" class="pr-pick d-${DCLS[d]}${cfg.diff.includes(d) ? " on" : ""}" data-act="diff" data-v="${d}" aria-pressed="${cfg.diff.includes(d)}">${d}</button>`).join("")}</div></div>
+            <div class="pr-field"><div class="pr-lab">Questions</div>${seg("count", [[10, "10"], [20, "20"], [30, "30"]], cfg.count)}</div>
+            <div class="pr-field"><div class="pr-lab">Source</div>${seg("source", [["bank", "Bank"], ["gen", "Generated"], ["mix", "Mix"]], cfg.source)}</div>
+            <div class="pr-field"><div class="pr-lab">Feedback</div>${seg("feedback", [["instant", "Instant"], ["test", "Test"]], cfg.feedback)}</div>
+            <div class="pr-field"><div class="pr-lab">Timing</div>${seg("timing", [["none", "Untimed"], ["target", "Target per question"], ["total", "Total timer"]], cfg.timing)}</div>
+          </div></details>
+        ${hint.length ? `<p class="pr-hint">${ic("bulb")} ${esc(hint.join(" "))}</p>` : ""}
+        <div class="pr-sumbar"><div class="pr-sumtxt"><b>${nQ} question${nQ === 1 ? "" : "s"} · ${esc(topicLbl)}</b>
+          <span>${cfg.diff.length === 3 ? "All levels" : esc(cfg.diff.join(", "))} · ${SRC_L[cfg.source]} · ${cfg.feedback === "instant" ? "instant feedback" : "test mode"} · ${TIM_L[cfg.timing]}</span></div>
+          <button class="btn primary pr-go" data-act="start"${nQ ? "" : " disabled"}>Start <kbd>Enter</kbd></button></div>
+      </div></div>`;
   }
-  /* quick-start tiles above the builder: daily set, speed drill, mock tests, weakest pattern */
+  /* quick-start row: three flat buttons, plus the weakest pattern as one muted line once there is data */
   function weakPatterns(ix) {
     const items = Store ? Store.load().items : {};
     return Object.keys(items).filter((k) => k.indexOf("pat:") === 0 && (items[k].n || 0) >= 3 && ix.has(k.slice(4)))
       .map((k) => ({ k: k.slice(4), n: items[k].n, acc: (items[k].c || 0) / items[k].n }))
       .sort((a, b) => a.acc - b.acc || b.n - a.n);
   }
-  function tilesHTML(ix) {
+  function quickHTML(ix) {
     const D = dailyMeta(), streak = Store && Store.streak ? Store.streak() : 0;
     const dAns = D ? Object.keys(D.ans || {}).length : 0, dN = D ? D.ids.length : 20;
-    const dState = !D ? "20 questions, built fresh today" : D.done ? `Done today · ${D.ok || 0} / ${dN} right` : dAns ? `${dAns} / ${dN} answered · continue` : "Ready · 20 questions";
+    const dState = !D ? "20 questions, fresh today" : D.done ? `Done today · ${D.ok || 0} / ${dN} right` : dAns ? `${dAns} / ${dN} answered · continue` : "20 questions";
     const sp = speedMeta(), bestMode = SPEED_MODES.map((m) => [m, sp.best[m[0]] || 0]).sort((a, b) => b[1] - a[1])[0];
-    const weak = weakPatterns(ix).filter((p) => p.acc < 1)[0];
-    const wk = weak ? weak.k.split("/") : null;
-    const tile = (href, cls, icn, title, sub, state, extra) => `<a class="pr-tile ${cls}" href="${href}"${extra || ""}><span class="ti">${ic(icn)}</span><span class="tb"><b>${title}</b><small>${sub}</small><em>${state}</em></span></a>`;
-    return `<div class="pr-tiles">
-      ${tile("#daily", "t-daily" + (D && D.done ? " done" : ""), D && D.done ? "check-circle" : "calendar", "Daily set", "Weak spots, reviews and new questions", esc(dState) + (streak ? ` <span class="pr-streak">${ic("flame")}${streak}</span>` : ""))}
-      ${tile("#speed", "t-speed", "bolt", "Speed drill", "60 seconds of mental maths", bestMode && bestMode[1] ? `Best ${bestMode[1]} · ${esc(bestMode[0][1])}` : "Set your first score")}
-      ${tile("mock.html", "t-mock", "timer", "Mock tests", "Company-style timed papers", "TCS, Infosys, AMCAT and more")}
-      ${weak ? tile("#drill/" + weak.k, "t-weak", "target", "Weakest pattern", esc(patTitle(wk[0], wk[1], wk[2])), `${Math.round(weak.acc * 100)}% over ${weak.n} answers`)
-        : `<div class="pr-tile t-weak off"><span class="ti">${ic("target")}</span><span class="tb"><b>Weakest pattern</b><small>A drill on your lowest-accuracy pattern</small><em>Unlocks after a few answers</em></span></div>`}
-    </div>`;
+    const weak = weakPatterns(ix).filter((p) => p.acc < 1)[0], wk = weak ? weak.k.split("/") : null;
+    const q = (href, icn, title, sub) => `<a class="pr-quick" href="${href}"><span class="qi">${ic(icn)}</span><span class="qb"><b>${title}</b><small>${sub}</small></span></a>`;
+    return `<div class="pr-quicks">
+      ${q("#daily", D && D.done ? "check-circle" : "calendar", "Daily set", esc(dState) + (streak ? ` · ${streak}-day streak` : ""))}
+      ${q("#speed", "bolt", "Speed drill", bestMode && bestMode[1] ? `60 s · best ${bestMode[1]}` : "60 seconds of mental maths")}
+      ${q("mock.html", "timer", "Mock tests", "Timed company papers")}
+    </div>${weak ? `<p class="pr-weak">Weakest pattern: <b>${esc(patTitle(wk[0], wk[1], wk[2]))}</b> at ${Math.round(weak.acc * 100)}% over ${weak.n} answers. <a href="#drill/${weak.k}">Drill it</a></p>` : ""}`;
   }
 
   function setupChange(act, v, el) {
@@ -305,7 +302,7 @@
       c.diff = d.length ? d : c.diff;
     } else if (act === "set") c[el.dataset.f] = el.dataset.f === "count" ? +v : v;
     const out = Object.assign({}, c); delete out._keys;
-    ls.set(LK, out);
+    ls.set(LSK, out);
     setupView();
   }
 
@@ -349,6 +346,7 @@
     const items = buildItems(cfg);
     if (!items.length) { toast("Nothing matches those choices yet"); return; }
     const out = Object.assign({}, cfg, { label: "Topic practice" }); delete out._keys;
+    ls.set(LSK, Object.assign({}, cfg, { _keys: undefined }));
     newSession({ mode: "topic", cfg: out, items });
     go("run");
   }
@@ -547,6 +545,7 @@
 
   function playerView() {
     view = "run";
+    document.body.classList.add("in-session");
     S.idx = clamp(S.idx, 0, total() - 1);
     S.far = Math.max(S.far || 0, S.idx);
     resume();
@@ -558,6 +557,7 @@
     if (!S || view !== "run") return;
     const y = window.scrollY;
     main.innerHTML = playerHTML(fresh);
+    applyPop();
     if (fresh) {
       const q = cur();
       if (window.RoughPad && RoughPad.setContext) RoughPad.setContext(q.id);
@@ -568,11 +568,7 @@
   }
   const modeName = () => (S.cfg.label || (S.mode === "drill" ? "Pattern drill" : "Topic practice"));
 
-  function timerHTML() {
-    return `<div class="pr-timer" id="prTimer"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="14" fill="none" stroke="var(--panel-2)" stroke-width="4"/>
-      <circle id="prRing" cx="18" cy="18" r="14" fill="none" stroke="var(--page-c, var(--accent))" stroke-width="4" stroke-linecap="round" stroke-dasharray="${RING}" stroke-dashoffset="${RING}" transform="rotate(-90 18 18)"/></svg>
-      <span class="t" id="prT">0:00</span><span class="tg" id="prTg"></span></div>`;
-  }
+  const clockHTML = () => `<span class="pr-clock" data-clock title="Your time / target"><b class="t">0:00</b><span class="tg"></span></span>`;
   function segHTML() {
     const n = total();
     if (S.mode === "drill") {
@@ -589,93 +585,103 @@
     return a.c == null ? (a.rev || a.skip ? "s" : "") : a.ok ? "c" : "w";
   }
   function crumbHTML(q) {
-    return `<span class="pr-chip sec" style="--sc:var(${SEC_VAR[q.sec] || "--accent"})">${esc(secName(q.sec))}</span><b>${esc(topicTitle(q.sec, q.topic))}</b> <span class="sep">›</span> ${esc(patTitle(q.sec, q.topic, q.pattern))} <span class="pr-chip ${DCLS[q.d] || "med"}">${esc(q.d)}</span>`;
+    return `<span class="pr-chip sec" style="--sc:var(${SEC_VAR[q.sec] || "--accent"})">${esc(secName(q.sec))}</span><span class="sep">›</span><span class="ct">${esc(topicTitle(q.sec, q.topic))}</span><span class="sep">›</span><span class="cp">${esc(patTitle(q.sec, q.topic, q.pattern))}</span>`;
   }
+  const isTouch = () => { try { return matchMedia("(pointer: coarse)").matches; } catch (e) { return false; } };
 
   function playerHTML(fresh) {
     const q = cur(), i = S.idx, n = total(), a = S.ans[i] || null;
-    const test = isTest(), drill = S.mode === "drill";
+    const test = isTest(), drill = S.mode === "drill", daily = S.mode === "daily";
     const answered = !!(a && a.c != null), revealed = !!(a && a.rev), fb = !test && (answered || revealed);
     const set = q.set && QB.sets[q.set] ? QB.sets[q.set] : null;
     const it = qItem(q), starred = !!it.star, marked = !!S.mark[i];
+    const done = answered || revealed || !!(a && a.skip);
 
     const opts = q.opts.map((o, k) => {
-      let cls = "", mk = "", why = "";
+      let cls = "", tag = "";
       if (fb) {
-        if (k === q.ans) { cls = "ok"; mk = ic("check", "mk"); }
-        else if (answered && a.c === k) { cls = "bad"; mk = ic("x", "mk"); }
+        if (k === q.ans) { cls = "ok"; tag = "Correct ✓"; }
+        else if (answered && a.c === k) { cls = "bad"; tag = "Your answer ×"; }
         else cls = "dim";
-        if (k !== q.ans && q.why && q.why[k]) why = `<span class="why">${fmt(q.why[k])}</span>`;
       } else if (test && answered && a.c === k) cls = "sel";
-      return `<button type="button" class="pr-opt ${cls}" data-act="opt" data-i="${k}"><span class="k">${LET[k]}</span><span class="v">${fmt(o)}</span>${why}${mk}</button>`;
+      return `<button type="button" class="pr-opt ${cls}" data-act="opt" data-i="${k}"${fb ? ` aria-disabled="true"` : ""}><span class="k">${LET[k]}</span><span class="v">${fmt(o)}</span>${tag ? `<span class="tag">${tag}</span>` : ""}</button>`;
     }).join("");
+    const after = fb ? afterHTML(q, a, answered, it) : "";
 
-    let after = "";
-    if (fb) after = feedbackHTML(q, a, answered);
-
-    // actions
+    // bottom row: quiet tools on the left, the one primary on the right
     const last = !drill && i >= n - 1;
-    const nextBtn = `<button class="btn primary" data-act="next"${!test && !(answered || revealed || (a && a.skip)) ? " disabled" : ""}>${swapLabel([test && last ? "Finish" : last ? "Finish" : "Next", "Finish"], last ? 1 : 0)} <kbd>Enter</kbd></button>`;
-    let acts;
-    if (test) {
-      acts = `<button class="btn" data-act="prev"${i === 0 ? " disabled" : ""}>${ic("back")} Previous</button>
-        ${answered ? `<button class="btn" data-act="clear">Clear answer</button>` : ""}<span class="grow"></span>${nextBtn}`;
-    } else if (!(answered || revealed)) {
-      acts = `<button class="btn" data-act="reveal">Show solution <kbd>S</kbd></button><button class="btn" data-act="skip">Skip</button><span class="grow"></span>${nextBtn}`;
-    } else {
-      const wrong = revealed || (answered && !a.ok), inBook = it.status === "revise";
-      const hasSol = !!((q.sol && q.sol.length) || q.short || q.trap);
-      acts = `${hasSol ? `<button class="btn" data-act="sol">${swapLabel(["Hide solution <kbd>S</kbd>", "Show solution <kbd>S</kbd>"], S.showSol ? 0 : 1)}</button>` : ""}
-        ${wrong ? `<button class="btn${inBook ? " on-red" : ""}" data-act="book">${swapLabel(["Add to mistake book", "In mistake book"], inBook ? 1 : 0)}</button>` : ""}
-        ${drill ? "" : `<a class="btn" href="#drill/${pk(q)}" data-act="drill">Drill this pattern</a>`}<span class="grow"></span>${nextBtn}`;
-    }
+    const nextBtn = `<button class="btn primary pr-next" data-act="next"${!test && !done ? " disabled" : ""}>${swapLabel([last ? "Finish" : "Next", "Finish"], last ? 1 : 0)} <kbd>Enter</kbd></button>`;
+    const tools = `<button type="button" class="pr-icon${starred ? " on" : ""}" data-act="star" title="Bookmark (F)" aria-label="Bookmark" aria-pressed="${starred}">${ic(starred ? "star-fill" : "star")}</button>
+      <button type="button" class="pr-icon${marked ? " mk" : ""}" data-act="mark" title="Mark for review (M)" aria-label="Mark for review" aria-pressed="${marked}">${ic("flag")}</button>
+      <button type="button" class="pr-icon" data-act="pop" data-v="keys" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" aria-expanded="false"><b>?</b></button>`;
+    let quiet = "";
+    if (test) quiet = `<button class="pr-quiet" data-act="prev"${i === 0 ? " disabled" : ""}>${ic("back")} Previous</button>${answered ? `<button class="pr-quiet" data-act="clear">Clear answer</button>` : ""}`;
+    else if (!done) quiet = `<button class="pr-quiet" data-act="reveal">Show solution <kbd>S</kbd></button><button class="pr-quiet" data-act="skip">Skip</button>`;
+    const acts = `<div class="pr-actions"><div class="pr-tools">${tools}${quiet}</div><span class="grow"></span>${nextBtn}${keysPopHTML()}</div>`;
 
-    const head = `<div class="pr-qhead"><span class="pr-qno">Q${i + 1}</span><span class="pr-pat">Pattern: <b>${esc(patTitle(q.sec, q.topic, q.pattern))}</b></span><span class="grow"></span>
-      <button class="pr-icon${starred ? " on" : ""}" data-act="star" title="Bookmark (F)" aria-label="Bookmark">${ic(starred ? "star-fill" : "star")}</button>
-      <button class="pr-icon${marked ? " mk" : ""}" data-act="mark" title="Mark for review (M)" aria-label="Mark for review">${ic("flag")}</button></div>`;
-    const qcard = (extraTop, small) => `<div class="pr-card pr-qcard${fb ? " answered" : ""}${test ? " test" : ""}" id="prQ">${extraTop || ""}${head}
-        <div class="pr-qtext${small ? " sm" : ""}">${body(q.q)}</div><div class="pr-opts">${opts}</div>${after}<div class="pr-actions">${acts}</div></div>`;
+    const qcard = `<div class="pr-card pr-qcard${fb ? " answered" : ""}${test ? " test" : ""}" id="prQ">
+        <div class="pr-patline">${esc(topicTitle(q.sec, q.topic))} › ${esc(patTitle(q.sec, q.topic, q.pattern))}</div>
+        <div class="pr-qbody2"><div class="pr-qtext">${body(q.q)}</div><div class="pr-opts" role="group" aria-label="Options">${opts}</div></div></div>`;
 
-    // session bar
+    // thin header
     const prog = drill ? `Q <b>${i + 1}</b>` : `Q <b>${i + 1}</b> / ${n}`;
-    const lvl = drill ? `<span class="pr-chip lvl">Level <b>${S.drill.d}</b></span>` : "";
-    const daily = S.mode === "daily";
-    const bar = `<div class="pr-sbar"><button type="button" class="pr-back" data-act="end">${ic("back")} ${daily ? "Save and exit" : "End session"}</button>
-      <div class="pr-crumb">${crumbHTML(q)}</div><span class="grow"></span>${lvl}
-      ${daily ? dailyChip() : `<span class="pr-chip mode">${esc(modeName())} · ${test ? "Test" : "Instant"}</span>`}${timerHTML()}<span class="pr-qcount">${prog}</span></div>
+    const curD = drill ? S.drill.d : q.d;
+    const head = `<div class="pr-top"><button type="button" class="pr-back" data-act="end">${ic("back")} ${daily ? "Save and exit" : "End"}</button>
+      <div class="pr-crumb">${crumbHTML(q)} <span class="pr-chip ${DCLS[curD] || "med"}">${esc(curD)}</span></div><span class="grow"></span>
+      <span class="pr-qcount">${prog}</span>${clockHTML()}
+      <button type="button" class="pr-back pr-sesbtn" data-act="pop" data-v="session" aria-expanded="false">Session ${ic("chevron")}</button>${sessionPopHTML()}</div>
       <div class="pr-seg${drill ? " drill" : ""}">${segHTML()}</div>`;
 
     let mainCol;
     if (set) {
       const sibs = S.items.map((id, k) => [id, k]).filter(([id]) => getQ(id).set === q.set), pos = sibs.findIndex(([, k]) => k === i);
-      const nav = `<div class="pr-setnav">Set question ${pos + 1} of ${sibs.length} ${sibs.map(([, k]) => `<i class="${k === i ? "cur" : S.ans[k] && S.ans[k].c != null ? (test ? "c" : S.ans[k].ok ? "c" : "w") : ""}"></i>`).join("")}</div>`;
-      mainCol = `<div class="pr-split"><div class="pr-card pr-stim"><span class="pr-pin">${ic("pin")}stays in view</span>${QB.setHTML(set)}</div>${qcard(nav, true)}</div>
-        <div class="pr-card pr-strip"><h5>Questions</h5>${paletteHTML()}${legendHTML()}</div>`;
-    } else {
-      mainCol = `<div class="pr-grid"><div class="pr-main">${qcard()}</div>${railHTML()}</div>`;
-    }
-    return `<div class="${fresh ? "pr-enter" : ""}">${bar}${mainCol}</div>`;
+      const nav = `<div class="pr-setnav">Question ${pos + 1} of ${sibs.length} in this set ${sibs.map(([, k]) => `<i class="${k === i ? "cur" : S.ans[k] && S.ans[k].c != null ? (test ? "c" : S.ans[k].ok ? "c" : "w") : ""}"></i>`).join("")}</div>`;
+      mainCol = `<div class="pr-split"><div class="pr-card pr-stim"><span class="pr-pin">${ic("pin")}stays in view</span>${QB.setHTML(set)}</div><div class="pr-col">${nav}${qcard}${after}${acts}</div></div>`;
+    } else mainCol = `<div class="pr-col">${qcard}${after}${acts}</div>`;
+
+    // tablet thumb rail (CSS shows it only when html[data-device="tablet"])
+    const sc = isTest() ? null : scoreOf();
+    const rail = `<aside class="session-rail" aria-label="Session controls">
+        <div class="sr-top"><button type="button" class="sr-btn sr-end" data-act="end">${daily ? "Save + exit" : "End"}</button>
+          <div class="sr-q">Q <b>${i + 1}</b>${drill ? "" : ` / ${n}`}</div>${clockHTML()}</div>
+        <div class="sr-tools">
+          ${test ? "" : `<button type="button" class="sr-btn" data-act="skey"><span>Solution</span><kbd>S</kbd></button>`}
+          <button type="button" class="sr-btn${marked ? " on" : ""}" data-act="mark" aria-pressed="${marked}"><span>Mark</span><kbd>M</kbd></button>
+          <button type="button" class="sr-btn${starred ? " on" : ""}" data-act="star" aria-pressed="${starred}"><span>Bookmark</span><kbd>F</kbd></button>
+          <button type="button" class="sr-btn" data-act="rough"><span>Rough work</span><kbd>W</kbd></button>
+          <button type="button" class="sr-btn" data-act="pop" data-v="session"><span>Session</span>${sc ? `<kbd>${sc.ok}/${sc.n}</kbd>` : ""}</button>
+        </div>
+        <button type="button" class="btn primary sr-next" data-act="next"${!test && !done ? " disabled" : ""}>${last ? "Finish" : "Next"}</button>
+      </aside>`;
+    return `<div class="${fresh ? "pr-enter " : ""}pr-play${set ? " wide" : ""}">${head}${mainCol}</div>${rail}`;
   }
 
-  function feedbackHTML(q, a, answered) {
+  function afterHTML(q, a, answered, it) {
     const secs = a.secs != null ? a.secs : S.tq[S.idx] || 0, tgt = q.time || 60, d = secs - tgt;
+    const timeLine = `Your time <b class="${d > 0 ? "over" : ""}">${mmss(secs)}</b> / target ${mmss(tgt)}${S.cfg.timing === "none" ? "" : d > 0 ? ` <span class="over">(${Math.round(d)} s over)</span>` : ` (${Math.round(-d)} s under)`}`;
+    const rushed = answered && !a.ok && secs > 0 && secs < tgt * 0.3 ? `<div class="pr-rushed">Answered in ${Math.max(1, Math.round(secs))} s. Rushed? Read the question once more before choosing.</div>` : "";
     let res;
-    const timeLine = `Your time <b class="${d > 0 ? "over" : ""}">${mmss(secs)}</b> · target ${mmss(tgt)}${S.cfg.timing === "none" ? "" : d > 0 ? ` · <b class="over">${Math.round(d)} s over</b>` : ` · ${Math.round(-d)} s under`}`;
-    const rushed = answered && !a.ok && secs > 0 && secs < tgt * 0.3 ? `<div class="pr-rushed">${ic("timer")} Answered in ${Math.max(1, Math.round(secs))} s. Rushed? Try reading the question once more before choosing.</div>` : "";
-    if (answered && a.ok) {
-      res = `<div class="pr-result ok"><span class="pr-ri">${ic("check-circle")}</span><div><div class="big">Correct</div><div class="tm">${timeLine}</div></div></div>`;
-    } else if (answered) {
-      res = `<div class="pr-result bad"><span class="pr-ri">${ic("x")}</span><div><div class="big">Not quite. It's ${LET[q.ans]}, ${fmt(q.opts[q.ans])}</div><div class="tm">${timeLine}</div>${rushed}</div>
-        <div class="pr-reasons">Why missed?${REASONS.map(([v, l]) => `<button type="button" class="${a.why === v ? "on" : ""}" data-act="why" data-v="${v}">${l}</button>`).join("")}</div></div>`;
-    } else {
-      res = `<div class="pr-result skip"><span class="pr-ri">${ic("bulb")}</span><div><div class="big">Solution shown. It's ${LET[q.ans]}, ${fmt(q.opts[q.ans])}</div><div class="tm">This one isn't counted. Try it again later.</div></div></div>`;
-    }
+    if (answered && a.ok) res = `<div class="pr-res ok"><b>Correct</b><span class="tm">${timeLine}</span></div>`;
+    else if (answered) res = `<div class="pr-res bad"><b>Not quite. It is ${LET[q.ans]}, ${fmt(q.opts[q.ans])}</b><span class="tm">${timeLine}</span>${rushed}</div>`;
+    else res = `<div class="pr-res skip"><b>Solution shown. It is ${LET[q.ans]}, ${fmt(q.opts[q.ans])}</b><span class="tm">Not counted. Try it again later.</span></div>`;
+    const hasSol = !!((q.sol && q.sol.length) || q.short || q.trap);
     let sol = "";
-    if (S.showSol && ((q.sol && q.sol.length) || q.short || q.trap)) {
-      sol = `<div class="pr-sol"><h4>${ic("solution")} Solution</h4>${q.sol && q.sol.length ? `<ol>${q.sol.map((s) => `<li>${fmt(s)}</li>`).join("")}</ol>` : ""}
-        ${q.short || q.trap ? `<div class="pr-boxes${q.short && q.trap ? "" : " one"}">${q.short ? `<div class="pr-box tip"><div class="lb">${ic("bolt")} Shortcut</div>${fmt(q.short)}</div>` : ""}${q.trap ? `<div class="pr-box trap"><div class="lb">${ic("warn")} Trap</div>${fmt(q.trap)}</div>` : ""}</div>` : ""}</div>`;
+    if (S.showSol && hasSol) {
+      sol = `${q.sol && q.sol.length ? `<ol class="pr-steps">${q.sol.map((s) => `<li>${fmt(s)}</li>`).join("")}</ol>` : ""}${q.short ? `<div class="pr-box tip"><div class="lb">Shortcut</div>${fmt(q.short)}</div>` : ""}`;
     }
-    return res + sol;
+    // why the other options are tempting (per-option reasons + the trap), folded
+    const whys = q.opts.map((o, k) => (k !== q.ans && q.why && q.why[k] ? `<li><b>${LET[k]}</b> ${fmt(q.why[k])}</li>` : "")).join("");
+    const tempt = S.showSol && (whys || q.trap)
+      ? `<details class="pr-fold pr-tempt" id="prWhy"${UI.why ? " open" : ""}><summary>Why the other options are tempting</summary><div class="pr-foldbody">${whys ? `<ul class="pr-whys">${whys}</ul>` : ""}${q.trap ? `<div class="pr-box trap"><div class="lb">Trap</div>${fmt(q.trap)}</div>` : ""}</div></details>` : "";
+    const reasons = answered && !a.ok
+      ? `<div class="pr-reasons"><span>Why missed?</span>${REASONS.map(([v, l]) => `<button type="button" class="${a.why === v ? "on" : ""}" data-act="why" data-v="${v}" aria-pressed="${a.why === v}">${l}</button>`).join("")}</div>` : "";
+    const wrong = !answered || !a.ok, inBook = it.status === "revise";
+    const foot = [
+      hasSol ? `<button type="button" class="pr-quiet" data-act="sol">${S.showSol ? "Hide" : "Show"} solution <kbd>S</kbd></button>` : "",
+      wrong ? `<button type="button" class="pr-quiet${inBook ? " on" : ""}" data-act="book">${inBook ? "In mistake book" : "Add to mistake book"}</button>` : "",
+      S.mode === "drill" ? "" : `<a class="pr-quiet" href="#drill/${pk(q)}" data-act="drill">Drill this pattern</a>`,
+    ].join("");
+    return `<div class="pr-card pr-after" role="status">${res}${sol}${tempt}${reasons}<div class="pr-afoot">${foot}</div></div>`;
   }
 
   function paletteHTML() {
@@ -689,66 +695,78 @@
       if (i === S.idx) c += " cur";
       if (S.mark[i]) c += " m";
       const lock = !test && i > S.far;
-      h += `<button type="button" class="${c}" data-act="go" data-i="${i}"${lock ? " disabled" : ""} title="Question ${i + 1}">${i + 1}</button>`;
+      h += `<button type="button" class="${c}" data-act="go" data-i="${i}"${lock ? " disabled" : ""} title="Question ${i + 1}" aria-label="Question ${i + 1}">${i + 1}</button>`;
     }
     return `<div class="pr-pal">${h}</div>`;
   }
   function legendHTML() {
     return isTest()
-      ? `<div class="pr-legend"><span><i style="background:var(--accent-soft);border:1px solid var(--accent)"></i>answered</span><span><i style="background:var(--purple);border-radius:50%"></i>marked</span><span><i style="border:1px solid var(--border)"></i>not answered</span></div>`
-      : `<div class="pr-legend"><span><i style="background:var(--green)"></i>correct</span><span><i style="background:var(--red)"></i>wrong</span><span><i style="background:var(--purple);border-radius:50%"></i>marked</span><span><i style="border:1px solid var(--border)"></i>not seen</span></div>`;
+      ? `<div class="pr-legend"><span><i class="lg-a"></i>answered</span><span><i class="lg-m"></i>marked</span><span><i class="lg-n"></i>not answered</span></div>`
+      : `<div class="pr-legend"><span><i class="lg-c"></i>correct</span><span><i class="lg-w"></i>wrong</span><span><i class="lg-m"></i>marked</span><span><i class="lg-n"></i>not seen</span></div>`;
   }
   function scoreOf() {
     let ok = 0, n = 0, secs = 0, wrong = 0;
     Object.keys(S.ans).forEach((i) => { const a = S.ans[i]; if (a.c != null) { n++; if (a.ok) ok++; else wrong++; secs += a.secs || 0; } });
     return { ok, n, wrong, secs, acc: n ? Math.round((ok / n) * 100) : 0, avg: n ? secs / n : 0 };
   }
-  function railHTML() {
+  /* popovers: session stats + question palette, and the keyboard shortcuts. Toggled in place (no re-render). */
+  function sessionPopHTML() {
     const test = isTest(), drill = S.mode === "drill";
     let stats;
     if (test) {
       const ans = answeredCount(), mk = Object.keys(S.mark).filter((k) => S.mark[k]).length;
-      stats = `<div class="pr-card"><h5>Your test</h5><div class="pr-stats"><div><b>${ans}/${total()}</b><span>answered</span></div><div><b>${mk}</b><span>marked</span></div><div><b>${mmss(elapsed())}</b><span>time</span></div></div></div>`;
+      stats = `<div class="pr-stats"><div><b>${ans}/${total()}</b><span>answered</span></div><div><b>${mk}</b><span>marked</span></div><div><b data-elapsed>${mmss(elapsed())}</b><span>time</span></div></div>`;
     } else {
       const sc = scoreOf();
-      stats = `<div class="pr-card"><h5>${drill ? "This drill" : "This session"}</h5><div class="pr-stats"><div><b>${sc.ok}/${sc.n}</b><span>correct</span></div><div><b>${sc.n ? sc.acc + "%" : "-"}</b><span>accuracy</span></div><div><b>${sc.n ? mmss(sc.avg) : "-"}</b><span>avg / Q</span></div></div>
-        ${drill ? `<div class="pr-lvl"><span>Difficulty</span>${DIFFS.map((d) => `<i class="${d === S.drill.d ? "on " : ""}${DCLS[d]}">${d}</i>`).join("")}</div><div class="pr-note">3 right in a row moves you up, 2 wrong in a row eases off.</div>` : ""}</div>`;
+      stats = `<div class="pr-stats"><div><b>${sc.ok}/${sc.n}</b><span>correct</span></div><div><b>${sc.n ? sc.acc + "%" : "-"}</b><span>accuracy</span></div><div><b>${sc.n ? mmss(sc.avg) : "-"}</b><span>avg / Q</span></div></div>
+        ${drill ? `<p class="pr-note">Level <b>${S.drill.d}</b>. Three right in a row moves you up, two wrong in a row eases off.</p>` : ""}`;
     }
-    return `<aside class="pr-rail">${stats}<div class="pr-card"><h5>Questions</h5>${paletteHTML()}${legendHTML()}</div>
-      <div class="pr-card"><h5>Keys</h5><div class="pr-keys">
+    return `<div class="pr-pop" id="prPop-session" role="dialog" aria-label="Session" hidden>
+      <div class="pr-pophead"><h3>${esc(modeName())} · ${test ? "Test" : "Instant"}</h3><button type="button" class="pr-icon" data-act="pop" data-v="" aria-label="Close">${ic("x")}</button></div>
+      ${stats}${drill ? "" : `<div class="pr-lab">Questions</div>${paletteHTML()}${legendHTML()}`}</div>`;
+  }
+  function keysPopHTML() {
+    const test = isTest();
+    return `<div class="pr-pop pr-keys-pop" id="prPop-keys" role="dialog" aria-label="Keyboard shortcuts" hidden>
+      <div class="pr-pophead"><h3>Keyboard shortcuts</h3><button type="button" class="pr-icon" data-act="pop" data-v="" aria-label="Close">${ic("x")}</button></div>
+      <div class="pr-keys">
         <span><kbd>1</kbd>–<kbd>4</kbd> <kbd>A</kbd>–<kbd>D</kbd></span><span>${test ? "choose (again to clear)" : "answer"}</span>
         <kbd>Enter</kbd><span>next question</span>
-        ${test ? "" : "<kbd>S</kbd><span>show solution</span>"}
+        ${test ? "" : "<kbd>S</kbd><span>show or hide the solution</span>"}
         <kbd>M</kbd><span>mark for review</span>
         <kbd>F</kbd><span>bookmark</span>
         <span><kbd>←</kbd> <kbd>→</kbd></span><span>previous / next</span>
-        <kbd>W</kbd><span>rough-work pad</span></div></div></aside>`;
+        <kbd>W</kbd><span>rough-work pad</span>
+        <kbd>?</kbd><span>this list</span></div></div>`;
   }
+  let POP = null;
+  function applyPop() {
+    main.querySelectorAll(".pr-pop").forEach((p) => { p.hidden = p.id !== "prPop-" + POP; });
+    main.querySelectorAll('[data-act="pop"][data-v]').forEach((b) => { if (b.dataset.v) b.setAttribute("aria-expanded", String(b.dataset.v === POP)); });
+  }
+  function togglePop(v) { POP = !v || POP === v ? null : v; applyPop(); }
 
   /* timer / ring: updated in place every 250 ms, never re-renders the page */
   function tick() {
     if (view !== "run" || !S) return;
-    const t = document.getElementById("prT");
-    if (!t) return;
+    const clocks = main.querySelectorAll("[data-clock]");
+    if (!clocks.length) return;
     if (++T.n % 20 === 0) persist();
     const q = cur(), i = S.idx, secs = secsOf(i), tgt = q.time || 60, mode = S.cfg.timing;
-    const tg = document.getElementById("prTg"), ring = document.getElementById("prRing"), box = document.getElementById("prTimer");
-    let big = secs, sub = "", frac = 0, over = false, showRing = true;
-    if (mode === "target") { sub = "/ " + mmss(tgt); frac = clamp(secs / tgt, 0, 1); over = secs > tgt; }
+    let big = secs, sub = "", over = false;
+    if (mode === "target") { sub = " / " + mmss(tgt); over = secs > tgt; }
     else if (mode === "total") {
       const tt = totalTarget(), rem = tt - elapsed();
-      big = Math.max(0, rem); sub = "/ " + mmss(tt); frac = clamp(1 - rem / tt, 0, 1); over = rem < Math.min(60, tt * 0.1);
+      big = Math.max(0, rem); sub = " / " + mmss(tt); over = rem < Math.min(60, tt * 0.1);
       if (rem <= 0 && !S.done) { timeUp(); return; }
-    } else showRing = false;
-    t.textContent = mmss(big);
-    tg.textContent = sub;
-    box.classList.toggle("over", over);
-    box.classList.toggle("noring", !showRing);
-    box.classList.toggle("still", !T.since);
-    ring.style.strokeDashoffset = String(RING * (1 - frac));
-    ring.style.stroke = over ? "var(--amber)" : "var(--page-c, var(--accent))";
-    if (!isTest()) { /* instant feedback block shows its own time; nothing else to update */ }
-    const st = main.querySelector(".pr-stats div:nth-child(3) b");
+    }
+    clocks.forEach((c) => {
+      c.querySelector(".t").textContent = mmss(big);
+      c.querySelector(".tg").textContent = sub;
+      c.classList.toggle("over", over);
+      c.classList.toggle("still", !T.since);
+    });
+    const st = main.querySelector("[data-elapsed]");
     if (st && isTest()) st.textContent = mmss(elapsed());
   }
   function timeUp() {
@@ -764,6 +782,7 @@
   /* ---------------------------------------------------------------- player actions */
   function goTo(i) {
     flush();
+    POP = null; UI.why = false;
     S.idx = clamp(i, 0, total() - 1);
     S.far = Math.max(S.far || 0, S.idx);
     resume();
@@ -858,6 +877,12 @@
     paint(false);
   }
 
+  function solKey() {
+    if (isTest()) return;
+    const a = S.ans[S.idx];
+    if (a && (a.c != null || a.rev)) { S.showSol = !S.showSol; persist(); paint(false); } else reveal();
+  }
+
   /* ending */
   function endSession() {
     if (S.mode === "daily") {                       // the daily set pauses instead of ending: it resumes from #daily all day
@@ -868,7 +893,7 @@
     const ans = answeredCount();
     if (!ans) {
       confirmBox({ title: "Leave this set?", text: "You haven't answered anything yet.", ok: "Leave", cancel: "Keep going" }).then((y) => {
-        if (y) { S = null; ss.del(SK); go("", true); }
+        if (y) { dropSession(); go("", true); }
       });
       return;
     }
@@ -993,7 +1018,7 @@
       <div class="pr-sbar"><a class="pr-back" href="#setup" data-act="newset">${ic("back")} Practice</a><div class="pr-crumb"><b>${esc(sessionLabel())}</b></div><span class="grow"></span><span class="pr-chip mode">${isTest() ? "Test" : "Instant"}</span></div>
       <h1 class="pr-h1">${S.mode === "drill" ? "Drill finished" : S.mode === "daily" ? "Daily set done" : "Set finished"}</h1>
       ${S.mode === "daily" ? `<p class="lead pr-dailydone">${dailyChip()} Nice work showing up today. A fresh set is built tomorrow from what you get wrong now.</p>` : ""}
-      <div class="pr-card pr-hero ${hot ? "hot" : ""}">
+      <div class="pr-card is-hero pr-hero ${hot ? "hot" : ""}">
         <div class="pr-score"><b>${okN}</b><span>/ ${n}${S.mode === "drill" ? "" : ""}</span><div class="muted small">${answered ? (acc >= 80 ? "Strong set." : acc >= 50 ? "Decent. The slips below are the quick wins." : "Rough one. Work through the solutions below.") : "Nothing answered."}</div></div>
         <div class="pr-stats big">
           <div><b>${acc}%</b><span>accuracy</span></div>
@@ -1155,7 +1180,7 @@
     main.innerHTML = `<div class="pr-enter">
       <div class="pr-sbar"><button type="button" class="pr-back" data-act="sp-modes">${ic("back")} Modes</button><div class="pr-crumb"><b>Speed drill</b> <span class="sep">›</span> ${esc(speedName(SP.mode))}</div></div>
       <h1 class="pr-h1">${saved ? "Time!" : "Stopped early"}</h1>
-      <div class="pr-card pr-hero${newBest ? " hot" : ""}">
+      <div class="pr-card is-hero pr-hero${newBest ? " hot" : ""}">
         <div class="pr-score"><b>${ok}</b><span>correct</span><div class="muted small">${saved ? (newBest ? "New best for this mode." : best ? `Your best here is ${best}.` : "") : "Runs you stop early are not saved."}</div></div>
         <div class="pr-stats big">
           <div><b>${n ? Math.round((ok / n) * 100) + "%" : "-"}</b><span>accuracy</span></div>
@@ -1277,6 +1302,7 @@
 
   /* ================================================================ events */
   main.addEventListener("click", (e) => {
+    if (POP && view === "run" && !e.target.closest(".pr-pop,[data-act='pop']")) togglePop("");      // click outside closes a popover
     const el = e.target.closest("[data-act]");
     if (!el || !main.contains(el)) return;
     const act = el.dataset.act;
@@ -1293,10 +1319,13 @@
       if (["sec", "topic", "pat", "pat-all", "diff", "set"].includes(act)) return setupChange(act, el.dataset.v, el);
       if (act === "start") return start();
       if (act === "resume") return go("run");
-      if (act === "discard") { S = null; ss.del(SK); return setupView(); }
+      if (act === "discard") { dropSession(); return setupView(); }
       if (act === "review-last") return go("review");
     }
     if (view === "run") {
+      if (act === "pop") return togglePop(el.dataset.v);
+      if (act === "skey") return solKey();
+      if (act === "rough") { if (window.RoughPad && RoughPad.toggle) RoughPad.toggle(); return; }
       if (act === "opt") return answer(+el.dataset.i);
       if (act === "next") return next();
       if (act === "prev") return prev();
@@ -1313,7 +1342,7 @@
       if (act === "drill") {
         e.preventDefault();
         const href = el.getAttribute("href");
-        return confirmBox({ title: "Leave this set?", text: "Your answers so far are saved to your progress. A pattern drill starts a fresh set.", ok: "Start the drill", cancel: "Stay here" }).then((y) => { if (y) { S = null; ss.del(SK); location.hash = href.replace(/^#/, ""); } });
+        return confirmBox({ title: "Leave this set?", text: "Your answers so far are saved to your progress. A pattern drill starts a fresh set.", ok: "Start the drill", cancel: "Stay here" }).then((y) => { if (y) { dropSession(); location.hash = href.replace(/^#/, ""); } });
       }
     }
     if (view === "review") {
@@ -1323,7 +1352,7 @@
       if (act === "newset") { e.preventDefault(); S = S && S.done ? S : S; return go("", true); }
     }
   });
-  main.addEventListener("click", (e) => { const r = e.target.closest("[data-reset]"); if (r) { S = null; ss.del(SK); } });
+  main.addEventListener("click", (e) => { const r = e.target.closest("[data-reset]"); if (r) { dropSession(); } });
 
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -1344,12 +1373,43 @@
     if ("1234".includes(k) && k.length === 1) { e.preventDefault(); return answer(+k - 1); }
     if ("abcd".includes(k) && k.length === 1) { e.preventDefault(); return answer("abcd".indexOf(k)); }
     if (k === "Enter") { e.preventDefault(); return next(); }
-    if (k === "s") { e.preventDefault(); const a = S.ans[S.idx]; if (a && (a.c != null || a.rev)) { S.showSol = !S.showSol; persist(); paint(false); } else reveal(); return; }
+    if (k === "?") { e.preventDefault(); return togglePop("keys"); }
+    if (k === "Escape" && POP) { e.preventDefault(); return togglePop(""); }
+    if (k === "s") { e.preventDefault(); return solKey(); }
     if (k === "m") { e.preventDefault(); return toggleMark(); }
     if (k === "f") { e.preventDefault(); return toggleStar(); }
     if (k === "ArrowLeft") { e.preventDefault(); return step(-1); }
     if (k === "ArrowRight") { e.preventDefault(); return step(1); }
   });
+
+  /* folds on the setup screen / "why tempting" remember being open across re-renders */
+  main.addEventListener("toggle", (e) => {
+    const d = e.target;
+    if (!d || d.tagName !== "DETAILS") return;
+    if (d.id === "prPats") UI.pats = d.open; else if (d.id === "prMore") UI.more = d.open; else if (d.id === "prWhy") UI.why = d.open;
+  }, true);
+
+  /* a set in progress: ask before the tab closes or reloads (answers are saved either way; the timer and set position are what is at stake) */
+  window.addEventListener("beforeunload", (e) => {
+    if (view === "run" && S && !S.done && S.items.length && S.mode !== "daily") { e.preventDefault(); e.returnValue = ""; return ""; }
+  });
+
+  /* touch: swipe left/right on the question = next / previous answered */
+  (function () {
+    let x0 = 0, y0 = 0, t0 = 0, ok = false;
+    main.addEventListener("touchstart", (e) => {
+      const t = e.touches[0];
+      ok = view === "run" && e.touches.length === 1 && !e.target.closest("input,textarea,table,svg,.pr-pop,.pr-stim,.table-wrap,[data-scroll]");
+      x0 = t.clientX; y0 = t.clientY; t0 = Date.now();
+    }, { passive: true });
+    main.addEventListener("touchend", (e) => {
+      if (!ok || !S || view !== "run" || modalOpen()) return;
+      const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
+      ok = false;
+      if (Math.abs(dx) < 70 || Math.abs(dy) > 45 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - t0 > 700) return;
+      step(dx < 0 ? 1 : -1);
+    }, { passive: true });
+  })();
 
   window.addEventListener("hashchange", safeRoute);
   safeRoute();
