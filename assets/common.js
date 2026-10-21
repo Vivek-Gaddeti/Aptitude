@@ -6,6 +6,38 @@
    - D: SVG diagram generators
    - DocPage: sidebar + section reader with progress
    ===================================================================== */
+/* ---- per-viewer layout preferences (run first, so the first paint already has the right attributes) ----
+   html[data-device]  "tablet" | "desktop" | "phone"   (apt:layout = auto | desktop | tablet)
+   html[data-hand]    "right" | "left"                 (apt:hand: which side the thumb rails sit on)
+   html[data-text]    "md" | "lg"                      (apt:text: lg scales the root font to 112.5%)
+   html[data-anim]    "on" | "off"                     (localStorage.anim: OFF unless the person turned effects on) */
+(function () {
+  var root = document.documentElement;
+  function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function device() {
+    var l = get("apt:layout") || "auto", w = window.innerWidth, h = window.innerHeight, short = Math.min(w, h), long = Math.max(w, h);
+    if (l === "tablet") return w >= 600 ? "tablet" : "phone";                      // a tablet rail does not fit a phone-width window
+    if (l === "auto" || (l !== "desktop")) {
+      var coarse = window.matchMedia && matchMedia("(pointer: coarse)").matches;
+      if (coarse && short >= 600 && long <= 1400) return "tablet";
+    }
+    return w < 700 ? "phone" : "desktop";
+  }
+  function apply() {
+    root.dataset.device = device();
+    root.dataset.hand = get("apt:hand") === "left" ? "left" : "right";
+    root.dataset.text = get("apt:text") === "lg" ? "lg" : "md";
+    root.dataset.anim = get("anim") === "on" ? "on" : "off";
+  }
+  apply();
+  var raf = 0;
+  window.addEventListener("resize", function () { if (!raf) raf = requestAnimationFrame(function () { raf = 0; apply(); }); });
+  window.addEventListener("orientationchange", apply);
+  window.addEventListener("storage", apply);
+  window.AptPrefs = { get: get, set: function (k, v) { set(k, v); apply(); document.dispatchEvent(new CustomEvent("apt:prefs")); }, apply: apply };
+})();
+
 (function () {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -83,6 +115,7 @@
     return: '<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
     laugh: '<circle cx="12" cy="12" r="9"/><path d="M7.8 13.5c.9 2.3 2.4 3.5 4.2 3.5s3.3-1.2 4.2-3.5z"/>' + DOT(9, 9.5) + DOT(15, 9.5),
     up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
+    sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
     restart: '<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 8.9"/><path d="M4.5 4.2v4.7h4.7"/>',
   };
   const icon = (name, cls = "") => ICONS[name] ? `<svg class="ico${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>` : "";
@@ -447,9 +480,10 @@
       default: return "";
     }
   }
-  /* ["formulas", [[name, formula, note?], ...]]: a neat card, formula in a pill */
+  /* ["formulas", [[name, formula, note?], ...]]: a clean 3-column table, the formula in plain Space Mono */
   function formulasBlock(rows) {
-    return `<div class="formulas">${(rows || []).map(([n, f, note]) => `<div class="fm-row"><div class="fm-name">${fmt(n)}</div><div class="fm-f"><code>${esc(f)}</code></div>${note ? `<div class="fm-note">${fmt(note)}</div>` : ""}</div>`).join("")}</div>`;
+    rows = rows || [];
+    return `<div class="formulas"><table class="fm-table"><thead><tr><th scope="col">Name</th><th scope="col">Formula</th><th scope="col">Note</th></tr></thead><tbody>${rows.map(([n, f, note]) => `<tr><th scope="row" class="fm-name">${fmt(n)}</th><td class="fm-f"><code>${esc(f)}</code></td><td class="fm-note">${note ? fmt(note) : ""}</td></tr>`).join("")}</tbody></table></div>`;
   }
   /* ["pattern", {key, title, spot, method[], ex:{q, steps[], ans}, shortcut?}]: one pattern card */
   function patternBlock(p) {
@@ -461,7 +495,7 @@
       ${p.method && p.method.length ? `<div class="pat-sec"><div class="pat-lbl">Method</div><ol class="steps">${p.method.map((x) => `<li>${fmt(x)}</li>`).join("")}</ol></div>` : ""}
       ${ex ? `<details class="box pat-ex"><summary>Solved example</summary><div class="body"><p>${fmt(ex.q)}</p>${ex.steps ? `<ol class="steps">${ex.steps.map((x) => `<li>${fmt(x)}</li>`).join("")}</ol>` : ""}${ex.ans ? `<p class="pat-ans"><strong>Answer:</strong> ${fmt(ex.ans)}</p>` : ""}</div></details>` : ""}
       ${p.shortcut ? `<div class="callout tip"><span class="label">Shortcut</span>${fmt(p.shortcut)}</div>` : ""}
-      ${p.key ? `<div class="pat-foot"><a class="btn primary" href="practice.html#drill/${esc(p.key)}">Practice this pattern ${icon("arrow-right")}</a></div>` : ""}
+      ${p.key ? `<div class="pat-foot"><a class="btn" href="practice.html#drill/${esc(p.key)}">Practice this pattern ${icon("arrow-right")}</a></div>` : ""}
     </div>`;
   }
   /* Learn sections for a page: LEARN[sec] if it has content, else one "Coming soon" section built from the catalog */
@@ -763,15 +797,12 @@
     const rays = ["M12 2.5v2", "M17.3 6.7l1.4-1.4", "M19.5 12h2", "M17.3 17.3l1.4 1.4", "M12 19.5v2", "M5.3 18.7l1.4-1.4", "M2.5 12h2", "M5.3 5.3l1.4 1.4"];
     return `<svg class="ni" viewBox="0 0 24 24" aria-hidden="true"><defs><mask id="d-tm-mask" maskUnits="userSpaceOnUse" x="-6" y="-6" width="36" height="36"><rect x="-6" y="-6" width="36" height="36" fill="#fff"/><circle class="tm-bite" cx="16.5" cy="8" r="5.6" fill="#000"/></mask></defs><circle class="tm-body" cx="12" cy="12" r="4.4" mask="url(#d-tm-mask)"/><g class="tm-rays">${rays.map((d, i) => `<path d="${d}" style="--i:${i}"/>`).join("")}</g></svg>`;
   })();
-  // the thin ring around the logo fills with your progress (what it counts is set in site.js)
+  // the brand tooltip shows your overall progress (the old progress ring around the logo is gone)
   function paintRing() {
-    const R = window.SITE && SITE.ring, w = document.querySelector(".topbar .logo-wrap");
-    if (!R || !w) return;
+    const R = window.SITE && SITE.ring, br = document.querySelector(".topbar .brand");
+    if (!R || !br) return;
     const done = Object.entries(Store.load().items).filter(([k, v]) => v.status && R.prefixes.some((p) => k.startsWith(p))).length;
-    const fg = w.querySelector(".fg");
-    fg.setAttribute("stroke-dasharray", Math.min(100, (done / R.total) * 100).toFixed(1) + " 100");
-    fg.style.opacity = done ? 1 : 0;                                   // no stray dot at 0%
-    w.closest(".brand").title = `${done} / ${R.total} ${R.label} · ${dueCount()} due for review`;
+    br.title = `${done} / ${R.total} ${R.label} · ${dueCount()} due for review`;
   }
   // a header link with a small menu (Python ▾): opens on hover or focus, or on tap where there is no hover
   function navMenus(h) {
@@ -805,44 +836,114 @@
       window.addEventListener("scroll", () => !menu.hidden && open(false), { passive: true });
     });
   }
+  /* ---- Settings: Theme, Layout, Rail side, Text size, Effects (one popover, opened from the header or the tablet rail) ---- */
+  const SETTINGS = [
+    ["Theme", "theme", [["light", "Light"], ["dark", "Dark"]]],
+    ["Layout", "layout", [["auto", "Auto"], ["desktop", "Desktop"], ["tablet", "Tablet"]], "Tablet puts the menu in a thumb rail"],
+    ["Rail side", "hand", [["right", "Right"], ["left", "Left"]], "Which side the tablet rails sit on"],
+    ["Text size", "text", [["md", "Normal"], ["lg", "Large"]]],
+    ["Effects", "anim", [["off", "Off"], ["on", "On"]], "Fades, confetti and smooth boxes"],
+  ];
+  const settingVal = (k) => {
+    const R = document.documentElement, g = (x) => { try { return localStorage.getItem(x); } catch (e) { return null; } };
+    return k === "theme" ? (R.dataset.theme === "dark" ? "dark" : "light") : k === "layout" ? (g("apt:layout") || "auto")
+      : k === "hand" ? R.dataset.hand : k === "text" ? R.dataset.text : R.dataset.anim === "on" ? "on" : "off";
+  };
+  function setSetting(k, v) {
+    const R = document.documentElement;
+    if (k === "theme") { R.dataset.theme = v; try { localStorage.setItem("theme", v); } catch (e) {} }
+    else if (k === "anim") { try { localStorage.setItem("anim", v); } catch (e) {} R.dataset.anim = v; document.dispatchEvent(new CustomEvent("fx:settings")); }
+    else AptPrefs.set(k === "layout" ? "apt:layout" : k === "hand" ? "apt:hand" : "apt:text", v);
+  }
+  let setMenu = null, setBtn = null;
+  function closeSettings() {
+    if (!setMenu) return;
+    setMenu.remove(); setMenu = null;
+    if (setBtn) { setBtn.setAttribute("aria-expanded", "false"); setBtn.classList.remove("on"); }
+  }
+  function openSettings(btn, pages) {
+    if (setMenu) { const same = setBtn === btn; closeSettings(); if (same) return; }
+    setBtn = btn; btn.setAttribute("aria-expanded", "true"); btn.classList.add("on");
+    const m = document.createElement("div");
+    m.className = "set-menu"; m.setAttribute("role", "dialog"); m.setAttribute("aria-label", "Settings");
+    const paint = () => SETTINGS.forEach(([, k]) => m.querySelectorAll(`[data-set="${k}"] button`).forEach((b) => { const on = b.dataset.v === settingVal(k); b.setAttribute("aria-pressed", on); b.classList.toggle("on", on); }));
+    m.innerHTML = `<div class="set-h">Settings</div>` + SETTINGS.map(([name, k, opts, note]) =>
+      `<div class="set-row"><div class="set-lbl">${name}</div><div class="set-seg" role="group" aria-label="${name}" data-set="${k}">${opts.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="false">${l}</button>`).join("")}</div>${note ? `<div class="set-note">${note}</div>` : ""}</div>`).join("") +
+      (pages && pages.length ? `<div class="set-pages"><div class="set-lbl">More pages</div>${pages.map(([h, l]) => `<a href="${h}">${esc(l)}</a>`).join("")}</div>` : "") +
+      `<div class="set-note set-keys">Press <kbd>?</kbd> for keyboard shortcuts</div>`;
+    document.body.appendChild(m);
+    setMenu = m; paint();
+    m.addEventListener("click", (e) => {
+      const b = e.target.closest(".set-seg button");
+      if (!b) return;
+      setSetting(b.parentNode.dataset.set, b.dataset.v); paint();
+      // layout / rail side move the controls: keep the menu open, but re-anchor it to whichever button is visible now
+      const rail = document.documentElement.dataset.device === "tablet", a2 = document.getElementById(rail ? "grMore" : "setBtn");
+      if (a2 && (a2 !== btn || b.parentNode.dataset.set === "hand")) { closeSettings(); openSettings(a2, pages); const nb = document.querySelector(`.set-seg[data-set="${b.parentNode.dataset.set}"] button[data-v="${b.dataset.v}"]`); nb && nb.focus(); }
+    });
+    // placement: beside the tablet rail (bottom, hand side), otherwise under the header button
+    const r = btn.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
+    if (btn.closest(".g-rail")) {
+      const left = document.documentElement.dataset.hand === "left";
+      m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom - h)) + "px";
+      m.style[left ? "left" : "right"] = "calc(var(--rail-w) + 8px)";
+    } else {
+      m.style.top = Math.min(r.bottom + 8, Math.max(8, innerHeight - h - 8)) + "px";
+      m.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + "px";
+    }
+    m.querySelector("button").focus();
+  }
+  document.addEventListener("click", (e) => { if (setMenu && e.target.isConnected && !setMenu.contains(e.target) && !(setBtn && setBtn.contains(e.target))) closeSettings(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && setMenu) { const b = setBtn; closeSettings(); b && b.focus(); } });
+  window.addEventListener("resize", () => closeSettings());
+
   function topbar(active) {
     const S = window.SITE || { brand: "Study", links: [] };
     const h = document.getElementById("topbar");
     if (!h || h.dataset.active === active) return;                   // already built (it's built early, see the end of this file)
     h.dataset.active = active;
     h.className = "topbar";
-    const streak = Store.streak(), due = dueCount(), hr = new Date().getHours();
-    // greeting + logo colour follow the time of day
-    const greet = hr < 5 || hr >= 22 ? icon("moon") + " Late-night grind" : hr < 12 ? icon("sun") + " Good morning" : hr < 17 ? icon("cloud-sun") + " Good afternoon" : icon("sunset") + " Good evening";
-    const mood = hr < 5 || hr >= 22 ? "night" : hr < 12 ? "morning" : hr < 17 ? "day" : "evening";
-    const season = (() => { const d = new Date(), m = d.getMonth(), day = d.getDate();
-      return m === 9 ? "pumpkin" : m === 11 ? "snowflake" : m === 1 && day === 14 ? "heart" : m === 0 && day === 1 ? "party" : ""; })();
+    const streak = Store.streak(), due = dueCount();
     h.innerHTML = `
       <button class="icon-btn menu-btn" id="menuBtn" aria-label="Menu">${icon("menu")}</button>
-      <a class="brand" href="${S.home || "index.html"}"><span class="logo-wrap" data-mood="${mood}"><span class="logo">${S.logo || "DS"}</span><svg class="logo-ring" viewBox="0 0 36 36" aria-hidden="true"><rect class="tr" x="1.5" y="1.5" width="33" height="33" rx="11"/><rect class="fg" x="1.5" y="1.5" width="33" height="33" rx="11" pathLength="100" stroke-dasharray="0 100"/></svg>${season ? `<span class="season season-${season}" aria-hidden="true">${icon(season)}</span>` : ""}</span><span class="brand-name">${S.brand}</span></a>
-      <span class="hello">${greet}</span>
-      <nav class="nav">${S.links.map(([href, label, sub], i) => {
+      <a class="brand" href="${S.home || "index.html"}"><span class="logo-wrap"><span class="logo">${S.logo || "DS"}</span></span><span class="brand-name">${S.brand}</span></a>
+      <nav class="nav" aria-label="Main">${S.links.map(([href, label, sub], i) => {
         const on = href === active || (sub && sub.some(([x]) => x === active)), C = NAV_COLORS[i % NAV_COLORS.length];
-        return `<a href="${href}" class="${[on ? "active" : "", sub ? "has-menu" : ""].filter(Boolean).join(" ")}" title="${label}"${sub ? ` aria-haspopup="true" aria-expanded="false" data-menu="${i}"` : ""} style="--c:${C[0]}" data-ink="${C[1]}" data-ink-dark="${C[2]}">${navIcon(label)}<span>${label}</span>${sub ? `<svg class="nav-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>` : ""}${href === "revision.html" ? badgeHTML(due) : ""}</a>`;
+        return `<a href="${href}" class="${[on ? "active" : "", sub ? "has-menu" : ""].filter(Boolean).join(" ")}" title="${label}"${on ? ' aria-current="page"' : ""}${sub ? ` aria-haspopup="true" aria-expanded="false" data-menu="${i}"` : ""} style="--c:${C[0]}" data-ink="${C[1]}" data-ink-dark="${C[2]}">${navIcon(label)}<span>${label}</span>${sub ? `<svg class="nav-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>` : ""}${href === "revision.html" ? badgeHTML(due) : ""}</a>`;
       }).join("")}</nav>
       ${S.links.map(([, , sub], i) => sub ? `<div class="nav-menu" role="menu" data-menu="${i}" style="--c:${NAV_COLORS[i % NAV_COLORS.length][0]}" hidden>${sub.map(([href, label, note]) => `<a role="menuitem" href="${href}" class="${href === active ? "active" : ""}">${navIcon(label)}<span><b>${label}</b>${note ? `<small>${note}</small>` : ""}</span></a>`).join("")}</div>` : "").join("")}
       ${streak > 0 ? `<span class="d-streak" title="${streak}-day study streak"><span class="f">${icon("flame")}</span><span class="sn">${streak}</span></span>` : ""}
-      <span class="fx-slot"></span>
+      <span class="fx-slot"><button class="icon-btn" id="setBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="Settings" aria-label="Settings">${icon("sliders")}</button></span>
       <button class="icon-btn" id="themeBtn" title="Toggle dark mode" aria-label="Toggle theme">${THEME_SVG}</button>`;
     $("#themeBtn").onclick = () => {
       const cur = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
       document.documentElement.dataset.theme = cur;
       try { localStorage.setItem("theme", cur); } catch (e) {}
     };
+    const subPages = [];
+    S.links.forEach(([href, , sub]) => sub && sub.forEach(([x, l]) => { if (!S.links.some(([y]) => y === x)) subPages.push([x, l]); }));
+    $("#setBtn").onclick = (e) => { e.stopPropagation(); openSettings(e.currentTarget); };
     const mb = $("#menuBtn");
     if (!document.getElementById("sidebar")) mb.style.display = "none";
     mb.onclick = () => document.body.classList.toggle("sidebar-open");
     document.addEventListener("click", (e) => {
-      if (document.body.classList.contains("sidebar-open") && !e.target.closest("#sidebar") && !e.target.closest("#menuBtn")) document.body.classList.remove("sidebar-open");
+      if (document.body.classList.contains("sidebar-open") && !e.target.closest("#sidebar") && !e.target.closest("#menuBtn") && !e.target.closest("#grTopics")) document.body.classList.remove("sidebar-open");
     });
     navMenus(h);
     paintRing();
-    // this page's own colour (from its header link) tints text selection, the cursor halo and the glow
+    buildRail(S, active, due, subPages);
+    // skip link (first thing a keyboard user tabs to)
+    if (!document.querySelector(".skip-link")) {
+      const sk = document.createElement("a");
+      sk.className = "skip-link"; sk.href = "#content"; sk.textContent = "Skip to content";
+      sk.addEventListener("click", (e) => {
+        const t = document.getElementById("content") || document.querySelector("main");
+        if (!t) return;
+        e.preventDefault(); t.setAttribute("tabindex", "-1"); t.focus({ preventScroll: false });
+      });
+      document.body.prepend(sk);
+    }
+    // this page's own colour (from its header link) tints text selection and the page accent
     const act = h.querySelector(".nav a.active");
     if (act) {
       const R = document.documentElement;
@@ -850,15 +951,42 @@
       R.style.setProperty("--page-ink", act.dataset.ink); R.style.setProperty("--page-ink-dark", act.dataset.inkDark);
       R.classList.add("page-tinted");
     }
-    // keep the due badge and the logo ring up to date
+    // keep the due badge and the brand tooltip up to date
     document.addEventListener("store:change", () => {
       paintRing();
-      const link = h.querySelector('.nav a[href="revision.html"]');
-      if (!link) return;
-      const n = dueCount(), b = link.querySelector(".nav-badge");
-      if (!n) { if (b) b.remove(); return; }
-      if (b) b.textContent = n > 99 ? "99+" : n; else link.insertAdjacentHTML("beforeend", badgeHTML(n));
+      document.querySelectorAll('.nav a[href="revision.html"], .g-rail a[href="revision.html"]').forEach((link) => {
+        const n = dueCount(), b = link.querySelector(".nav-badge");
+        if (!n) { if (b) b.remove(); return; }
+        if (b) b.textContent = n > 99 ? "99+" : n; else link.insertAdjacentHTML("beforeend", badgeHTML(n));
+      });
     });
+  }
+
+  /* ---- tablet global rail: logo at the top, sections in the lower half, Search / Rough work / Settings at the bottom (thumb zone).
+     It is always built; CSS shows it only for html[data-device="tablet"] and hides it while body.in-session. ---- */
+  function buildRail(S, active, due, subPages) {
+    if (document.querySelector(".g-rail")) return;
+    const rail = document.createElement("nav");
+    rail.className = "g-rail"; rail.setAttribute("aria-label", "Main");
+    const item = (href, label, ic, extra = "", on = false) => `<a class="gr-item${on ? " active" : ""}" href="${href}"${on ? ' aria-current="page"' : ""} ${extra}>${ic}<span>${label}</span></a>`;
+    rail.innerHTML = `<a class="gr-logo" href="${S.home || "index.html"}" aria-label="${esc(S.brand)}" title="${esc(S.brand)}"><span class="logo">${S.logo || "DS"}</span></a>
+      <div class="gr-nav">${S.links.map(([href, label, sub], i) => {
+        const on = href === active || (sub && sub.some(([x]) => x === active)), C = NAV_COLORS[i % NAV_COLORS.length];
+        const lab = label === "Dashboard" ? "Home" : label;
+        return item(href, lab, navIcon(label), `style="--c:${C[0]}"`, on) .replace("</a>", (href === "revision.html" ? badgeHTML(due) : "") + "</a>");
+      }).join("")}</div>
+      <div class="gr-tools">
+        ${document.getElementById("sidebar") ? `<button type="button" class="gr-item" id="grTopics" aria-label="Topics list">${icon("menu")}<span>Topics</span></button>` : ""}
+        <button type="button" class="gr-item" id="grFind" aria-label="Search">${icon("search")}<span>Search</span></button>
+        <button type="button" class="gr-item gr-rough" id="grRough" aria-label="Rough work">${icon("pencil")}<span>Rough</span></button>
+        <button type="button" class="gr-item" id="grMore" aria-haspopup="dialog" aria-expanded="false" aria-label="Settings and more">${icon("sliders")}<span>More</span></button>
+      </div>`;
+    document.body.appendChild(rail);
+    rail.querySelector("#grFind").onclick = () => window.FindBox && FindBox.open();
+    rail.querySelector("#grRough").onclick = () => window.RoughPad && RoughPad.toggle();
+    const tp = rail.querySelector("#grTopics");
+    if (tp) tp.onclick = () => document.body.classList.toggle("sidebar-open");
+    rail.querySelector("#grMore").onclick = (e) => { e.stopPropagation(); openSettings(e.currentTarget, subPages); };
   }
 
   /* ------------------------------------------------------------- Status buttons (shared UI) */
@@ -866,10 +994,13 @@
     const it = Store.item(key);
     const doneLabel = opts.doneLabel || "Mark as learned";
     const due = it.next ? relDay(it.next) : "";
+    const done = it.status === "done";
+    const P = opts.practice ? `<a class="btn primary da-practise" href="${esc(opts.practice.href)}">${esc(opts.practice.label)} ${icon("arrow-right")}</a>` : "";
     return `<div class="doc-actions" data-key="${key}">
-      <button class="btn ${it.status === "done" ? "on-green" : ""}" data-act="done">${swapLabel([icon("circle") + " " + doneLabel, icon("check") + " " + (opts.doneOn || "Learned")], it.status === "done" ? 1 : 0)}</button>
-      <button class="btn ${it.status === "revise" ? "on-red" : ""}" data-act="revise">${swapLabel([icon("repeat") + " Mark for revision", icon("repeat") + " Needs revision"], it.status === "revise" ? 1 : 0)}</button>
-      <button class="btn ${it.star ? "on-amber" : ""}" data-act="star">${swapLabel([icon("star") + " Bookmark", icon("star-fill") + " Bookmarked"], it.star ? 1 : 0)}</button>
+      ${P}
+      <button type="button" class="da-learn${done ? " on-green on" : ""}" data-act="done" role="switch" aria-checked="${done}"><span class="da-box">${icon("check")}</span>${swapLabel([doneLabel, opts.doneOn || "Learned"], done ? 1 : 0)}</button>
+      <button type="button" class="da-quiet${it.status === "revise" ? " on-red on" : ""}" data-act="revise">${swapLabel([icon("repeat") + " Mark for revision", icon("repeat") + " Needs revision"], it.status === "revise" ? 1 : 0)}</button>
+      <button type="button" class="da-quiet${it.star ? " on-amber on" : ""}" data-act="star">${swapLabel([icon("star") + " Bookmark", icon("star-fill") + " Bookmarked"], it.star ? 1 : 0)}</button>
       <span class="small muted due">${it.status && due ? "Next review: " + due : ""}</span>
     </div>`;
   }
@@ -886,6 +1017,7 @@
     bar.querySelectorAll("[data-act]").forEach((btn) => {
       const nb = fresh.querySelector(`[data-act="${btn.dataset.act}"]`);
       btn.className = nb.className;
+      if (nb.hasAttribute("aria-checked")) btn.setAttribute("aria-checked", nb.getAttribute("aria-checked"));
       setSwap(btn, nb.querySelector(".swap").dataset.s);
     });
     bar.querySelector(".due").textContent = fresh.querySelector(".due").textContent;
@@ -907,6 +1039,44 @@
     clearTimeout(noteT);
     noteT = setTimeout(() => Store.setNote(t.dataset.note, t.value), 400);
   });
+
+  /* ------------------------------------------------------------- Sticky "Practise this topic" + Back to top */
+  let stickyEl = null, stickyHref = "";
+  function stickyPractice(practice) {
+    if (!practice) { if (stickyEl) stickyEl.hidden = true; stickyHref = ""; document.body.classList.remove("has-sticky"); return; }
+    if (!stickyEl) {
+      stickyEl = document.createElement("a");
+      stickyEl.className = "btn primary sticky-practise"; stickyEl.hidden = true;
+      document.body.appendChild(stickyEl);
+    }
+    stickyEl.href = practice.href; stickyEl.innerHTML = `Practise this topic ${icon("arrow-right")}`;
+    stickyHref = practice.href;
+    syncFloaters();
+  }
+  function syncFloaters() {
+    if (stickyEl) {
+      const bar = document.querySelector(".doc-actions .da-practise"), past = !!bar && bar.getBoundingClientRect().bottom < 8;
+      const show = !!stickyHref && past && !document.body.classList.contains("in-session");
+      stickyEl.hidden = !show; document.body.classList.toggle("has-sticky", show);
+    }
+    if (toTop) {
+      const long = document.documentElement.scrollHeight > innerHeight * 2.5;
+      toTop.hidden = !(long && scrollY > innerHeight * 1.2);
+    }
+  }
+  let toTop = null;
+  (function () {
+    toTop = document.createElement("button");
+    toTop.type = "button"; toTop.className = "to-top"; toTop.hidden = true;
+    toTop.setAttribute("aria-label", "Back to top"); toTop.title = "Back to top";
+    toTop.innerHTML = icon("up");
+    toTop.onclick = () => window.scrollTo({ top: 0, behavior: document.documentElement.dataset.anim === "on" ? "smooth" : "auto" });
+    document.addEventListener("DOMContentLoaded", () => document.body.appendChild(toTop));
+    if (document.body) document.body.appendChild(toTop);
+    let t = 0;
+    window.addEventListener("scroll", () => { if (!t) t = requestAnimationFrame(() => { t = 0; syncFloaters(); }); }, { passive: true });
+    window.addEventListener("resize", syncFloaters);
+  })();
 
   /* ------------------------------------------------------------- DocPage: sidebar + one section at a time */
   function textOf(blocks) {
@@ -931,7 +1101,6 @@
 
     const byId = Object.fromEntries(secs.map((s) => [s.id, s]));
     window.__doc = { secs, kind, byId, title: cfg.title };                // used by assets/fx/fx-sidebar.js for hover previews
-    let lastPct = null;
     function sidebar() {
       const total = secs.length, done = secs.filter((s) => Store.item(kind + ":" + s.id).status).length;
       const hashId = (location.hash || "").slice(1), curId = byId[hashId] ? hashId : secs[0].id, ci = secs.findIndex((s) => s.id === curId);
@@ -954,15 +1123,7 @@
         const folded = folds.includes(G.g);
         h += `<div class="sb-group${folded ? " folded" : ""}" data-g="${esc(G.g)}"><button type="button" class="group-title" aria-expanded="${!folded}"><span class="gt-arrow">▸</span><span class="gt-name">${esc(G.g)}</span><span class="gt-count">${gd}/${G.items.length}</span></button><div class="gt-line"><span style="width: ${((gd / G.items.length) * 100).toFixed(1)}%"></span></div><div class="sb-items"><div>${G.items.map(itemHTML).join("")}</div></div></div>`;
       });
-      // a tiny mascot walks towards the 🏁 as you progress
-      const pct = total ? Math.round((done / total) * 100) : 0, mpos = (x) => (x >= 100 ? 100 : x * 0.86);
-      h += `<div class="sb-mascot${pct >= 100 ? " won" : ""}" title="${done} / ${total} done"><div class="sbm-track"><span class="sbm-m" style="left:${mpos(lastPct ?? pct)}%">${icon(cfg.mascot || (window.SITE && SITE.mascot) || "turtle")}</span><span class="sbm-flag">${icon("flag")}</span></div><div class="sbm-txt">${pct >= 100 ? icon("party") + " You made it!" : `${pct}% of the way`}</div></div>`;
       sb.innerHTML = h;
-      if (lastPct !== null && lastPct !== pct) {
-        const m = sb.querySelector(".sbm-m");
-        requestAnimationFrame(() => { m.classList.add("walking"); m.style.left = mpos(pct) + "%"; setTimeout(() => m.classList.remove("walking"), 1300); });
-      }
-      lastPct = pct;
       applyFilter();
       const inp = $("#docSearch");
       inp.oninput = () => { filter = inp.value.trim().toLowerCase(); applyFilter(); };   // no re-render: items fold away softly
@@ -990,21 +1151,26 @@
       const key = kind + ":" + s.id, prev = secs[i - 1], next = secs[i + 1];
       if (s.group && getFolds().includes(s.group)) setFolds(getFolds().filter((x) => x !== s.group));
       document.title = s.title + " · " + (cfg.title || "");
+      // "Practise <topic>" only where the catalog has that topic
+      const cat = (window.CATALOG || []).find((c) => c.sec === kind), hasPractice = !s.soon && cat && cat.topics.some((t) => t.id === s.id);
+      const practice = hasPractice ? { href: `practice.html#topic/${kind}/${s.id}`, label: "Practise " + s.title } : null;
+      const aopts = Object.assign({}, cfg.actionOpts || {}, practice ? { practice } : {});
       main.innerHTML = `
         <div class="crumbs">${esc(cfg.title || "")}${s.group ? " / " + esc(s.group) : ""}</div>
         <h1>${esc(s.title)}</h1>
         ${s.sub ? `<p class="lead">${fmt(s.sub)}</p>` : ""}
+        ${s.soon ? "" : actionBar(key, aopts)}
+        ${s.tags && s.tags.length ? `<p class="asked-in small muted">Asked in ${s.tags.map(esc).join(", ")}</p>` : ""}
         ${window.BRIEFS && BRIEFS[key] ? `<div class="callout tip brief"><span class="label">${icon("bulb")} In short, in plain English</span>${String(BRIEFS[key]).split(/\n\s*\n/).map((x) => `<p>${fmt(x.trim())}</p>`).join("")}</div>` : ""}
-        ${s.tags ? `<div class="btn-row my-2">${s.tags.map((t) => `<span class="badge blue">${esc(t)}</span>`).join("")}</div>` : ""}
-        ${s.soon ? "" : actionBar(key, cfg.actionOpts)}
         <div class="doc-body">${renderBlocks(s.blocks)}</div>
         ${s.soon ? "" : `<hr>${notesBox(key)}`}
         <div class="btn-row page-nav">
           ${prev ? `<a class="btn" href="#${prev.id}">← ${esc(prev.title)}</a>` : "<span></span>"}
           ${next ? `<a class="btn primary" href="#${next.id}">${esc(next.title)} →</a>` : ""}
         </div>`;
+      stickyPractice(practice);
       const bar = main.querySelector(".doc-actions");
-      if (bar) bar.dataset.opts = JSON.stringify(cfg.actionOpts || {});
+      if (bar) bar.dataset.opts = JSON.stringify(aopts);
       if (window.Viz) Viz.mountAll(main);
       if (window.glossify) glossify(main);
       sidebar();

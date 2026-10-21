@@ -259,7 +259,7 @@
     if (!nQ && !nL) return `<div class="rv-grid"><div>${empty("party", "All caught up", "Nothing is due right now. Wrong answers and lessons you mark as learned come back here on a 1, 3, 7, 14, 30, 60-day schedule.",
       `<div class="btn-row rv-ec"><a class="btn primary" href="practice.html#daily">${ic("play")} Today's daily set</a>${M.mist.length ? `<a class="btn" href="#mistakes">${ic("mistake")} Mistake book (${M.mist.length})</a>` : ""}${M.cardsDue ? `<a class="btn" href="#cards/${deck}">${ic("cards")} ${M.cardsDue} flashcards due</a>` : ""}</div>`)}</div>${rail(M)}</div>`;
     const groups = byTopic(M.due, (a, b) => (a.it.next || 0) - (b.it.next || 0));
-    const hero = `<div class="pr-card rv-hero"><div class="rv-big"><b>${nQ + nL}</b><span>due</span></div>
+    const hero = `<div class="pr-card is-hero rv-hero"><div class="rv-big"><b>${nQ + nL}</b><span>due</span></div>
       <div class="rv-hero-t"><b>${nQ ? plural(nQ, "question") : ""}${nQ && nL ? " and " : ""}${nL ? plural(nL, "lesson") : ""}</b> ready for review.
       <div class="muted small">Re-solve each one from memory before you peek at the solution.</div></div><span class="grow"></span>
       ${nQ ? `<a class="btn primary" href="${qsHref(M.due.map((r) => r.k))}">${ic("play")} Practise all due</a>` : ""}</div>`;
@@ -341,7 +341,7 @@
     if (!q.length && !l.length) return `<div class="rv-grid"><div>${empty("star", "No bookmarks yet", "Star a question in practice (the star next to the question) or a lesson (the star in its action bar) and it shows up here for a quick look before an exam.",
       `<div class="btn-row rv-ec"><a class="btn primary" href="practice.html">${ic("play")} Go to practice</a></div>`)}</div>${starRail(M)}</div>`;
     const groups = byTopic(q, (a, b) => (b.it.updated || 0) - (a.it.updated || 0));
-    const hero = q.length ? `<div class="pr-card rv-hero"><div class="rv-big"><b>${q.length}</b><span>starred</span></div><div class="rv-hero-t"><b>${plural(q.length, "question")}</b> you wanted to keep.<div class="muted small">Open one for its solution, or run them all as a set.</div></div><span class="grow"></span>
+    const hero = q.length ? `<div class="pr-card is-hero rv-hero"><div class="rv-big"><b>${q.length}</b><span>starred</span></div><div class="rv-hero-t"><b>${plural(q.length, "question")}</b> you wanted to keep.<div class="muted small">Open one for its solution, or run them all as a set.</div></div><span class="grow"></span>
       <a class="btn primary" href="${qsHref(q.map((r) => r.k))}">${ic("play")} Practise all</a></div>` : "";
     return `<div class="rv-grid"><div class="rv-main pr-enter">${hero}${groups.map((g) => groupCard(topicHead(g.sec, g.topic, g.rows.length), g.rows, "star", g.rows.length > 1 ? g.rows.map((r) => r.k) : [])).join("")}
       ${!q.length ? empty("star", "No starred questions", "Starred lessons are on the right. Star questions in practice to collect them here.") : ""}</div>${starRail(M)}</div>`;
@@ -740,6 +740,49 @@
   .rv-hero .btn.primary { width: 100%; justify-content: center; }
 }
 @media print { .rv-tabs, .rv-rail, .rv-acts, .rv-tools { display: none; } .rv-grid { display: block; } }
+/* calm: flat, sentence-case headings, one loud thing (.btn.primary / .is-hero) */
+.rv h2, .rv h3, .rv h4 { text-transform: none; letter-spacing: 0; font-weight: 800; border: 0; }
+.rv .pr-card, .rv .rv-stim, .rv .pr-qrow, .rv .rv-tally div, .rv .rv-cstats > div { box-shadow: none; border: 2px solid var(--ink); border-radius: 0; }
+.rv .pr-card.is-hero { border-width: 3px; box-shadow: 6px 6px 0 var(--ink); }
+.rv .pr-card h5, .rv h5 { font: 700 12px var(--mono); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.rv .btn:not(.primary), .rv .pr-icon { box-shadow: none; transform: none !important; border: 2px solid var(--ink) !important; text-transform: none; letter-spacing: 0; font-weight: 800; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: .35rem; }
+.rv .btn:not(.primary):hover { background: var(--panel-2); color: var(--text); box-shadow: none; transform: none !important; }
+.rv .btn.primary { text-transform: none; letter-spacing: 0; min-height: 44px; }
+.rv .btn.sm { min-height: 44px; }
+.rv-tabs { box-shadow: none; border: 2px solid var(--ink); border-radius: 0; background: var(--panel); padding: 0; gap: 0; }
+.rv-tabs a { border-radius: 0; min-height: 44px; color: var(--text); border-right: 2px solid var(--ink); text-transform: none; }
+.rv-tabs a:last-child { border-right: 0; }
+.rv-tabs a:hover { background: var(--panel-2); color: var(--text); }
+.rv-tabs a.on, .rv-tabs a.on:hover { background: var(--ink); color: var(--bg); box-shadow: none; }
+.rv-tabs .n { border-radius: 0; font-family: var(--mono); }
+.rv-tabs a.on .n { background: var(--bg); color: var(--ink); }
+.rv-big { border-radius: 0; border: 2px solid var(--ink); background: var(--panel-2); color: var(--text); }
+.rv-big b { font-family: var(--mono); }
+.rv-cnt { border-radius: 0; font-family: var(--mono); border: 1.5px solid var(--ink); background: var(--panel); }
+.rv-ub, .rv-pbar, .rv-mix { border-radius: 0; border: 1.5px solid var(--ink); }
+.rv-rdot { border-radius: 0; border: 1.5px solid var(--ink); }
+.rv-lv i { border-radius: 0; }
+.rv-links a { min-height: 44px; border-radius: 0; }
+.rv-links a:hover { background: var(--panel-2); }
+.rv .rv-wl b, .rv .rv-up .v, .rv-cstats b, .rv-tally b, .rv .rv-rl b { font-family: var(--mono); }
+.rv-empty-i { border-radius: 0; border: 2px solid var(--ink); background: var(--panel-2); color: var(--text); }
+.rv-face { border-radius: 0; border: 2px solid var(--ink); box-shadow: none; background: var(--panel); }
+.rv-flip { border-radius: 0; }
+.rv-back { background: var(--panel-2); border-color: var(--ink); }
+.rv-flip:focus-visible .rv-face { box-shadow: none; outline: 3px solid var(--accent); outline-offset: 2px; }
+.rv-nt { border-radius: 0; border: 2px solid var(--ink); background: var(--green-soft); color: var(--text); }
+.rv-tags span { border-radius: 0; }
+.rv-rate button { border-radius: 0; border: 2px solid var(--ink); min-height: 56px; box-shadow: none; transform: none; }
+.rv-rate button:hover { transform: none; box-shadow: none; }
+.rv-rate .g1:hover { background: var(--red-soft); border-color: var(--ink); } .rv-rate .g2:hover { background: var(--amber-soft); border-color: var(--ink); }
+.rv-rate .g3:hover { background: var(--green-soft); border-color: var(--ink); } .rv-rate .g4:hover { background: var(--panel-2); border-color: var(--ink); }
+.rv-rate .g1 b, .rv-rate .g2 b, .rv-rate .g3 b, .rv-rate .g4 b, .rv-tally .g1 b, .rv-tally .g2 b, .rv-tally .g3 b, .rv-tally .g4 b { color: var(--text); }
+.rv-stim > summary { color: var(--text); min-height: 44px; }
+.rv .pr-pick, .rv .pr-segc { box-shadow: none; border-radius: 0; }
+.rv .pr-pick { border: 2px solid var(--ink); min-height: 44px; }
+.rv .pr-pick.on, .rv .pr-segc button.on { background: var(--ink); color: var(--bg); box-shadow: none; }
+.rv .pr-segc button { min-height: 40px; }
+.rv .pr-chip { box-shadow: none; }
 `;
 
   /* ---------------------------------------------------------------- boot */

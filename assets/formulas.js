@@ -81,6 +81,28 @@ mark.ch-hl { background: var(--hl); color: #1d1d1f; border-radius: 3px; padding:
   .ch-n, .ch-note { padding-top: 0; }
   .ch-print { margin-left: 0; }
 }
+.ch-page h2, .ch-page h3, .ch-page h4 { text-transform: none; letter-spacing: 0; }
+.ch-toc h2 { font: 700 12px var(--mono); text-transform: uppercase; letter-spacing: .04em; border: 0; padding: 0; }
+.ch-sechead { text-transform: none; border: 0; padding: 0; }
+.ch-sechead::before { border-radius: 0; width: .7rem; height: .7rem; border: 1.5px solid var(--ink); background: var(--dot); }
+.ch-card { box-shadow: none; border: 2px solid var(--ink); border-radius: 0; }
+.ch-search input { border: 2px solid var(--ink); border-radius: 0; min-height: 44px; box-shadow: none; }
+.ch-search input:focus { border-color: var(--ink); box-shadow: none; outline: 3px solid var(--accent); }
+.ch-search kbd { border-radius: 0; }
+.ch-chip, .ch-print { border: 2px solid var(--ink); border-radius: 0; box-shadow: none; min-height: 44px; color: var(--text); text-transform: none; letter-spacing: 0; font-weight: 800; transform: none; }
+.ch-chip:hover, .ch-print:hover { background: var(--panel-2); transform: none; box-shadow: none; }
+.ch-chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.ch-toc a { min-height: 44px; display: flex; align-items: center; border-radius: 0; color: var(--text); }
+.ch-toc a.on { background: var(--ink); color: var(--bg); }
+.ch-tag { border-radius: 0; font-family: var(--mono); font-size: 12px; color: var(--muted); background: none; border: 1.5px solid var(--ink); }
+.ch-pr { color: var(--text); min-height: 44px; }
+.ch-f { background: none; border: 0; border-radius: 0; padding: .2rem 0; font-family: var(--mono); }
+.ch-card[data-sec="verbal"] .ch-f { font-family: var(--sans); }
+.ch-note code, .ch-card li code { border-radius: 0; }
+.ch-lists .t h4, .ch-lists .x h4 { color: var(--text); }
+.ch-lists li::before { border-radius: 0; }
+.ch-empty, .ch-empty-all { border-radius: 0; border: 2px dashed var(--ink); }
+.ch-tbl.zebra-cols td:nth-child(2n) { color: var(--text); font-weight: 700; }
 @media print {
   @page { margin: 12mm; }
   html, body { background: #fff !important; color: #000 !important; }
