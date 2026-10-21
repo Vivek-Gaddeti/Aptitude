@@ -89,7 +89,7 @@ html, body { margin: 0; }
 [data-theme="dark"].page-tinted { --accent: var(--page-ink-dark); --accent-soft: color-mix(in srgb, var(--page-c) 20%, var(--panel)); }
 
 /* header height (shrinks a little when you scroll, see delight.js) */
-:root { --top-h: 56px; }
+:root { --top-big: 56px; --top-small: 48px; --top-h: var(--top-big); }
 /* soft light ↔ dark switch (used with document.startViewTransition) */
 ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .45s; animation-timing-function: cubic-bezier(.4,0,.2,1); }
 body {

@@ -301,7 +301,9 @@ function validateQ(q, o) {
   // calc / check
   const hasCalc = q.calc != null && q.calc !== '';
   const hasCheck = q.check != null && q.check !== '';
-  if (!hasCalc && o.gen) E.push('calc: generated questions must supply calc (a JS expression for the numeric answer)');
+  // generated questions must prove their answer: calc for a number, or a real check (not a bare "true") for text answers
+  const trivialCheck = hasCheck && /^\s*(true|!0|1)\s*$/.test(String(q.check));
+  if (o.gen && !hasCalc && (!hasCheck || trivialCheck)) E.push('calc/check: generated questions must supply calc (numeric answer) or a check expression that tests the correct option (a bare "true" proves nothing)');
   if (!hasCalc && !hasCheck && !o.gen && q.sec === 'quant') W.push('quant question has neither calc nor check, so its answer key is NOT machine-verified');
 
   if (hasCalc) {

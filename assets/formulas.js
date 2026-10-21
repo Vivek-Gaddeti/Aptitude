@@ -3,7 +3,7 @@
 (function () {
   const SEC_ORDER = ["quant", "reasoning", "verbal", "di"];
   const SEC_NAME = { quant: "Quant", reasoning: "Reasoning", verbal: "Verbal", di: "DI", tables: "Tables" };
-  const SEC_COLOR = { quant: "#1fae7a", reasoning: "#8b6cf0", verbal: "#e2609a", di: "#22a3b6", tables: "#ec8a4f" };
+  const SEC_COLOR = { quant: "#FF8AB0", reasoning: "#3DDC84", verbal: "#FFD23F", di: "#8EC5FF", tables: "#FF9F5A" };
 
   const CSS = `
 #content.ch-page { max-width: 1240px; }

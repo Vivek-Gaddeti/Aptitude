@@ -1,7 +1,6 @@
 /* home.js — the dashboard (index.html).
-   Left column: hello + today's goal ring (editable goal), streaks, an accuracy gauge, mistake reasons.
-   Main column: "Up next" (daily set, continue learning, due reviews, speed drill), one card per section, weak patterns,
-   mock history, the year heatmap. Popovers: how-to (?), backup (gear: Export / Import / Reset), daily goal.
+   One column, top to bottom: today (goal bar, the one big "start" button, streak) → "Up next" (continue learning,
+   reviews, speed drill) → one card per section → weak patterns + why you miss → mock history → the year heatmap. Popovers: how-to (?), backup (gear: Export / Import / Reset), daily goal.
    Data: data/progress.js (PROGRESS: catalog, learn, qcount, gens), data/mocks.js (window.MOCKS, optional) and the Store:
    items q:* / g:* (n, c, t, why…), pat:<sec>/<topic>/<pattern> (n, c, ts, seen), learn topics <sec>:<topic> (status),
    activity (day → count), mocks[], meta.goal / meta.daily / meta.speed. Renders fine with an empty Store. */
@@ -46,8 +45,6 @@
   const mmss = (s) => { s = Math.round(s || 0); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
   const plural = (n, w) => `${N(n)} ${w}${n === 1 ? "" : "s"}`;
   const greet = () => { const h = new Date().getHours(); return h < 5 || h >= 22 ? "Late-night grind" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; };
-  const ring = (frac, cls) => `<circle class="${cls}" cx="29" cy="29" r="24" pathLength="100" stroke-dasharray="${Math.max(0, Math.min(100, frac * 100)).toFixed(1)} 100"/>`;
-  const accTone = (a) => (a < 0.5 ? "red" : a < 0.75 ? "amber" : "green");
   const goalOf = (d) => { const g = Math.round(+((d.meta || {}).goal)); return g >= 1 && g <= 500 ? g : 25; };
   const shortDate = (t) => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   const prettyId = (s) => String(s || "").replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
@@ -133,126 +130,113 @@
       tot, sections, weak, rated: rated.length, why, wrongs, tagged, nextLesson, daily, speedBest, due, mocks, presets: MK.length };
   }
 
-  /* ---------- pieces ---------- */
-  function hello(M) {
-    const frac = Math.min(1, M.todayN / M.goal), left = Math.max(0, M.goal - M.todayN);
-    const line = M.todayN >= M.goal ? "Goal done for today. Nice work!" : M.todayN ? `${plural(left, "question")} to go today.` : "Ready for today's session?";
-    return `<section class="card dash-card dash-hello">
-      <span class="dash-mascot">${ICON(I.walk)}</span>
-      <div class="flex-1"><div class="small muted">${greet()}</div><div class="dash-hello-t">${line}</div></div>
-      <button type="button" class="dash-goal hm-goalbtn" data-pop="goal" title="Today: ${M.todayN} of ${M.goal} questions. Click to change the daily goal." aria-label="Today ${M.todayN} of ${M.goal} questions. Change daily goal">
-        <svg viewBox="0 0 58 58" aria-hidden="true">${ring(1, "goal-track")}${frac > 0 ? ring(frac, "goal-arc") : ""}</svg>
-        <div><b>${Math.min(M.todayN, M.goal)}/${M.goal}</b><span>today</span></div>
-        <i class="hm-goaledit">${ICON(I.pencil)}</i></button>
+  /* ---------- pieces ----------
+     The page reads top to bottom: today (goal + one big start button) → up next → sections → weak spots → mocks → the year.
+     One primary action per block; empty blocks say one line instead of filling space. */
+  const DAYS = ["S", "M", "T", "W", "T", "F", "S"];
+
+  function hero(M) {
+    const D = M.daily, dDone = D ? Math.min(D.idx || 0, D.ids.length) : 0, dFull = D && dDone >= D.ids.length;
+    const left = Math.max(0, M.goal - M.todayN), done = M.todayN >= M.goal;
+    const line = done ? "Goal done for today" : M.todayN ? `${plural(left, "question")} to go` : "Ready for today's set?";
+    const cells = Math.min(M.goal, 30), on = Math.round(Math.min(1, M.todayN / M.goal) * cells);
+    const cta = dFull ? { t: "Practise more", href: "practice.html#setup" }
+      : D && dDone ? { t: `Continue set · ${dDone}/${D.ids.length}`, href: "practice.html#daily" }
+      : { t: "Start today's set", href: "practice.html#daily" };
+    const week = [];
+    for (let i = 6; i >= 0; i--) { const t = Date.now() - i * 864e5; week.push({ l: DAYS[new Date(t).getDay()], on: (M.d.activity[today(t)] || 0) > 0, now: i === 0 }); }
+    const T = M.tot;
+    return `<section class="db-hero">
+      <div class="db-hello">
+        <div class="db-hello-top"><span class="db-tag">${greet()}</span>
+          <span class="dash-tools">
+            <button type="button" class="icon-btn" data-pop="help" aria-label="How to use this site" title="How to use this site">${ICON(I.help)}</button>
+            <button type="button" class="icon-btn" data-pop="gear" aria-label="Backup, import or reset progress" title="Backup / import / reset">${ICON(I.gear)}</button></span></div>
+        <h1 class="db-title">${line}</h1>
+        <div class="db-goal">
+          <div class="db-goal-h"><span>Today's goal</span><span class="db-mono"><b>${N(Math.min(M.todayN, 9999))}</b> / ${M.goal} questions</span></div>
+          <div class="db-cells" role="img" aria-label="${M.todayN} of ${M.goal} questions today" style="--n:${cells}">${Array.from({ length: cells }, (_, i) => `<i${i < on ? ' class="on"' : ""}></i>`).join("")}</div>
+        </div>
+        <div class="db-actions">
+          <a class="btn primary db-cta" href="${cta.href}">${cta.t} ${ICON(I.arrow)}</a>
+          <button type="button" class="btn" data-pop="goal">Edit goal</button>
+          ${T.n ? `<span class="db-mono db-overall">${N(T.n)} answered · ${pct(T.c / T.n)} right</span>` : ""}
+        </div>
+      </div>
+      <div class="db-streak">
+        <div class="db-streak-n"><b>${M.streak}</b><span>day streak</span></div>
+        <span class="db-pill">Best · ${M.best}</span>
+        <div class="db-week" aria-label="Last 7 days">${week.map((w) => `<span class="${w.on ? "on" : ""}${w.now ? " now" : ""}"><i></i>${w.l}</span>`).join("")}</div>
+      </div>
     </section>`;
   }
 
-  function streaks(M) {
-    return `<div class="dash-pair">
-      <section class="card dash-card"><div class="small muted">Current streak</div><div class="dash-big">${ICON(I.flame, "cat-ico ico-amber")}<span class="stat">${plural(M.streak, "day")}</span></div></section>
-      <section class="card dash-card"><div class="small muted">Best streak</div><div class="dash-big">${ICON(I.trophy, "cat-ico ico-amber")}<span class="stat">${plural(M.best, "day")}</span></div></section>
-    </div>`;
-  }
-
-  function gauge(M) {
-    const T = M.tot, acc = T.n ? T.c / T.n : 0, len = acc * 75;
-    const tone = T.n ? `var(--${accTone(acc)})` : "var(--muted)";
-    return `<section class="card dash-card"><div class="dash-h">${ICON(I.target, "cat-ico ico-green")}Accuracy</div>
-      <div class="dash-gauge-row"><div class="rm-diff">
-        <div><span class="text-accent">Answered</span><b>${N(T.n)}</b></div>
-        <div><span class="text-green">Correct</span><b>${N(T.c)}</b></div>
-        <div><span class="text-amber">Avg time</span><b>${T.n ? mmss(T.ts / T.n) : "-"}</b></div></div>
-      <div class="rm-gauge"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="g-track" cx="60" cy="60" r="48" pathLength="100"/>${T.n ? `<circle class="g-arc" cx="60" cy="60" r="48" pathLength="100" style="stroke:${tone};stroke-dasharray:${len.toFixed(2)} 100"/>` : ""}</svg>
-        <div class="rm-gauge-t"><b class="stat">${T.n ? Math.round(acc * 100) + "<small>%</small>" : "-"}</b><span>${T.n ? "overall" : "no answers yet"}</span></div></div></div></section>`;
-  }
-
-  function reasons(M) {
-    const head = `<div class="dash-h">${ICON(I.alert, "cat-ico ico-red")}Why you miss</div>`;
-    if (!M.tagged) return `<section class="card dash-card">${head}
-      <p class="small muted dash-due">${M.wrongs ? `You have ${plural(M.wrongs, "wrong answer")} but none tagged yet.` : "No wrong answers yet."} After a wrong answer, tap a reason chip (Concept, Calculation, Misread, Time, Guessed) and the split shows up here with a tip.</p></section>`;
-    const rows = REASONS.map(([k, label]) => ({ k, label, n: M.why[k] || 0 }));
-    const top = rows.slice().sort((a, z) => z.n - a.n)[0], max = Math.max(...rows.map((r) => r.n));
-    return `<section class="card dash-card">${head}
-      <div class="hm-mr">${rows.map((r) => `<div class="hm-mr-row${r.k === top.k ? " top" : ""}"><span>${r.label}</span>
-        <span class="hm-bar"><span style="width:${max ? ((r.n / max) * 100).toFixed(1) : 0}%"></span></span><b>${pct(r.n / M.tagged)}</b></div>`).join("")}</div>
-      <p class="small hm-tip">${ICON(I.bulb, "cat-ico ico-amber")}<span>${REASONS.find((r) => r[0] === top.k)[2]}</span></p>
-      <div class="small muted">${plural(M.tagged, "tagged mistake")}${M.wrongs > M.tagged ? ` · ${N(M.wrongs - M.tagged)} untagged` : ""} · <a href="revision.html">Open the mistake book</a></div></section>`;
-  }
-
   function upNext(M) {
-    const D = M.daily, dDone = D ? Math.min(D.idx || 0, D.ids.length) : 0;
-    const dailySub = D ? (dDone >= D.ids.length ? "Done for today. Come back tomorrow." : `${dDone} of ${D.ids.length} answered. Pick up where you left off.`)
-      : "20 questions: your weak patterns, due reviews and new ones.";
-    const L = M.nextLesson;
-    const sp = M.speedBest;
+    const L = M.nextLesson, sp = M.speedBest;
     const tiles = [
-      { cls: "main", ic: I.cal, kick: "Daily set", t: D && dDone >= D.ids.length ? "Daily set done" : D && dDone ? "Continue the daily set" : "Start today's set", sub: dailySub, href: "practice.html#daily" },
-      { ic: I.book, kick: "Continue learning", t: L ? L.title : "All written lessons learned", sub: L ? `${L.short} · ${L.group || "lesson"}` : "New lessons appear as they are written.", href: L ? L.href : "quant.html" },
-      { ic: I.repeat, kick: "Due for review", t: M.due ? plural(M.due, "item") + " due" : "All caught up", sub: M.due ? "Questions you missed and topics to revise." : "Nothing is waiting. Missed questions come back here.", href: "revision.html", badge: M.due ? `<span class="badge purple">${M.due > 99 ? "99+" : M.due}</span>` : "" },
-      { ic: I.bolt, kick: "Speed drill", t: sp ? `Best: ${N(sp[1])}` : "60-second drill", sub: sp ? `Personal best (${esc(prettyId(sp[0]).toLowerCase())}). Beat it.` : "Squares, percentages, fractions and tables against the clock.", href: "practice.html#speed" },
+      { n: "01", kick: "Continue learning", t: L ? L.title : "All lessons learned", sub: L ? `${L.short} · ${L.group || "lesson"}` : "New lessons appear as they are written", href: L ? L.href : "quant.html", go: M.sections.some((x) => x.done) ? "Resume" : "Start" },
+      { n: "02", kick: "Review", t: M.due ? plural(M.due, "item") + " due" : "All caught up", sub: M.due ? "Questions you missed, back on schedule" : "Missed questions come back here", href: "revision.html", go: M.due ? "Review" : "Open", hot: M.due > 0 },
+      { n: "03", kick: "Speed drill", t: sp ? `Best · ${N(sp[1])}` : "60-second drill", sub: sp ? `Beat your ${esc(prettyId(sp[0]).toLowerCase())} score` : "Squares, %, fractions against the clock", href: "practice.html#speed", go: "Go" },
     ];
-    return `<section><h2 class="dash-h2">Up next</h2><div class="hm-next">${tiles.map((x) => `<a class="card hm-tile${x.cls ? " " + x.cls : ""}" href="${x.href}">
-      <span class="hm-tile-ic">${ICON(x.ic)}</span>
-      <span class="hm-tile-b"><span class="dash-kicker">${x.kick}</span><b>${esc(x.t)}</b><span class="small muted">${x.sub}</span></span>
-      ${x.badge || ""}<span class="hm-tile-go">${ICON(I.arrow)}</span></a>`).join("")}</div></section>`;
+    return `<section class="db-box">
+      <div class="db-box-h"><span class="db-label">${ICON(I.arrow)}Up next</span></div>
+      <div class="db-next">${tiles.map((x) => `<a class="db-tile${x.hot ? " hot" : ""}" href="${x.href}">
+        <span class="db-kick">${x.n} · ${x.kick}</span><b>${esc(x.t)}</b><span class="db-sub">${x.sub}</span>
+        <span class="db-go">${x.go} ${ICON(I.arrow)}</span></a>`).join("")}</div>
+    </section>`;
   }
 
   function sectionCards(M) {
-    return `<section><h2 class="dash-h2">Sections</h2><div class="dash-courses hm-secs">${M.sections.map((s) => {
+    return `<section><h2 class="db-h2">Sections</h2><div class="db-secs">${M.sections.map((s) => {
       const acc = s.n ? s.c / s.n : 0, over = s.n && s.avg > s.tgt * 1.1;
-      return `<div class="card dash-course hm-sec sc-${s.sec}">
-        <span class="dash-kicker hm-sc">${esc(s.short)}</span>
-        <b class="dash-course-t">${esc(s.name)}</b>
-        <span class="hm-stats3">
-          <span><b>${N(s.n)}</b><small>answered</small></span>
-          <span><b class="${s.n ? "text-" + accTone(acc) : ""}">${s.n ? pct(acc) : "-"}</b><small>accuracy</small></span>
-          <span><b class="${over ? "text-amber" : ""}">${s.n ? mmss(s.avg) : "-"}</b><small>avg / q</small></span></span>
-        <span class="row-between small"><span class="muted">Topics learned</span><span class="ct-n">${s.done} / ${s.total}</span></span>
-        <span class="ct-bar hm-scbar"><span style="width:${s.total ? ((s.done / s.total) * 100).toFixed(1) : 0}%"></span></span>
-        <span class="hm-sec-btns"><a class="btn sm primary hm-scbtn" href="${s.practiseHref}">Practise</a><a class="btn sm" href="${s.learnHref}" title="${s.learnLabel ? "Next lesson: " + esc(s.learnLabel) : "Open the " + esc(s.short) + " lessons"}">Learn</a></span>
-      </div>`;
+      return `<article class="db-sec sc-${s.sec}">
+        <div class="db-sec-h"><b>${esc(s.short)}</b><span class="db-pill">${s.total} topics</span></div>
+        <div class="db-sec-b">
+          <div class="db-sec-name">${esc(s.name)}</div>
+          <div class="db-learned"><span>Learned</span><span class="db-mono">${s.done} / ${s.total}</span></div>
+          <span class="db-bar"><span style="width:${s.total ? ((s.done / s.total) * 100).toFixed(1) : 0}%"></span></span>
+          <div class="db-stats"><span><b>${s.n ? pct(acc) : "–"}</b><small>accuracy</small></span><span><b class="${over ? "over" : ""}">${s.n ? mmss(s.avg) : "–"}</b><small>per question</small></span></div>
+          <div class="db-sec-btns"><a class="btn" href="${s.learnHref}" title="${s.learnLabel ? "Next lesson: " + esc(s.learnLabel) : "Open the " + esc(s.short) + " lessons"}">Learn</a><a class="btn db-dark" href="${s.practiseHref}">Practise</a></div>
+        </div></article>`;
     }).join("")}</div></section>`;
   }
 
   function weakCard(M) {
-    const head = `<div class="row-between"><div class="dash-h">${ICON(I.target, "cat-ico ico-red")}Weak patterns</div>${M.weak.length ? `<span class="small muted">lowest accuracy first</span>` : ""}</div>`;
-    if (!M.weak.length) {
-      const msg = M.rated ? `No weak patterns right now: every pattern you have answered 3+ times is above 85% and on time. Keep the daily set going.`
-        : "Not enough data yet. Answer at least 3 questions in a pattern and it is rated here, weakest first, with a one-click drill.";
-      return `<section class="card dash-card">${head}<div class="hm-empty">${ICON(M.rated ? I.trophy : I.chart, "cat-ico")}<p class="small muted">${msg}</p>
-        <a class="btn primary" href="practice.html#daily">Start the daily set ${ICON(I.arrow)}</a></div></section>`;
-    }
-    return `<section class="card dash-card">${head}<div class="hm-weak">${M.weak.map((p) => {
-      const t = TOPIC[p.sec + "/" + p.topic], over = p.avg > p.tgt;
-      return `<div class="hm-wk sc-${p.sec}">
-        <span class="hm-wk-n"><b>${esc(PAT[p.key] || prettyId(p.pattern))}</b><small><i class="hm-dot"></i>${esc((SEC[p.sec] || {}).short || p.sec)} · ${esc(t ? t.title : prettyId(p.topic))} · ${p.c}/${p.n} right</small></span>
-        <span class="hm-wk-a"><span class="hm-bar ${accTone(p.acc)}"><span style="width:${Math.max(3, p.acc * 100).toFixed(1)}%"></span></span><b class="text-${accTone(p.acc)}">${pct(p.acc)}</b></span>
-        <span class="hm-wk-t${over ? " over" : ""}" title="Average time per question vs the rough target">${mmss(p.avg)}<small> / ${mmss(p.tgt)}</small></span>
-        <a class="btn sm hm-wk-go" href="practice.html#drill/${p.key.split("/").map(encodeURIComponent).join("/")}">Drill</a></div>`;
-    }).join("")}</div></section>`;
+    const head = `<div class="db-card-h dark"><span>${ICON(I.alert)}Weak patterns</span>${M.weak.length ? `<small>lowest first</small>` : ""}</div>`;
+    if (!M.weak.length) return `<section class="db-card">${head}<p class="db-empty">${M.rated
+      ? "Nothing weak right now: every pattern you have tried 3+ times is above 85% and on time."
+      : "Answer 3 questions in a pattern and it gets rated here, weakest first, with a one-click drill."}</p></section>`;
+    return `<section class="db-card">${head}${M.weak.slice(0, 5).map((p) => {
+      const t = TOPIC[p.sec + "/" + p.topic];
+      return `<div class="db-wk sc-${p.sec}"><i class="db-sq"></i>
+        <span class="db-wk-n"><b>${esc(PAT[p.key] || prettyId(p.pattern))}</b><small>${esc(t ? t.title : prettyId(p.topic))} · ${p.c}/${p.n} right${p.avg > p.tgt ? " · slow" : ""}</small></span>
+        <b class="db-mono db-wk-a">${pct(p.acc)}</b>
+        <a class="btn sm db-yellow" href="practice.html#drill/${p.key.split("/").map(encodeURIComponent).join("/")}">Drill</a></div>`;
+    }).join("")}</section>`;
+  }
+
+  function reasons(M) {
+    const head = `<div class="db-card-h"><span>${ICON(I.bulb)}Why you miss</span>${M.tagged ? `<a class="small" href="revision.html">Mistake book</a>` : ""}</div>`;
+    if (!M.tagged) return `<section class="db-card">${head}<p class="db-empty">${M.wrongs ? `${plural(M.wrongs, "wrong answer")}, none tagged yet.` : "No wrong answers yet."} After a miss, tap a reason (Concept, Calculation, Misread, Time, Guessed) to see your pattern here.</p></section>`;
+    const rows = REASONS.map(([k, label, tip]) => ({ k, label, tip, n: M.why[k] || 0 })).sort((a, z) => z.n - a.n);
+    return `<section class="db-card">${head}<div class="db-why">
+      <div class="db-chips">${rows.map((r, i) => `<span class="db-chip${i === 0 ? " top" : ""}">${r.label} · ${r.n}</span>`).join("")}</div>
+      <p class="db-tip">${rows[0].tip}</p></div></section>`;
   }
 
   function mockCard(M) {
-    const head = `<div class="row-between"><div class="dash-h">${ICON(I.chart, "cat-ico ico-green")}Mock tests</div><a class="small fw-700" href="mock.html">All mocks</a></div>`;
-    if (!M.mocks.length) return `<section class="card dash-card">${head}<div class="hm-empty">${ICON(I.trophy, "cat-ico")}
-      <p class="small muted">No mocks yet. A mock is a timed, exam-style test${M.presets ? ` (${M.presets} formats, from TCS NQT-style to a quick 15)` : ""} with negative marking and a full analysis at the end.</p>
-      <a class="btn primary" href="mock.html">Take your first mock ${ICON(I.arrow)}</a></div></section>`;
+    const head = `<div class="db-card-h"><span>${ICON(I.chart)}Mock tests</span><a class="small" href="mock.html">All mocks →</a></div>`;
+    if (!M.mocks.length) return `<section class="db-card">${head}<div class="db-empty db-empty-row"><span>No mocks yet. A mock is a timed, company-style test${M.presets ? ` (${M.presets} formats)` : ""} with negative marking and a full analysis.</span>
+      <a class="btn" href="mock.html">Take a mock ${ICON(I.arrow)}</a></div></section>`;
     const last = M.mocks.slice(-10), best = M.mocks.reduce((b, m) => (m.p > b.p ? m : b), M.mocks[0]);
-    const L = M.mocks[M.mocks.length - 1], prev = M.mocks[M.mocks.length - 2];
-    const avg = M.mocks.reduce((s, m) => s + m.p, 0) / M.mocks.length, delta = prev ? Math.round((L.p - prev.p) * 100) : null;
+    const L = M.mocks[M.mocks.length - 1], avg = M.mocks.reduce((s, m) => s + m.p, 0) / M.mocks.length;
     const sc = (m) => (m.max ? `${+(+m.score || 0).toFixed(2)} / ${m.max}` : pct(m.p));
-    return `<section class="card dash-card">${head}
-      <div class="hm-mstats">
-        <span><b>${M.mocks.length}</b><small>taken</small></span>
-        <span><b class="text-green">${pct(Math.max(0, best.p))}</b><small>best</small></span>
-        <span><b>${pct(Math.max(0, L.p))}${delta != null && delta !== 0 ? ` <em class="${delta > 0 ? "text-green" : "text-red"}">${delta > 0 ? "+" : ""}${delta}</em>` : ""}</b><small>last</small></span>
-        <span><b>${pct(Math.max(0, avg))}</b><small>average</small></span></div>
-      <div class="hm-mk" role="img" aria-label="Score of the last ${last.length} mocks">
-        <span class="hm-mk-grid"><i style="bottom:100%"><em>100</em></i><i style="bottom:50%"><em>50</em></i><i style="bottom:0"><em>0</em></i></span>
-        ${last.map((m) => { const v = Math.max(0, Math.min(1, m.p)); return `<span class="hm-mk-c${m === best ? " best" : ""}" title="${esc(m.name)} · ${shortDate(m.at)} · ${sc(m)} (${pct(m.p)})">
-          <span class="hm-mk-v">${Math.round(m.p * 100)}</span><span class="hm-mk-f" style="height:${Math.max(2, v * 100).toFixed(1)}%"></span><span class="hm-mk-d">${shortDate(m.at)}</span></span>`; }).join("")}
+    return `<section class="db-card">${head}
+      <div class="db-mk" role="img" aria-label="Score of the last ${last.length} mocks">
+        ${last.map((m) => { const v = Math.max(0, Math.min(1, m.p)); return `<span class="db-mk-c${m === L ? " last" : ""}" title="${esc(m.name)} · ${shortDate(m.at)} · ${sc(m)}">
+          <small>${Math.round(m.p * 100)}%</small><i style="height:${Math.max(3, v * 100).toFixed(1)}%"></i><em>${shortDate(m.at)}</em></span>`; }).join("")}
       </div>
-      <div class="small muted hm-mbest">${ICON(I.trophy, "cat-ico ico-amber")}<span>Best: <b class="text-strong">${esc(best.name)}</b> on ${new Date(best.at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}, ${sc(best)}</span></div>
+      <div class="db-card-f">Last: <b>${esc(L.name)}</b> · ${pct(Math.max(0, L.p))} &nbsp;·&nbsp; Best ${pct(Math.max(0, best.p))} &nbsp;·&nbsp; Average ${pct(Math.max(0, avg))} &nbsp;·&nbsp; ${plural(M.mocks.length, "mock")}</div>
     </section>`;
   }
 
@@ -279,36 +263,21 @@
   /* ---------- the page ---------- */
   function render() {
     const M = model(), H = heat(M.d.activity, M.goal);
-    main.innerHTML = `
-      <div class="dash-top">
-        <h1 class="dash-title">Dashboard</h1>
-        <div class="dash-tools">
-          <button type="button" class="icon-btn" data-pop="help" aria-label="How to use this site" title="How to use this site">${ICON(I.help)}</button>
-          <button type="button" class="icon-btn" data-pop="gear" aria-label="Backup, import or reset progress" title="Backup / import / reset">${ICON(I.gear)}</button>
-        </div>
-      </div>
-      <div class="dash">
-        <aside class="dash-left">
-          ${hello(M)}
-          ${streaks(M)}
-          ${gauge(M)}
-          ${reasons(M)}
-        </aside>
-        <div class="dash-main">
-          ${upNext(M)}
-          ${sectionCards(M)}
-          ${weakCard(M)}
-          ${mockCard(M)}
-          <section class="card dash-card hm" id="hm">
-            <div class="hm-head"><b>${ICON(I.pulse, "cat-ico ico-green")}${plural(H.total, "question")} in ${year}</b>
-              <span class="hm-stats"><span>Active days <b>${H.days}</b></span><span>Current streak <b>${M.streak}</b></span><span>Max streak <b>${M.best}</b></span>
-              <select id="hmYear" aria-label="Year">${H.years.map((y) => `<option ${y === year ? "selected" : ""}>${y}</option>`).join("")}</select></span></div>
-            ${H.svg}
-            <div class="hm-foot"><span>Each square is a day; the darkest green means you hit your goal of ${M.goal}.</span><span class="hm-legend">Less ${[0, 1, 2, 3, 4].map((l) => `<i class="l${l}"></i>`).join("")} More</span></div>
-          </section>
-        </div>
-      </div>
-      <div class="dash-pop card" id="dashPop" hidden></div>`;
+    main.innerHTML = `<div class="db">
+      ${hero(M)}
+      ${upNext(M)}
+      ${sectionCards(M)}
+      <div class="db-two">${weakCard(M)}${reasons(M)}</div>
+      ${mockCard(M)}
+      <section class="db-card hm" id="hm">
+        <div class="db-card-h"><span>${ICON(I.cal)}${plural(H.total, "question")} in ${year}</span>
+          <span class="hm-stats"><span>Active days <b>${H.days}</b></span><span>Best streak <b>${M.best}</b></span>
+          <select id="hmYear" aria-label="Year">${H.years.map((y) => `<option ${y === year ? "selected" : ""}>${y}</option>`).join("")}</select></span></div>
+        <div class="db-hm-b">${H.svg}
+        <div class="hm-foot"><span>Each square is a day. The darkest means you hit your goal of ${M.goal}.</span><span class="hm-legend">Less ${[0, 1, 2, 3, 4].map((l) => `<i class="l${l}"></i>`).join("")} More</span></div></div>
+      </section>
+    </div>
+    <div class="dash-pop card" id="dashPop" hidden></div>`;
     const yr = $("#hmYear");
     if (yr) yr.onchange = () => { year = +yr.value; render(); };
     const sc = $(".hm-scroll");                                         // narrow screens: show the latest months first
@@ -326,7 +295,7 @@
         <li><strong>Practice</strong> serves one question at a time. Start with the <strong>daily set</strong>; every pattern also has a drill that gets harder as you improve.</li>
         <li>After a wrong answer, tag <strong>why</strong> you missed it. Missed questions come back in <strong>Revision</strong> after 1, 3, 7, 14, 30 and 60 days.</li>
         <li><strong>Mock tests</strong> copy the format of each company's test, with a timer and negative marking.</li>
-        <li>Your goal is ${goal} questions a day (click the ring to change it). Streaks count every day you practise.</li></ol>
+        <li>Your goal is ${goal} questions a day (use <strong>Edit goal</strong> to change it). Streaks count every day you practise.</li></ol>
       <p class="small muted">Press <kbd>Ctrl</kbd> <kbd>K</kbd> to find anything, or <kbd>?</kbd> for all keyboard shortcuts.</p>`;
     else if (kind === "gear") el.innerHTML = `<div class="dash-h">Your progress</div><p class="small muted">Answers, mocks, notes and bookmarks are saved only in this browser. Export them now and then, and import the file on another device.</p>
          <div class="btn-row"><button type="button" class="btn primary" data-do="export">${icon("download")} Export</button><label class="btn">${icon("upload")} Import<input type="file" data-do="import" accept=".json,application/json" hidden></label><button type="button" class="btn on-red" data-do="reset">Reset</button></div>`;
@@ -335,8 +304,10 @@
          <form class="hm-goalform" data-goalform><label class="small muted" for="hmGoalIn">Custom</label><input id="hmGoalIn" type="number" min="1" max="500" step="1" value="${goal}"><button type="submit" class="btn sm primary">Save</button></form>`;
     const r = btn.getBoundingClientRect(), mr = main.getBoundingClientRect();
     el.style.top = r.bottom - mr.top + 8 + "px";
-    if (kind === "goal") { el.style.right = ""; el.style.left = Math.max(0, Math.min(r.left - mr.left - 150, mr.width - Math.min(360, mr.width))) + "px"; }
-    else { el.style.left = ""; el.style.right = mr.right - r.right + "px"; }
+    // keep the popover inside the page: under its button, nudged left or right so it never runs off a phone screen
+    const w = Math.min(360, mr.width - 16), want = kind === "goal" ? r.left - mr.left - 150 : r.right - mr.left - w;
+    el.style.right = ""; el.style.width = w + "px";
+    el.style.left = Math.max(8, Math.min(want, mr.width - w - 8)) + "px";
     el.hidden = false;
   }
   function closePop() { pop = null; const el = $("#dashPop"); if (el) el.hidden = true; }
@@ -370,108 +341,124 @@
     const st = document.createElement("style");
     st.id = "homeStyle";
     st.textContent = `
-.sc-quant { --sc: #1fae7a; --si: #177f59; } .sc-reasoning { --sc: #8b6cf0; --si: #785dce; } .sc-verbal { --sc: #e2609a; --si: #b34c7a; } .sc-di { --sc: #22a3b6; --si: #197a88; }
-[data-theme="dark"] .sc-quant { --si: #2fc28d; } [data-theme="dark"] .sc-reasoning { --si: #9d84f3; } [data-theme="dark"] .sc-verbal { --si: #e874a8; } [data-theme="dark"] .sc-di { --si: #33b5c8; }
-.text-strong { color: var(--text); }
-.dash-left > .card, .dash-main > .card { margin: 0; }
-button.hm-goalbtn { border: 0; padding: 0; background: none; color: inherit; font: inherit; cursor: pointer; border-radius: 50%; }
-.hm-goalbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.hm-goaledit { position: absolute; right: -4px; bottom: -4px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: var(--panel); border: 1px solid var(--border); color: var(--muted); opacity: .85; transition: color .3s ease, border-color .3s ease; }
-.hm-goaledit .cat-ico { width: 11px; height: 11px; }
-.hm-goalbtn:hover .hm-goaledit { color: var(--accent); border-color: var(--accent); }
+.sc-quant { --sc: #FF8AB0; } .sc-reasoning { --sc: #3DDC84; } .sc-verbal { --sc: #FFD23F; } .sc-di { --sc: #8EC5FF; }
+.db { --ink-c: var(--ink, var(--text)); --bw-c: var(--bw, 2px); --sh-c: var(--sh, var(--shadow)); position: relative; display: flex; flex-direction: column; gap: 2.25rem; }
+.db .db-mono { font-family: var(--mono); }
+.db-h2 { margin: 0 0 1rem; }
+.db-pill { font: 700 .72rem var(--mono); background: var(--panel); color: var(--text); border: 2px solid var(--ink-c); padding: .1rem .45rem; white-space: nowrap; }
+.db-tag { font: 700 .74rem var(--mono); letter-spacing: .1em; text-transform: uppercase; background: var(--green-soft); color: var(--text); border: 2px solid var(--ink-c); padding: .15rem .55rem; }
+/* hero: today */
+.db-hero { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+.db-hello { flex: 999 1 460px; min-width: 0; background: var(--panel); border: var(--bw-c) solid var(--ink-c); box-shadow: var(--sh-c); padding: 1.4rem 1.5rem; display: flex; flex-direction: column; gap: 1.1rem; }
+.db-hello-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.db-title { margin: 0 !important; font-size: clamp(1.9rem, 4.2vw, 3rem) !important; line-height: 1 !important; border: 0; padding: 0; }
+.db-goal { border-top: var(--bw-c) dashed var(--ink-c); padding-top: 1rem; display: flex; flex-direction: column; gap: .55rem; }
+.db-goal-h { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; font: 800 .85rem var(--display); text-transform: uppercase; }
+.db-goal-h .db-mono { font-weight: 400; text-transform: none; font-size: .85rem; } .db-goal-h b { font-size: 1.3rem; }
+.db-cells { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 3px; border: var(--bw-c) solid var(--ink-c); padding: 4px; background: var(--panel); }
+.db-cells i { height: 22px; background: var(--accent-soft); }
+.db-cells i.on { background: var(--accent); }
+.db-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.db-cta { font-size: 1rem !important; padding: .7rem 1.3rem !important; min-height: 48px; display: inline-flex; align-items: center; gap: .5rem; }
+.db-cta .cat-ico { width: 18px; height: 18px; }
+.db-overall { font-size: .8rem; color: var(--muted); margin-left: auto; }
+.db-streak { flex: 1 1 250px; background: var(--f-yellow, #FFD23F); color: #22121A; border: var(--bw-c) solid var(--ink-c); box-shadow: var(--sh-c); padding: 1.3rem 1.4rem; display: flex; flex-direction: column; gap: .9rem; position: relative; }
+.db-streak .db-pill { position: absolute; top: 1.2rem; right: 1.2rem; background: #fff; color: #22121A; border-color: #22121A; }
+.db-streak-n b { display: block; font: 900 4.6rem/0.85 var(--display); }
+.db-streak-n span { font: 800 .9rem var(--display); text-transform: uppercase; }
+.db-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: auto; }
+.db-week span { display: flex; flex-direction: column; align-items: center; gap: 3px; font: 700 .72rem var(--mono); }
+.db-week i { width: 100%; aspect-ratio: 1; border: 3px solid #22121A; background: #fff; }
+.db-week .on i { background: #22121A; }
+.db-week .now i { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #22121A; }
+/* boxed panels with a label tab */
+.db-box, .db-card { background: var(--panel); border: var(--bw-c) solid var(--ink-c); box-shadow: var(--sh-c); min-width: 0; }
+.db-box-h { padding: .8rem 1rem; border-bottom: var(--bw-c) solid var(--ink-c); background: var(--accent-soft); }
+.db-label { display: inline-flex; align-items: center; gap: .45rem; background: var(--accent); color: #fff; border: var(--bw-c) solid var(--ink-c); padding: .3rem .75rem; font: 900 .95rem var(--display); text-transform: uppercase; letter-spacing: .03em; }
+[data-theme="dark"] .db-label { color: #22121A; }
+.db-label .cat-ico { width: 16px; height: 16px; }
+.db-next { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.db-tile { display: flex; flex-direction: column; gap: .35rem; padding: 1.1rem 1.2rem 1rem; color: var(--text) !important; text-decoration: none !important; border-right: var(--bw-c) solid var(--ink-c); margin-right: calc(-1 * var(--bw-c)); transition: background .15s; }
+.db-tile:hover { background: var(--f-yellow, #FFD23F) !important; color: #22121A !important; }
+.db-tile.hot { background: var(--accent-soft); }
+.db-kick { font: 700 .72rem var(--mono); text-transform: uppercase; letter-spacing: .05em; }
+.db-tile b { font: 900 1.25rem/1.1 var(--display); text-transform: uppercase; }
+.db-sub { font-size: .86rem; color: var(--muted); }
+.db-tile:hover .db-sub { color: #22121A; }
+.db-go { margin-top: auto; padding-top: .5rem; display: inline-flex; align-items: center; gap: .35rem; font: 900 .82rem var(--display); text-transform: uppercase; }
+.db-go .cat-ico { width: 15px; height: 15px; transition: transform .15s; }
+.db-tile:hover .db-go .cat-ico { transform: translateX(3px); }
+/* sections */
+.db-secs { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1.4rem; }
+.db-sec { background: var(--panel); border: var(--bw-c) solid var(--ink-c); box-shadow: var(--sh-c); display: flex; flex-direction: column; }
+.db-sec-h { background: var(--sc); color: #22121A; border-bottom: var(--bw-c) solid var(--ink-c); padding: .7rem .9rem; display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+.db-sec-h b { font: 900 1.3rem var(--display); text-transform: uppercase; }
+.db-sec-h .db-pill { background: #fff; color: #22121A; border-color: #22121A; }
+.db-sec-b { padding: .9rem; display: flex; flex-direction: column; gap: .65rem; flex: 1; }
+.db-sec-name { font-size: .88rem; color: var(--muted); }
+.db-learned { display: flex; justify-content: space-between; font: 800 .78rem var(--display); text-transform: uppercase; }
+.db-bar { display: block; height: 14px; border: 2px solid var(--ink-c); background: var(--panel); }
+.db-bar > span { display: block; height: 100%; background: var(--ink-c); }
+.db-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+.db-stats > span { border: 2px solid var(--ink-c); padding: .45rem .55rem; display: flex; flex-direction: column; }
+.db-stats b { font: 900 1.3rem var(--display); font-variant-numeric: tabular-nums; }
+.db-stats b.over { color: var(--amber); }
+.db-stats small { font: 400 .7rem var(--mono); color: var(--muted); }
+.db-sec-btns { display: flex; gap: .6rem; margin-top: auto; padding-top: .2rem; }
+.db-sec-btns .btn { flex: 1; justify-content: center; text-align: center; min-height: 42px; }
+.btn.db-dark { background: var(--ink-c); color: var(--bg); box-shadow: 3px 3px 0 var(--sc); }
+.btn.db-dark:hover { background: var(--ink-c); color: var(--bg); box-shadow: 5px 5px 0 var(--sc); }
+.btn.db-yellow { background: var(--f-yellow, #FFD23F); color: #22121A; }
+/* cards */
+.db-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; align-items: start; }
+.db-card-h { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .5rem 1rem; padding: .75rem 1rem; border-bottom: var(--bw-c) solid var(--ink-c); }
+.db-card-h > span:first-child { display: inline-flex; align-items: center; gap: .5rem; font: 900 1rem var(--display); text-transform: uppercase; }
+.db-card-h .cat-ico { width: 18px; height: 18px; }
+.db-card-h small { font: 400 .78rem var(--mono); }
+.db-card-h a { font: 700 .8rem var(--mono); }
+.db-card-h.dark { background: var(--ink-c); color: var(--bg); }
+.db-card-h.dark .cat-ico { color: var(--f-yellow, #FFD23F); }
+.db-empty { margin: 0; padding: 1.1rem 1rem; color: var(--muted); font-size: .92rem; line-height: 1.5; }
+.db-empty-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+.db-empty-row span { flex: 1 1 320px; }
+.db-wk { display: flex; align-items: center; gap: .75rem; padding: .7rem 1rem; border-bottom: 2px solid var(--ink-c); }
+.db-wk:last-child { border-bottom: 0; }
+.db-sq { width: 13px; height: 13px; flex: none; background: var(--sc); border: 2px solid var(--ink-c); }
+.db-wk-n { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.db-wk-n b { font-weight: 800; font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.db-wk-n small { font: 400 .74rem var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.db-wk-a { font-size: 1.05rem; }
+.db-why { padding: 1rem; display: flex; flex-direction: column; gap: .8rem; }
+.db-chips { display: flex; flex-wrap: wrap; gap: .45rem; }
+.db-chip { border: 2px solid var(--ink-c); padding: .2rem .6rem; font-weight: 700; font-size: .84rem; }
+.db-chip.top { background: var(--f-pink, #FF8AB0); color: #22121A; }
+.db-tip { margin: 0; font-size: .92rem; line-height: 1.5; border-top: 2px dashed var(--ink-c); padding-top: .75rem; }
+/* mock bars */
+.db-mk { display: flex; align-items: flex-end; gap: clamp(6px, 1.4vw, 16px); height: 200px; padding: 1.2rem 1rem 1.8rem; background-image: linear-gradient(color-mix(in srgb, var(--ink-c) 12%, transparent) 2px, transparent 2px); background-size: 100% 25%; background-origin: content-box; }
+.db-mk-c { position: relative; flex: 1; max-width: 64px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
+.db-mk-c small { font: 700 .72rem var(--mono); }
+.db-mk-c i { width: 100%; background: var(--accent-soft); border: 2px solid var(--ink-c); }
+.db-mk-c.last i { background: var(--accent); }
+.db-mk-c em { position: absolute; bottom: -1.4rem; font: 400 .66rem var(--mono); font-style: normal; color: var(--muted); white-space: nowrap; }
+.db-card-f { padding: .75rem 1rem; border-top: 2px dashed var(--ink-c); font-size: .88rem; }
+/* heatmap */
+.db .hm-stats { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1rem; font-size: .82rem; }
+.db .hm-stats select { padding: .2rem .5rem; }
+.db-hm-b { padding: 1rem; }
+/* popovers + goal form */
 .hm-goals { margin: .7rem 0 .6rem; } .hm-goals .btn { min-width: 2.8rem; justify-content: center; }
 .hm-goalform { display: flex; align-items: center; gap: .5rem; }
-.hm-goalform input { width: 5.5rem; padding: .3rem .5rem; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--panel); color: var(--text); font: 600 var(--fs-sm) var(--mono); }
-.hm-goalform input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.rm-gauge-t b small { font: 700 var(--fs-md) var(--display); color: var(--muted); }
-/* up next */
-.hm-next { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: var(--sp-3); }
-.hm-tile { display: flex; align-items: center; gap: .85rem; padding: .95rem 1.05rem; color: var(--text); text-decoration: none !important; transition: border-color .3s ease, transform .3s cubic-bezier(.22,1,.36,1); }
-.hm-tile:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
-:root[data-anim="on"] .hm-tile:hover { transform: translateY(-1px); }
-.hm-tile-ic { display: grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 12px; background: var(--panel-2); color: var(--accent); }
-.hm-tile-ic .cat-ico { width: 20px; height: 20px; }
-.hm-tile.main { background: color-mix(in srgb, var(--accent-soft) 70%, var(--panel)); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
-.hm-tile.main .hm-tile-ic { background: var(--accent); color: #fff; }
-.hm-tile-b { display: flex; flex-direction: column; gap: .1rem; min-width: 0; flex: 1; }
-.hm-tile-b b { font: 800 var(--fs-md) var(--display); line-height: 1.3; }
-.hm-tile-b .small { line-height: 1.4; font-size: var(--fs-xs); }
-.hm-tile-go { color: var(--muted); flex: none; } .hm-tile-go .cat-ico { width: 16px; height: 16px; }
-.hm-tile:hover .hm-tile-go { color: var(--accent); }
-/* section cards */
-.hm-secs { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
-.hm-sec { border-top: 3px solid var(--sc); gap: .55rem; }
-.hm-sc { color: var(--si); }
-.hm-stats3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .3rem; padding: .55rem 0; border-block: 1px dashed var(--border); }
-.hm-stats3 > span { display: flex; flex-direction: column; min-width: 0; }
-.hm-stats3 b { font: 800 var(--fs-lg) var(--display); font-variant-numeric: tabular-nums; line-height: 1.2; }
-.hm-stats3 small { font-size: var(--fs-2xs); color: var(--muted); white-space: nowrap; }
-.hm-scbar > span { background: var(--sc); }
-.hm-sec-btns { display: flex; gap: .4rem; margin-top: auto; padding-top: .2rem; }
-.hm-sec-btns .btn { flex: 1; justify-content: center; text-align: center; }
-.btn.hm-scbtn { background: var(--si); border-color: var(--si); color: #fff; }
-[data-theme="dark"] .btn.hm-scbtn { color: #111; }
-/* bars */
-.hm-bar { display: block; height: 7px; border-radius: var(--r-pill); background: var(--panel-2); overflow: hidden; }
-.hm-bar > span { display: block; height: 100%; border-radius: var(--r-pill); background: var(--accent); transition: width .6s cubic-bezier(.22,1,.36,1); }
-.hm-bar.red > span { background: var(--red); } .hm-bar.amber > span { background: var(--amber); } .hm-bar.green > span { background: var(--green); }
-/* weak patterns */
-.hm-weak { display: flex; flex-direction: column; margin-top: var(--sp-2); }
-.hm-wk { display: grid; grid-template-columns: minmax(0, 1fr) minmax(110px, 170px) 5.6rem auto; gap: .4rem 1rem; align-items: center; padding: .6rem 0; border-bottom: 1px dashed var(--border); }
-.hm-wk:last-child { border-bottom: 0; padding-bottom: 0; }
-.hm-wk-n { display: flex; flex-direction: column; min-width: 0; }
-.hm-wk-n b { font-weight: 600; font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hm-wk-n small { color: var(--muted); font-size: var(--fs-xs); display: flex; align-items: center; gap: .35rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.hm-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sc); flex: none; }
-.hm-wk-a { display: flex; align-items: center; gap: .55rem; }
-.hm-wk-a .hm-bar { flex: 1; }
-.hm-wk-a b { font: 700 var(--fs-xs) var(--mono); width: 2.6rem; text-align: right; }
-.hm-wk-t { font: 600 var(--fs-xs) var(--mono); text-align: right; white-space: nowrap; }
-.hm-wk-t small { color: var(--muted); font-weight: 500; }
-.hm-wk-t.over { color: var(--amber); }
+.hm-goalform input { width: 5.5rem; padding: .3rem .5rem; background: var(--panel); color: var(--text); font: 600 var(--fs-sm) var(--mono); }
+.text-strong { color: var(--text); }
 @media (max-width: 600px) {
-  .hm-wk { grid-template-columns: minmax(0, 1fr) auto auto; gap: .35rem .7rem; }
-  .hm-wk-n { grid-column: 1 / -1; }
+  .db { gap: 1.6rem; }
+  .db-hello, .db-streak { padding: 1rem; }
+  .db-streak-n b { font-size: 3.6rem; }
+  .db-cells i { height: 16px; }
+  .db-overall { margin-left: 0; width: 100%; }
+  .db-tile { border-right: 0; margin-right: 0; border-bottom: var(--bw-c) solid var(--ink-c); }
+  .db-tile:last-child { border-bottom: 0; }
 }
-/* mistake reasons */
-.hm-mr { display: flex; flex-direction: column; gap: .45rem; margin-top: var(--sp-3); }
-.hm-mr-row { display: grid; grid-template-columns: 6.6rem minmax(0, 1fr) 2.6rem; gap: .6rem; align-items: center; font-size: var(--fs-sm); }
-.hm-mr-row b { font: 700 var(--fs-xs) var(--mono); text-align: right; color: var(--muted); }
-.hm-mr-row .hm-bar > span { background: color-mix(in srgb, var(--red) 55%, var(--panel-2)); }
-.hm-mr-row.top .hm-bar > span { background: var(--red); }
-.hm-mr-row.top span:first-child, .hm-mr-row.top b { color: var(--text); font-weight: 700; }
-.hm-tip { display: flex; gap: .55rem; align-items: flex-start; margin: var(--sp-3) 0 var(--sp-2); padding: .65rem .75rem; border-radius: var(--r-sm); background: var(--amber-soft); line-height: 1.45; }
-.hm-tip .cat-ico { flex: none; margin-top: .1rem; }
-/* empty states */
-.hm-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: .55rem; padding: var(--sp-4) var(--sp-3) var(--sp-2); }
-.hm-empty > .cat-ico { width: 30px; height: 30px; color: var(--muted); opacity: .7; }
-.hm-empty p { max-width: 440px; margin: 0; line-height: 1.5; }
-.hm-empty .btn .cat-ico, .hm-empty .btn .ico { width: 16px; height: 16px; }
-/* mock history */
-.hm-mstats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; margin: var(--sp-3) 0 var(--sp-4); }
-.hm-mstats > span { display: flex; flex-direction: column; }
-.hm-mstats b { font: 800 var(--fs-xl) var(--display); font-variant-numeric: tabular-nums; line-height: 1.15; }
-.hm-mstats em { font: 700 var(--fs-xs) var(--mono); font-style: normal; vertical-align: middle; }
-.hm-mstats small { font-size: var(--fs-xs); color: var(--muted); }
-.hm-mk { position: relative; display: flex; align-items: stretch; gap: clamp(4px, 1.4vw, 14px); height: 150px; padding: 18px 0 22px 26px; }
-.hm-mk-grid { position: absolute; left: 26px; right: 0; top: 18px; bottom: 22px; pointer-events: none; }
-.hm-mk-grid i { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--border); }
-.hm-mk-grid em { position: absolute; left: -26px; top: -.55em; font: 500 10px var(--mono); font-style: normal; color: var(--muted); }
-.hm-mk-c { position: relative; flex: 1; max-width: 56px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
-.hm-mk-f { width: 100%; border-radius: 6px 6px 2px 2px; background: color-mix(in srgb, var(--accent) 55%, var(--panel-2)); transition: background .3s ease; }
-.hm-mk-c:hover .hm-mk-f { background: var(--accent); }
-.hm-mk-c.best .hm-mk-f { background: var(--green); }
-.hm-mk-v { font: 700 10.5px var(--mono); color: var(--muted); margin-bottom: 3px; }
-.hm-mk-c.best .hm-mk-v { color: var(--green); }
-.hm-mk-d { position: absolute; bottom: -19px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--muted); white-space: nowrap; }
-:root[data-anim="on"] .hm-mk-f { animation: hm-grow .7s cubic-bezier(.22,1,.36,1) backwards; transform-origin: bottom; }
-@keyframes hm-grow { from { transform: scaleY(0); } }
-.hm-mbest { display: flex; align-items: center; gap: .45rem; margin-top: var(--sp-3); }
-.hm-mbest .cat-ico { flex: none; width: 16px; height: 16px; }
-@media (max-width: 520px) { .hm-mk-d { display: none; } .hm-mk { padding-bottom: 4px; } .hm-mk-grid { bottom: 4px; } .hm-mstats b { font-size: var(--fs-lg); } }
-/* heatmap: scroll sideways on narrow screens instead of shrinking to nothing */
-.hm-scroll { overflow-x: auto; }
-@media (max-width: 640px) { .hm-scroll .hm-svg { min-width: 640px; } }
 `;
     document.head.appendChild(st);
   }
