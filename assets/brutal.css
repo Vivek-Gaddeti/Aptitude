@@ -24,6 +24,7 @@
   --muted: #6B5560;
   --border: var(--line);
   --accent: #D6245F;
+  --site-accent: #D6245F;         /* the site accent, never replaced by a section tint (logo, primary buttons) */
   --accent-soft: #FFD6E2;
   --green: #0B7A43;  --green-soft: #C9F7D9;
   --amber: #8A5A00;  --amber-soft: #FFE89A;
@@ -57,6 +58,7 @@
   --text: #EEEAE4;
   --muted: #ABA69F;
   --accent: #FF6B93;
+  --site-accent: #FF6B93;
   --accent-soft: #2E2025;
   --green: #5BD98C;  --green-soft: #183626;
   --amber: #F2C94C;  --amber-soft: #3A3014;
@@ -71,6 +73,9 @@
 /* the page accent: dark ink shade in light mode (white text on it passes), bright fill in dark mode */
 .page-tinted { --accent-soft: color-mix(in srgb, var(--page-c) 30%, var(--panel)); }
 [data-theme="dark"].page-tinted { --accent-soft: color-mix(in srgb, var(--page-c) 22%, var(--panel)); }
+/* style.css re-points --accent at the section ink on .page-tinted; the logo and primary buttons re-pin it to the site accent,
+   so var(--accent) inside them is always the site accent on every page and in both themes */
+.brand .logo, .logo-wrap[data-mood] .logo, .gr-logo .logo, .btn.primary, .btn.hm-scbtn, .session-rail button.sr-go, .session-rail .sr-next { --accent: var(--site-accent); }
 /* ---------- base ---------- */
 body {
   font-family: var(--sans);
@@ -289,9 +294,11 @@ h1, .pr-h1 { font-size: 1.9rem; }
 [data-theme="dark"] .hm-legend i.l2 { background: #8A3D58; }
 [data-theme="dark"] .hm-legend i.l3 { background: #FF6B93; }
 [data-theme="dark"] .hm-legend i.l4 { background: #FFD3DF; }
-/* practice: page-coloured primary buttons are bright fills, so ink text */
-.pr .btn.primary, .pr-modal-box .btn.primary { background: var(--page-c, var(--accent)); color: var(--on-fill); border-color: var(--ink) !important; }
-.pr .btn.primary:hover, .pr-modal-box .btn.primary:hover { background: var(--page-c, var(--accent)); color: var(--on-fill); }
+/* practice: primary buttons use the site accent with white text (dark theme: on-fill text, set below) */
+.pr .btn.primary, .pr-modal-box .btn.primary { background: var(--accent); color: #fff; border-color: var(--ink) !important; }
+.pr .btn.primary:hover, .pr-modal-box .btn.primary:hover { background: var(--accent); color: #fff; }
+[data-theme="dark"] .pr .btn.primary, [data-theme="dark"] .pr-modal-box .btn.primary,
+[data-theme="dark"] .pr .btn.primary:hover, [data-theme="dark"] .pr-modal-box .btn.primary:hover { color: var(--on-fill); }
 .pr .btn.primary kbd { color: var(--on-fill); }
 /* solution boxes: full outline instead of a left stripe */
 .pr-box, .qz-short { border: var(--bw-s) solid var(--line) !important; border-radius: 0; color: var(--text); }
