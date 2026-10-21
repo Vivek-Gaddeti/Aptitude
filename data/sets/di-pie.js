@@ -1,0 +1,3 @@
+// Shared stimuli for di-pie.
+QB.set("di-pie-1", {"title":"Monthly expenditure of a family (total income ₹60,000)","kind":"chart","chart":{"type":"pie","labels":["Rent","Food","Education","Transport","Savings","Others"],"series":[{"name":"Share","data":[25,30,15,10,12,8]}],"note":"Percentages of the total monthly income of ₹60,000."}});
+QB.set("di-pie-2", {"title":"Sales by region (share of total sales)","kind":"chart","chart":{"type":"donut","labels":["North","South","East","West"],"series":[{"name":"2022","data":[30,25,20,25]},{"name":"2023","data":[24,30,22,24]}],"note":"Total sales: 2022 = ₹400 crore; 2023 = ₹500 crore."}});

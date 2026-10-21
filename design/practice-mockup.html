@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Practice mock-up · Aptitude Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=optional">
+<script>try{if(localStorage.getItem('theme')==='dark')document.documentElement.dataset.theme='dark'}catch(e){}</script>
+<style>
+/* tokens copied from the Study Hub's assets/style.css */
+:root {
+  --bg:#f7f7f5; --panel:#fff; --panel-2:#f1f1ee; --text:#1d1d1f; --muted:#6b6b70; --border:#e3e3df;
+  --green:#1f9d55; --green-soft:#e3f5ea; --amber:#b7791f; --amber-soft:#fbf1df; --red:#d64545; --red-soft:#fbe6e6;
+  --purple:#7c4dff; --purple-soft:#efe9ff; --shadow:0 1px 2px rgba(0,0,0,.04),0 2px 8px rgba(0,0,0,.04);
+  --mono:"Cascadia Code",Consolas,monospace; --sans:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+  --display:"Nunito","Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;
+  --fs-2xs:.7rem; --fs-xs:.78rem; --fs-sm:.86rem; --fs-md:.93rem; --fs-lg:1.1rem; --fs-xl:1.35rem; --fs-2xl:1.9rem;
+  --r-xs:4px; --r-sm:8px; --r-md:12px; --r-pill:999px;
+  /* page colour: Practice = orange (same as NeetCode on the Study Hub) */
+  --page-c:#ec8a4f; --accent:#a35f37; --accent-soft:color-mix(in srgb,var(--page-c) 13%,var(--panel));
+  --c-quant:#1fae7a; --c-reason:#8b6cf0; --c-verbal:#e2609a; --c-di:#22a3b6;
+  color-scheme:light;
+}
+[data-theme="dark"] {
+  --bg:#121214; --panel:#1a1a1d; --panel-2:#232327; --text:#ececee; --muted:#9a9aa2; --border:#2e2e33;
+  --green:#4cc38a; --green-soft:#173126; --amber:#e0a84a; --amber-soft:#3a2d15; --red:#f07070; --red-soft:#3d1c1c;
+  --purple:#a78bfa; --purple-soft:#2a2140; --shadow:none;
+  --accent:#ef9a65; --accent-soft:color-mix(in srgb,var(--page-c) 20%,var(--panel)); color-scheme:dark;
+}
+*{box-sizing:border-box} html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:15.5px/1.6 var(--sans);-webkit-font-smoothing:antialiased;transition:background .45s,color .45s}
+button{font:inherit;color:inherit;cursor:pointer}
+.ni{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+kbd{font-family:var(--mono);font-size:.78em;border:1px solid var(--border);border-bottom-width:2px;padding:0 .4em;border-radius:var(--r-xs);background:var(--panel);color:var(--muted)}
+
+/* ---------- header (same shape as the Study Hub) ---------- */
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:1rem;height:56px;padding:0 1rem;
+  background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.brand{font:800 1.05rem var(--display);display:flex;align-items:center;gap:.5rem;white-space:nowrap}
+.logo{width:28px;height:28px;border-radius:var(--r-sm);background:linear-gradient(135deg,#4f7cff,#8b6cf0);color:#fff;display:grid;place-items:center;font-size:var(--fs-xs)}
+.greet{font-size:var(--fs-xs);color:var(--muted);display:flex;align-items:center;gap:.3rem;white-space:nowrap}
+.nav{display:flex;gap:.15rem;flex:1;overflow:hidden}
+.nav a{color:var(--muted);padding:.4rem .7rem;border-radius:var(--r-sm);font:600 var(--fs-md) var(--display);display:inline-flex;align-items:center;gap:.4rem;white-space:nowrap;text-decoration:none}
+.nav a .ni{color:var(--c)}
+.nav a.active{color:var(--accent);background:var(--accent-soft)}
+.nav .caret{width:10px;height:10px;opacity:.6}
+.tb-btn{width:34px;height:34px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--panel);display:grid;place-items:center;color:var(--text)}
+.tb-btn.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.streak{font:700 var(--fs-sm) var(--sans);display:flex;align-items:center;gap:.2rem;color:var(--text)}
+
+/* ---------- session bar ---------- */
+.wrap{max-width:1240px;margin:0 auto;padding:1.25rem 1.5rem 6rem}
+.sbar{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+.back{border:1px solid var(--border);background:var(--panel);border-radius:var(--r-sm);padding:.3rem .7rem;font-size:var(--fs-sm);display:inline-flex;gap:.35rem;align-items:center}
+.crumb{display:flex;align-items:center;gap:.4rem;font-size:var(--fs-sm);color:var(--muted)}
+.crumb b{color:var(--text);font-weight:600}
+.chip{font-size:var(--fs-xs);padding:.1rem .55rem;border-radius:var(--r-pill);font-weight:600;white-space:nowrap}
+.chip.sec{background:color-mix(in srgb,var(--sc) 14%,var(--panel));color:color-mix(in srgb,var(--sc) 75%,var(--text))}
+.chip.med{background:var(--amber-soft);color:var(--amber)}
+.chip.mode{background:var(--panel-2);color:var(--muted)}
+.grow{flex:1}
+.timer{display:flex;align-items:center;gap:.55rem;border:1px solid var(--border);background:var(--panel);border-radius:var(--r-pill);padding:.25rem .8rem .25rem .35rem;font-family:var(--mono);font-size:var(--fs-sm)}
+.timer svg{width:26px;height:26px}
+.timer .t{font-weight:700;font-size:var(--fs-md)} .timer .tg{color:var(--muted)}
+.timer.over .t{color:var(--amber)}
+.seg{display:flex;gap:3px;height:6px;margin:.1rem 0 1.25rem}
+.seg i{flex:1;border-radius:var(--r-pill);background:var(--panel-2);border:1px solid var(--border)}
+.seg i.c{background:var(--green);border-color:transparent} .seg i.w{background:var(--red);border-color:transparent}
+.seg i.cur{background:var(--accent);border-color:transparent;opacity:.55}
+.qcount{font:700 var(--fs-sm) var(--display);color:var(--muted);white-space:nowrap}
+.qcount b{color:var(--text);font-size:var(--fs-lg)}
+
+/* ---------- layout ---------- */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:1.25rem;align-items:start}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow)}
+.qcard{padding:1.5rem 1.75rem 1.25rem}
+.qhead{display:flex;align-items:center;gap:.6rem;margin-bottom:.9rem}
+.qno{font:800 var(--fs-sm) var(--display);color:var(--accent);background:var(--accent-soft);border-radius:var(--r-sm);padding:.15rem .55rem}
+.pat{font-size:var(--fs-xs);color:var(--muted)}
+.icon-btn{border:1px solid transparent;background:none;border-radius:var(--r-sm);width:32px;height:32px;display:grid;place-items:center;color:var(--muted)}
+.icon-btn:hover{border-color:var(--border);color:var(--text)}
+.icon-btn.on{color:var(--amber)}
+.qtext{font-size:1.2rem;line-height:1.65;margin:.2rem 0 1.25rem;font-weight:500}
+.opts{display:grid;gap:.6rem}
+.opt{display:flex;align-items:center;gap:.9rem;text-align:left;width:100%;padding:.8rem 1rem;border-radius:var(--r-md);
+  border:1.5px solid var(--border);background:var(--panel);font-size:1.02rem;transition:border-color .35s,background .35s}
+.opt:hover{border-color:color-mix(in srgb,var(--page-c) 55%,var(--border))}
+.opt .k{width:30px;height:30px;flex:none;border-radius:var(--r-sm);display:grid;place-items:center;font:800 var(--fs-sm) var(--display);background:var(--panel-2);color:var(--muted)}
+.opt .v{flex:1;font-variant-numeric:tabular-nums}
+.opt .why{font-size:var(--fs-xs);color:var(--muted);max-width:42%;text-align:right;line-height:1.35}
+.opt .mk{width:20px;height:20px;flex:none}
+.opt.ok{border-color:var(--green);background:var(--green-soft)} .opt.ok .k{background:var(--green);color:#fff}
+.opt.bad{border-color:var(--red);background:var(--red-soft)} .opt.bad .k{background:var(--red);color:#fff}
+.opt.dim{opacity:.7}
+.answered .opt:hover{border-color:var(--border)} .answered .opt.ok:hover{border-color:var(--green)} .answered .opt.bad:hover{border-color:var(--red)}
+.actions{display:flex;align-items:center;gap:.5rem;margin-top:1.25rem;flex-wrap:wrap}
+.btn{border:1px solid var(--border);background:var(--panel);border-radius:var(--r-sm);padding:.45rem .85rem;font:600 var(--fs-sm) var(--display);display:inline-flex;align-items:center;gap:.4rem}
+.btn kbd{margin-left:.15rem}
+.btn.primary{background:var(--page-c);border-color:transparent;color:#fff} .btn.primary kbd{background:rgba(255,255,255,.2);color:#fff;border-color:rgba(255,255,255,.35)}
+[data-theme="dark"] .btn.primary{color:#1a1a1d} [data-theme="dark"] .btn.primary kbd{color:#1a1a1d;border-color:rgba(0,0,0,.25)}
+
+/* result + solution */
+.result{display:flex;align-items:center;gap:.75rem;margin-top:1.1rem;padding:.7rem 1rem;border-radius:var(--r-md);background:var(--red-soft);border:1px solid color-mix(in srgb,var(--red) 30%,transparent)}
+.result .big{font:800 var(--fs-lg) var(--display);color:var(--red)}
+.result .tm{font-size:var(--fs-sm);color:var(--muted)} .result .tm b{color:var(--amber)}
+.reasons{display:flex;gap:.35rem;flex-wrap:wrap;align-items:center;margin-left:auto;font-size:var(--fs-xs);color:var(--muted)}
+.reasons button{border:1px solid var(--border);background:var(--panel);border-radius:var(--r-pill);padding:.1rem .6rem;font-size:var(--fs-xs)}
+.reasons button.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.sol{margin-top:1rem;padding:1.1rem 1.25rem;border-radius:var(--r-md);background:var(--panel-2)}
+.sol h4{margin:0 0 .5rem;font:800 var(--fs-md) var(--display);display:flex;align-items:center;gap:.4rem}
+.sol ol{margin:0;padding-left:1.3rem} .sol li{margin:.2rem 0} .sol code{font-family:var(--mono);font-size:.9em}
+.boxes{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-top:.75rem}
+.box{border-radius:var(--r-md);padding:.75rem 1rem;font-size:var(--fs-md);border-left:3px solid}
+.box .lb{display:flex;align-items:center;gap:.35rem;font:800 var(--fs-xs) var(--display);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem}
+.box.tip{background:var(--green-soft);border-color:var(--green)} .box.tip .lb{color:var(--green)}
+.box.trap{background:var(--amber-soft);border-color:var(--amber)} .box.trap .lb{color:var(--amber)}
+.formula{font-family:var(--mono);background:var(--panel);border:1px solid var(--border);border-radius:var(--r-sm);padding:.05rem .4rem;font-size:.88em}
+
+/* ---------- right rail ---------- */
+.rail{display:grid;gap:1rem;position:sticky;top:76px}
+.rail .card{padding:1rem 1.1rem}
+.rail h5{margin:0 0 .6rem;font:800 var(--fs-xs) var(--display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;text-align:center}
+.stats b{display:block;font:800 var(--fs-xl) var(--display)} .stats span{font-size:var(--fs-2xs);color:var(--muted)}
+.pal{display:grid;grid-template-columns:repeat(5,1fr);gap:.4rem}
+.pal button{aspect-ratio:1.25;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--panel);font:700 var(--fs-xs) var(--display);color:var(--muted);position:relative}
+.pal .c{background:var(--green-soft);border-color:color-mix(in srgb,var(--green) 45%,transparent);color:var(--green)}
+.pal .w{background:var(--red-soft);border-color:color-mix(in srgb,var(--red) 45%,transparent);color:var(--red)}
+.pal .cur{border:2px solid var(--accent);color:var(--accent)}
+.pal .m::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--purple)}
+.legend{display:flex;flex-wrap:wrap;gap:.3rem .8rem;margin-top:.7rem;font-size:var(--fs-2xs);color:var(--muted)}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:.3rem;vertical-align:-1px}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:.35rem .7rem;font-size:var(--fs-xs);color:var(--muted);align-items:center;justify-items:start}
+
+/* ---------- DI split ---------- */
+.split{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:1.25rem;align-items:start}
+.stim{padding:1.25rem 1.4rem;position:sticky;top:76px}
+.stim h3{margin:0 0 .15rem;font:800 var(--fs-lg) var(--display)} .stim p{margin:0 0 .8rem;font-size:var(--fs-sm);color:var(--muted)}
+.setnav{display:flex;gap:.35rem;margin-bottom:.9rem;align-items:center;font-size:var(--fs-xs);color:var(--muted)}
+.setnav i{width:24px;height:6px;border-radius:var(--r-pill);background:var(--panel-2);border:1px solid var(--border)}
+.setnav i.c{background:var(--green);border-color:transparent} .setnav i.cur{background:var(--accent);border-color:transparent;opacity:.6}
+.pin{font-size:var(--fs-2xs);display:inline-flex;align-items:center;gap:.25rem;color:var(--muted);float:right}
+.chart text{font:12px var(--sans);fill:var(--muted)}
+
+/* ---------- rough-work drawer ---------- */
+.drawer{position:fixed;top:56px;right:0;bottom:0;width:380px;background:var(--panel);border-left:1px solid var(--border);box-shadow:-8px 0 24px rgba(0,0,0,.06);
+  transform:translateX(105%);transition:transform .5s cubic-bezier(.22,1,.36,1);z-index:40;display:flex;flex-direction:column;padding:1rem}
+.drawer.show{transform:none}
+.drawer:not(.show){pointer-events:none}
+.dhead{display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem}
+.dhead h4{margin:0;font:800 var(--fs-md) var(--display);flex:1}
+.tabs{display:flex;gap:.2rem;background:var(--panel-2);border-radius:var(--r-pill);padding:3px;margin-bottom:.75rem}
+.tabs button{flex:1;border:0;background:none;border-radius:var(--r-pill);padding:.25rem;font:700 var(--fs-xs) var(--display);color:var(--muted)}
+.tabs button.on{background:var(--panel);color:var(--text);box-shadow:var(--shadow)}
+.tools{display:flex;gap:.3rem;margin-bottom:.5rem}
+.tools .icon-btn{border-color:var(--border)} .tools .icon-btn.on{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+canvas{flex:1;width:100%;border:1px dashed var(--border);border-radius:var(--r-md);background:var(--bg);cursor:crosshair;touch-action:none}
+.exam{display:flex;align-items:center;gap:.5rem;margin-top:.75rem;font-size:var(--fs-xs);color:var(--muted)}
+.sw{width:30px;height:17px;border-radius:var(--r-pill);background:var(--panel-2);border:1px solid var(--border);position:relative}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:var(--muted)}
+
+/* ---------- mock-up controls (not part of the design) ---------- */
+.mockbar{position:fixed;left:50%;bottom:16px;translate:-50% 0;z-index:60;display:flex;gap:.25rem;align-items:center;padding:.35rem;
+  background:var(--text);color:var(--bg);border-radius:var(--r-pill);font:700 var(--fs-xs) var(--display);box-shadow:0 6px 24px rgba(0,0,0,.18)}
+.mockbar span{padding:0 .6rem;opacity:.6}
+.mockbar button{border:0;background:none;color:inherit;border-radius:var(--r-pill);padding:.35rem .8rem;font:inherit}
+.mockbar button.on{background:var(--bg);color:var(--text)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">AH</span>Aptitude Hub</div>
+  <span class="greet"><svg class="ni" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2"/></svg>Good afternoon</span>
+  <nav class="nav">
+    <a style="--c:#4f7cff"><svg class="ni" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>Dashboard</a>
+    <a style="--c:var(--c-quant)"><svg class="ni" viewBox="0 0 24 24"><path d="M19 5 5 19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>Quant</a>
+    <a style="--c:var(--c-reason)"><svg class="ni" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.2"/><circle cx="5" cy="18" r="2.2"/><circle cx="19" cy="18" r="2.2"/><path d="M11 7 6 16M13 7l5 9M7.2 18h9.6"/></svg>Reasoning</a>
+    <a style="--c:var(--c-verbal)"><svg class="ni" viewBox="0 0 24 24"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0 0 4h13"/></svg>Verbal</a>
+    <a style="--c:var(--c-di)"><svg class="ni" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>DI</a>
+    <a class="active"><svg class="ni" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Practice<svg class="ni caret" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></a>
+    <a style="--c:#6d6af0"><svg class="ni" viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>Revision<svg class="ni caret" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></a>
+  </nav>
+  <span class="streak"><svg class="ni" viewBox="0 0 24 24" style="color:#ec8a4f"><path d="M12 22c4 0 7-3 7-7 0-5-5-7-5-12-3 2-4 5-4 7-1-1-2-2-2-4-2 2-3 5-3 9 0 4 3 7 7 7z"/></svg>6</span>
+  <button class="tb-btn" id="rwBtn" title="Rough work (W)"><svg class="ni" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+  <button class="tb-btn" title="Find (Ctrl+K)"><svg class="ni" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+  <button class="tb-btn" title="Effects"><svg class="ni" viewBox="0 0 24 24" style="color:#e0a84a"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg></button>
+  <button class="tb-btn" id="themeBtn" title="Theme"><svg class="ni" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+</header>
+
+<div class="wrap">
+  <!-- session bar -->
+  <div class="sbar">
+    <button class="back"><svg class="ni" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>End session</button>
+    <div class="crumb" id="crumb"></div>
+    <span class="grow"></span>
+    <span class="chip mode" id="modeChip">Topic practice · Instant</span>
+    <div class="timer" id="timer">
+      <svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="14" fill="none" stroke="var(--panel-2)" stroke-width="4"/>
+        <circle id="ring" cx="18" cy="18" r="14" fill="none" stroke="var(--page-c)" stroke-width="4" stroke-linecap="round" stroke-dasharray="88" stroke-dashoffset="30" transform="rotate(-90 18 18)"/></svg>
+      <span class="t" id="tNow">0:28</span><span class="tg">/ <span id="tTarget">0:45</span></span>
+    </div>
+    <span class="qcount">Q <b id="qNum">7</b> / 20</span>
+  </div>
+  <div class="seg" id="seg"></div>
+
+  <!-- STATE: single question (answering / answered) -->
+  <div class="grid" id="single">
+    <div>
+      <div class="card qcard" id="qcard">
+        <div class="qhead">
+          <span class="qno">Q7</span>
+          <span class="pat">Pattern: <b>Successive change</b> · back-calculating the original</span>
+          <span class="grow"></span>
+          <button class="icon-btn" title="Bookmark (F)"><svg class="ni" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button>
+          <button class="icon-btn" title="Mark for review (M)"><svg class="ni" viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5"/></svg></button>
+        </div>
+        <div class="qtext">A jacket's price is raised by <b>30%</b> and then, in a sale, cut by <b>30%</b>. It now sells for <b>₹910</b>. What was the price before the rise?</div>
+        <div class="opts" id="opts"></div>
+        <div id="after" hidden>
+          <div class="result">
+            <svg class="ni" viewBox="0 0 24 24" style="width:22px;height:22px;color:var(--red)"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg>
+            <div><div class="big">Not quite. It's C, ₹1,000</div><div class="tm">Your time <b>0:52</b> · target 0:45 · 7 s over</div></div>
+            <div class="reasons">Why missed?
+              <button>Concept</button><button class="on">Calculation</button><button>Misread</button><button>Time</button><button>Guessed</button></div>
+          </div>
+          <div class="sol">
+            <h4><svg class="ni" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Solution</h4>
+            <ol>
+              <li>Net change for +a% then −b%: <span class="formula">a − b − ab/100</span> = 30 − 30 − 9 = <b>−9%</b></li>
+              <li>So the final price is 91% of the original: 0.91 × P = 910</li>
+              <li>P = 910 ÷ 0.91 = <b>₹1,000</b></li>
+            </ol>
+            <div class="boxes">
+              <div class="box tip"><div class="lb"><svg class="ni" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>Shortcut</div>
+                Up x% then down x% is always a <b>loss of x²/100 %</b>. Here 900/100 = 9%, so 910 is 91% → original 1,000.</div>
+              <div class="box trap"><div class="lb"><svg class="ni" viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></svg>Trap</div>
+                Adding 9% back to 910 (option B). The 9% is of the <b>original</b>, so divide by 0.91. Don't multiply by 1.09.</div>
+            </div>
+          </div>
+        </div>
+        <div class="actions" id="acts"></div>
+      </div>
+    </div>
+    <aside class="rail">
+      <div class="card"><h5>This session</h5>
+        <div class="stats"><div><b>5/6</b><span>correct</span></div><div><b>83%</b><span>accuracy</span></div><div><b>0:38</b><span>avg / Q</span></div></div></div>
+      <div class="card"><h5>Questions</h5><div class="pal" id="pal"></div>
+        <div class="legend"><span><i style="background:var(--green)"></i>correct</span><span><i style="background:var(--red)"></i>wrong</span><span><i style="background:var(--purple);border-radius:50%"></i>marked</span><span><i style="border:1px solid var(--border)"></i>not seen</span></div></div>
+      <div class="card"><h5>Keys</h5><div class="keys">
+        <span><kbd>1</kbd>–<kbd>4</kbd> <kbd>A</kbd>–<kbd>D</kbd></span><span>answer</span>
+        <kbd>Enter</kbd><span>next question</span>
+        <kbd>S</kbd><span>show solution</span>
+        <kbd>M</kbd><span>mark for review</span>
+        <kbd>F</kbd><span>bookmark</span>
+        <kbd>W</kbd><span>rough-work pad</span></div></div>
+    </aside>
+  </div>
+
+  <!-- STATE: DI set (chart pinned left) -->
+  <div class="split" id="di" hidden>
+    <div class="card stim">
+      <span class="pin"><svg class="ni" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M12 17v5M5 17h14l-2-5V4H7v8z"/></svg>stays in view</span>
+      <h3>Units sold (thousands), 2020–2024</h3>
+      <p>Grouped bar chart · three products of one company</p>
+      <svg class="chart" viewBox="0 0 520 290" width="100%" id="chart"></svg>
+    </div>
+    <div class="card qcard">
+      <div class="setnav">Set question 2 of 5 <i class="c"></i><i class="cur"></i><i></i><i></i><i></i></div>
+      <div class="qhead"><span class="qno">Q12</span><span class="pat">Pattern: <b>% change between two years</b></span><span class="grow"></span>
+        <button class="icon-btn"><svg class="ni" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button></div>
+      <div class="qtext" style="font-size:1.1rem">By what percent did sales of <b>Product B</b> rise from <b>2021</b> to <b>2024</b>?</div>
+      <div class="opts">
+        <button class="opt"><span class="k">A</span><span class="v">24%</span></button>
+        <button class="opt"><span class="k">B</span><span class="v">33.3%</span></button>
+        <button class="opt"><span class="k">C</span><span class="v">50%</span></button>
+        <button class="opt"><span class="k">D</span><span class="v">66.7%</span></button>
+      </div>
+      <div class="actions"><button class="btn">Show solution <kbd>S</kbd></button><span class="grow"></span><button class="btn primary">Next <kbd>Enter</kbd></button></div>
+    </div>
+  </div>
+</div>
+
+<!-- rough-work drawer -->
+<aside class="drawer" id="drawer">
+  <div class="dhead"><h4>Rough work</h4><span style="font-size:var(--fs-2xs);color:var(--muted)">saved with Q7</span>
+    <button class="icon-btn" id="rwClose" title="Close (W or Esc)"><svg class="ni" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="tabs"><button class="on">Draw</button><button>Notes</button><button>Calculator</button></div>
+  <div class="tools">
+    <button class="icon-btn on" title="Pen"><svg class="ni" viewBox="0 0 24 24"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button>
+    <button class="icon-btn" title="Eraser"><svg class="ni" viewBox="0 0 24 24"><path d="M7 21h10M5 15l9-9 5 5-7 7H8z"/></svg></button>
+    <span class="grow"></span>
+    <button class="icon-btn" id="clr" title="Clear"><svg class="ni" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+  </div>
+  <canvas id="pad"></canvas>
+  <div class="exam"><span class="sw"></span>Exam mode (no calculator, like the real test)</div>
+</aside>
+
+<div class="mockbar" id="mockbar">
+  <span>MOCK-UP</span>
+  <button data-s="ask" class="on">1 · Answering</button>
+  <button data-s="done">2 · Answered</button>
+  <button data-s="di">3 · DI set</button>
+  <button data-s="rw">4 · Rough work</button>
+  <button id="mbTheme">Light / Dark</button>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const OPTS = [["₹910", "Assumed +30% and −30% cancel out"], ["₹992", "Added 9% back to 910 instead of dividing by 0.91"],
+  ["₹1,000", ""], ["₹1,300", "Undid only the 30% cut (910 ÷ 0.7)"]];
+const tick = '<svg class="ni mk" viewBox="0 0 24 24" style="color:var(--green)"><path d="m5 12 5 5 9-10"/></svg>';
+const cross = '<svg class="ni mk" viewBox="0 0 24 24" style="color:var(--red)"><path d="m6 6 12 12M18 6 6 18"/></svg>';
+
+function render(state) {
+  document.querySelectorAll("#mockbar [data-s]").forEach((b) => b.classList.toggle("on", b.dataset.s === state));
+  const di = state === "di";
+  $("#single").hidden = di; $("#di").hidden = !di;
+  $("#drawer").classList.toggle("show", state === "rw"); $("#rwBtn").classList.toggle("on", state === "rw");
+  const done = state === "done";
+  // breadcrumb + header bits
+  $("#crumb").innerHTML = di
+    ? '<span class="chip sec" style="--sc:var(--c-di)">DI</span><b>Bar charts</b> › Grouped bars <span class="chip med">Medium</span>'
+    : '<span class="chip sec" style="--sc:var(--c-quant)">Quant</span><b>Percentages</b> › Successive change <span class="chip med">Medium</span>';
+  $("#qNum").textContent = di ? 12 : 7;
+  $("#tNow").textContent = done ? "0:52" : di ? "0:21" : "0:28";
+  $("#tTarget").textContent = di ? "1:00" : "0:45";
+  $("#timer").classList.toggle("over", done);
+  $("#ring").style.strokeDashoffset = done ? 0 : di ? 56 : 33;
+  $("#ring").style.stroke = done ? "var(--amber)" : "var(--page-c)";
+  // progress line
+  const res = di ? "cccccwcwcccc" : "ccwccc", cur = di ? 11 : 6;
+  $("#seg").innerHTML = Array.from({ length: 20 }, (_, i) => `<i class="${i < res.length ? res[i] : i === cur ? (done ? "w" : "cur") : ""}"></i>`).join("");
+  $("#pal").innerHTML = Array.from({ length: 20 }, (_, i) => {
+    let c = i < 6 ? res[i] : i === 6 ? (done ? "w" : "cur") : "";
+    if (i === 3) c += " m";
+    return `<button class="${c}">${i + 1}</button>`;
+  }).join("");
+  // options
+  $("#qcard").classList.toggle("answered", done);
+  $("#opts").innerHTML = OPTS.map(([v, why], i) => {
+    const cls = !done ? "" : i === 2 ? "ok" : i === 1 ? "bad" : "dim";
+    const mark = !done ? "" : i === 2 ? tick : i === 1 ? cross : "";
+    const w = done && why ? `<span class="why">${why}</span>` : "";
+    return `<button class="opt ${cls}" data-i="${i}"><span class="k">${"ABCD"[i]}</span><span class="v">${v}</span>${w}${mark}</button>`;
+  }).join("");
+  $("#after").hidden = !done;
+  $("#acts").innerHTML = done
+    ? '<button class="btn">Add to mistake book</button><button class="btn">Drill this pattern</button><span class="grow"></span><button class="btn primary">Next <kbd>Enter</kbd></button>'
+    : '<button class="btn">Show solution <kbd>S</kbd></button><button class="btn">Skip</button><span class="grow"></span><button class="btn primary">Next <kbd>Enter</kbd></button>';
+  if (state === "rw") sizePad();
+}
+let state = "ask";
+document.querySelectorAll("#mockbar [data-s]").forEach((b) => (b.onclick = () => render((state = b.dataset.s))));
+$("#opts").addEventListener("click", (e) => { if (e.target.closest(".opt") && state === "ask") render((state = "done")); });
+const theme = () => { const d = document.documentElement; d.dataset.theme = d.dataset.theme === "dark" ? "light" : "dark"; try { localStorage.setItem("theme", d.dataset.theme); } catch (e) {} drawChart(); };
+$("#mbTheme").onclick = theme; $("#themeBtn").onclick = theme;
+$("#rwBtn").onclick = () => render((state = state === "rw" ? "ask" : "rw"));
+$("#rwClose").onclick = () => render((state = "ask"));
+addEventListener("keydown", (e) => {
+  const k = e.key.toLowerCase();
+  if (state === "ask" && ("1234".includes(k) || "abcd".includes(k)) && k.length === 1) render((state = "done"));
+  else if (k === "w" || (k === "escape" && state === "rw")) render((state = state === "rw" ? "ask" : "rw"));
+  else if (k === "enter" && state === "done") render((state = "ask"));
+});
+
+/* grouped bar chart drawn from a data spec (the real site will do this for every DI set) */
+const SPEC = { years: [2020, 2021, 2022, 2023, 2024], series: [["A", "#4f7cff", [52, 58, 50, 64, 70]], ["B", "#22a3b6", [40, 48, 55, 62, 72]], ["C", "#ec8a4f", [30, 34, 46, 41, 52]]] };
+function drawChart() {
+  const W = 520, H = 290, L = 40, B = 250, T = 30, max = 80, gw = (W - L - 10) / SPEC.years.length, bw = 22;
+  const y = (v) => B - (v / max) * (B - T), grid = getComputedStyle(document.documentElement).getPropertyValue("--border");
+  let s = "";
+  for (let v = 0; v <= max; v += 20) s += `<line x1="${L}" x2="${W - 10}" y1="${y(v)}" y2="${y(v)}" stroke="${grid}"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  SPEC.years.forEach((yr, i) => {
+    const x0 = L + i * gw + (gw - bw * 3 - 8) / 2;
+    SPEC.series.forEach(([n, c, d], j) => {
+      const hl = n === "B" && (yr === 2021 || yr === 2024);
+      s += `<rect x="${x0 + j * (bw + 4)}" y="${y(d[i])}" width="${bw}" height="${B - y(d[i])}" rx="4" fill="${c}" opacity="${n === "B" ? 1 : .55}"/>`;
+      if (hl) s += `<text x="${x0 + j * (bw + 4) + bw / 2}" y="${y(d[i]) - 6}" text-anchor="middle" style="font-weight:700;fill:var(--text)">${d[i]}</text>`;
+    });
+    s += `<text x="${L + i * gw + gw / 2}" y="${B + 20}" text-anchor="middle">${yr}</text>`;
+  });
+  SPEC.series.forEach(([n, c], j) => (s += `<rect x="${L + j * 90}" y="4" width="12" height="12" rx="3" fill="${c}"/><text x="${L + j * 90 + 18}" y="14">Product ${n}</text>`));
+  $("#chart").innerHTML = s;
+}
+
+/* a working scratch pad */
+const pad = $("#pad"), ctx = pad.getContext("2d");
+function sizePad() { requestAnimationFrame(() => { const r = pad.getBoundingClientRect(); if (pad.width !== Math.round(r.width)) { pad.width = r.width; pad.height = r.height; demoInk(); } }); }
+function demoInk() {
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--text"); ctx.lineWidth = 2; ctx.lineCap = "round";
+  ctx.font = "20px Segoe Print, Comic Sans MS, cursive"; ctx.fillStyle = ctx.strokeStyle;
+  ctx.fillText("+30, −30 → 30 − 30 − 9 = −9%", 18, 46); ctx.fillText("0.91 P = 910", 18, 90); ctx.fillText("P = 1000", 18, 134);
+  ctx.beginPath(); ctx.ellipse(66, 128, 66, 22, 0, 0, 7); ctx.stroke();
+}
+let drawing = false;
+pad.onpointerdown = (e) => { drawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); };
+pad.onpointermove = (e) => { if (drawing) { ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); } };
+addEventListener("pointerup", () => (drawing = false));
+$("#clr").onclick = () => ctx.clearRect(0, 0, pad.width, pad.height);
+
+render(state); drawChart();
+</script>
+</body>
+</html>
