@@ -2,9 +2,16 @@
    Usage:  node tools/cdp.js path/to/my-steps.js        (screenshots are saved next to the steps file)
    Steps file:  module.exports = async ({ go, ev, shot, send, sleep, log }) => { await go("index.html"); log(await ev("document.title")); await shot("home"); };
    go(page) loads a page · ev(js) runs JavaScript there and returns the value · shot(name) saves name.png
-   send(method, params) is a raw DevTools call (e.g. Input.dispatchKeyEvent for real typing). Needs Chrome + Node 22+. */
+   send(method, params) is a raw DevTools call (e.g. Input.dispatchKeyEvent for real typing). Needs Chrome + Node 22+.
+   Chrome is found from the CHROME env var if set, else the first known install path that exists (Windows, Linux, macOS). */
 const { spawn } = require("child_process"), fs = require("fs"), path = require("path"), os = require("os");
-const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
+const CHROME = process.env.CHROME || [
+  "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "/opt/pw-browsers/chromium",
+  "/usr/bin/google-chrome",
+  "/usr/bin/chromium",
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+].find((p) => fs.existsSync(p)) || "chrome";
 const SITE = "file:///" + path.join(__dirname, "..").split(path.sep).join("/") + "/";
 const stepsFile = path.resolve(process.argv[2] || "steps.js"), OUT = path.dirname(stepsFile);
 const PORT = +process.env.CDP_PORT || 9400 + Math.floor(Math.random() * 500);   // own port, so several test runs at once do not talk to each other
