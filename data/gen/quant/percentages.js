@@ -42,16 +42,18 @@
 
   /* ------------------------------------------------------------------ 1. % of a number, % <-> fraction */
   const HINT = { 5: "5% is half of 10%", 10: "10% is the decimal point moved one place", 15: "15% = 10% + 5%", 20: "20% is double 10%", 25: "25% is one quarter", 30: "30% is three times 10%", 40: "40% is four times 10%", 60: "60% is six times 10%", 75: "75% is three quarters" };
-  const QUART = { 25: "a quarter", 50: "half", 75: "three quarters", 20: "one fifth", 40: "two fifths" };
-  const FR = [[3, 8], [5, 8], [7, 8], [3, 16], [9, 16], [7, 16], [3, 40], [11, 40], [17, 40], [7, 25], [13, 20], [9, 20], [3, 25], [19, 25], [7, 50], [11, 25], [13, 40]];
+  const QUART = { 25: "a quarter", 50: "half", 75: "three quarters", 20: "one fifth", 40: "two fifths", 10: "one tenth", 30: "three tenths", 60: "three fifths", 80: "four fifths" };
+  const FR = [[3, 8], [5, 8], [7, 8], [3, 16], [9, 16], [7, 16], [3, 40], [11, 40], [17, 40], [7, 25], [13, 20], [9, 20], [3, 25], [19, 25], [7, 50], [11, 25], [13, 40], [1, 8], [1, 4], [3, 4], [1, 5], [2, 5], [3, 5], [4, 5], [1, 10], [3, 10], [7, 10], [9, 10], [1, 16], [5, 16], [11, 16], [13, 16], [15, 16], [1, 20], [3, 20], [1, 25], [2, 25], [1, 40], [1, 50]];
   QB.gen("quant/percentages/percent-of", { title: "% of a number & % ↔ fraction", gen: wrap((rng, d) => {
     if (d === "Easy") {
-      const p = T(rng, [5, 10, 15, 20, 25, 30, 40, 60, 75]), b = T(rng, [40, 60, 80, 120, 160, 200, 240, 300, 360, 400, 480, 600, 800]);
-      const a = b * p / 100, t = rng.int(0, 2);
+      const p = T(rng, [5, 10, 15, 20, 25, 30, 40, 60, 75]), b = T(rng, [40, 60, 80, 100, 120, 150, 160, 200, 240, 250, 300, 360, 400, 480, 500, 600, 640, 720, 800, 900, 1200, 1500]);
+      const a = b * p / 100, t = rng.int(0, 4);
       let f = N, q;
       if (t === 0) q = `What is **${p}%** of **${N(b)}**?`;
       else if (t === 1) q = `In a class of **${b}** students, **${p}%** are girls. How many girls are in the class?`;
-      else { f = M; q = `A shirt marked at **${M(b)}** is sold at a **${p}%** discount. How much is the discount, in rupees?`; }
+      else if (t === 2) { f = M; q = `A shirt marked at **${M(b)}** is sold at a **${p}%** discount. How much is the discount, in rupees?`; }
+      else if (t === 3) q = `Calculate **${p}%** of **${N(b)}**.`;
+      else q = `A library has **${N(b)}** books and **${p}%** of them are in Hindi. How many books are in Hindi?`;
       return mk(rng, f, a, [
         [b - a, `That is what is left after taking ${p}% away, not the ${p}% itself`],
         [a * 10, "Moved the decimal point one place too far to the right"],
@@ -65,7 +67,7 @@
     if (d === "Medium") {
       const k = rng.int(0, 2);
       if (k === 0) {
-        const p = T(rng, [12.5, 37.5, 62.5, 87.5, 35, 45, 85, 16, 12, 18, 24, 36, 72, 125]), b = rng.int(2, 30) * 40, a = b * p / 100;
+        const p = T(rng, [12.5, 37.5, 62.5, 87.5, 35, 45, 85, 16, 12, 18, 24, 36, 72, 125, 15, 30, 60, 65, 55, 95, 8, 110, 150]), b = rng.int(2, 160) * 20, a = b * p / 100;
         if (!I(a)) return null;
         const small = { 12.5: "1/8", 37.5: "3/8", 62.5: "5/8", 87.5: "7/8", 125: "5/4" }[p];
         return mk(rng, N, a, [
@@ -91,7 +93,7 @@
           `The percentage of ${n}/${dn} is not ${dn}/${n}: keep the numerator on top.`));
       }
       // x% of y = y% of x
-      const p = T(rng, [16, 24, 32, 36, 44, 52, 64, 28, 48, 56, 68, 84]), q = T(rng, [25, 50, 75, 20, 40]);
+      const p = T(rng, [16, 24, 32, 36, 44, 52, 64, 28, 48, 56, 68, 84, 12, 18, 20, 40, 60, 72, 76, 80, 88, 92, 96]), q = T(rng, [25, 50, 75, 20, 40, 10, 30, 60, 80]);
       const a = p * q / 100;
       return mk(rng, N, a, [
         [a * 10, "Moved the decimal point one place too far to the right"],
@@ -154,15 +156,19 @@
     (o, n) => `A town's population grew from **${N(o)}** to **${N(n)}**. Find the percentage increase.`,
     (o, n) => `Riya's score went up from **${o}** marks to **${n}** marks in a retest. What is the percentage increase in her marks?`,
     (o, n) => `A mobile plan that cost **${M(o)}** a month now costs **${M(n)}**. By what percent has it gone up?`,
+    (o, n) => `Last year a shop's monthly sales were **${M(o)}**; this year they are **${M(n)}**. Find the percentage increase.`,
+    (o, n) => `The number of members in a library grew from **${N(o)}** to **${N(n)}**. What is the percentage growth?`,
   ];
   const DOWN = [
     (o, n) => `The price of a bag was cut from **${M(o)}** to **${M(n)}**. What is the percentage decrease?`,
     (o, n) => `A college's intake fell from **${o}** seats to **${n}** seats. Find the percentage decrease.`,
     (o, n) => `A factory's daily output dropped from **${N(o)}** units to **${N(n)}** units. What is the percentage decrease?`,
     (o, n) => `A household's electricity bill came down from **${M(o)}** to **${M(n)}**. By what percent did it fall?`,
+    (o, n) => `Last month a cab's fare was **${M(o)}**; this month it is **${M(n)}**. By what percent did the fare drop?`,
+    (o, n) => `The number of visitors to a park fell from **${N(o)}** to **${N(n)}**. What is the percentage decrease?`,
   ];
   function changeQ(rng, d, o, n, dir, r) {
-    const diff = Math.abs(n - o), q = (dir > 0 ? UP : DOWN)[rng.int(0, 3)](o, n);
+    const pool = dir > 0 ? UP : DOWN, diff = Math.abs(n - o), q = pool[rng.int(0, pool.length - 1)](o, n);
     const word = dir > 0 ? "increase" : "decrease";
     return mk(rng, P, r, [
       [diff / n * 100, `Divided the change by the new value (${n}) instead of the original (${o})`],
@@ -178,7 +184,7 @@
   QB.gen("quant/percentages/pct-change", { title: "Percentage change", gen: wrap((rng, d) => {
     const dir = rng.chance(0.5) ? 1 : -1;
     if (d === "Easy") {
-      const r = T(rng, [10, 20, 25, 50]), o = T(rng, [40, 50, 60, 80, 100, 120, 150, 200, 240, 400, 500]);
+      const r = T(rng, [5, 10, 15, 20, 25, 30, 40, 50, 60, 75]), o = T(rng, [40, 50, 60, 80, 100, 120, 150, 160, 200, 240, 250, 300, 360, 400, 480, 500, 600]);
       const n = o * (1 + dir * r / 100);
       if (!I(n) || dir < 0 && r === 100) return null;
       return changeQ(rng, d, o, n, dir, r);
@@ -191,7 +197,7 @@
     }
     if (rng.chance(0.5)) {
       // percentage points vs relative change
-      const p1 = T(rng, [20, 25, 30, 40, 50, 60, 70, 80]), p2 = p1 + T(rng, [5, 10, 15, 20]);
+      const p1 = T(rng, [15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 64, 70, 75, 80, 90]), p2 = p1 + T(rng, [5, 10, 15, 20, 25]);
       if (p2 > 95) return null;
       const r = (p2 - p1) / p1 * 100;
       return mk(rng, P, r, [
@@ -199,21 +205,22 @@
         [(p2 - p1) / p2 * 100, `Divided by this year's rate (${p2}%) instead of last year's (${p1}%)`],
         [p2 / p1 * 100, "Gave new rate ÷ old rate × 100 instead of the change"],
         [r / 2, "Halved the correct figure"],
-      ], finish(d, `In an entrance test, **${p1}%** of candidates passed last year and **${p2}%** passed this year. By what percent has the pass rate increased?`,
+      ], finish(d, T(rng, [`In an entrance test, **${p1}%** of candidates passed last year and **${p2}%** passed this year. By what percent has the pass rate increased?`, `In a district exam, **${p1}%** of candidates passed last year and **${p2}%** passed this year. By what percent has the pass rate increased?`, `A coaching centre reports that **${p1}%** of its students passed last year and **${p2}%** passed this year. By what percent has the pass rate gone up?`]),
         [`Rise in points = ${p2} − ${p1} = ${p2 - p1} percentage points`, `Relative increase = ${p2 - p1}/${p1} × 100 = **${P(R(r))}**`],
         `"Percent increase" compares the two rates: (${p2} − ${p1})/${p1} = ${QB.frac(p2 - p1, p1)}.`,
         `${p2 - p1} is a rise of ${p2 - p1} percentage points. A percent increase is measured against ${p1}%, so it is ${P(R(r))}.`));
     }
-    const x = rng.int(2, 15) * 100, r1 = T(rng, [10, 20, 25, 30, 40, 50]), r2 = T(rng, [10, 20, 25, 30, 40, 50]);
+    const x = rng.int(2, 40) * 100, item2 = T(rng, ["laptop bag", "water purifier", "bicycle", "steel almirah"]), r1 = T(rng, [10, 15, 20, 25, 30, 35, 40, 50, 60, 75]), r2 = T(rng, [10, 15, 20, 25, 30, 35, 40, 50, 60, 75]);
     const y = x * (1 + r1 / 100), z = y * (1 - r2 / 100), ov = (z - x) / x * 100;
     if (!I(y) || !I(z) || ov === 0) return null;
+    if (Math.abs((z - x) / z * 100 - ov) < 0.5 || Math.abs((z - y) / y * 100 - ov) < 0.5) return null;   // keep every wrong option clearly apart from the answer
     const lbl = ov < 0 ? "fall" : "rise";
     return mk(rng, sg, ov, [
       [r1 - r2, `Added the two percent changes (${r1} − ${r2}) without noticing the second one works on a new base`],
       [(z - x) / z * 100, `Divided by the final value (${M(z)}) instead of the original (${M(x)})`],
       [-ov, `Got the direction the wrong way round`],
       [(z - y) / y * 100, "Gave only the second change"],
-    ], finish(d, `The price of a laptop bag was **${M(x)}**. It was raised to **${M(y)}** in the festival season, and later reduced to **${M(z)}**. What is the overall percentage change from the original price? (Write a fall as a negative value.)`,
+    ], finish(d, `The price of a ${item2} was **${M(x)}**. It was raised to **${M(y)}** in the festival season, and later reduced to **${M(z)}**. What is the overall percentage change from the original price? (Write a fall as a negative value.)`,
       [`Overall change = ${M(z)} − ${M(x)} = ${M(z - x)}`, `Percent = (${z - x})/${x} × 100 = **${sg(ov)}**`],
       `Skip the middle step: compare final with the first price only. ${QB.frac(z - x, x)} = ${sg(ov)}.`,
       `The two percent changes (${r1}% up, ${r2}% down) have different bases, so they cannot be added or subtracted directly: overall it is a ${lbl} of ${P(R(Math.abs(ov)))}.`),
@@ -252,12 +259,12 @@
     }
     const kind = rng.int(0, 1);
     if (kind === 0) {
-      const lo = rng.int(4, 18) * 5, hi = lo + T(rng, [5, 10, 15, 20, 25, 30, 40]);
-      const who = T(rng, [["Neha", "Om"], ["Isha", "Jay"], ["Tara", "Uday"]]);
+      const lo = rng.int(4, 40) * 5, hi = lo + T(rng, [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 80, 100]);
+      const who = T(rng, [["Neha", "Om"], ["Isha", "Jay"], ["Tara", "Uday"], ["Kiran", "Lata"], ["Sameer", "Dipa"], ["Gita", "Harsh"], ["Vikram", "Meera"]]), u = T(rng, ["marks", "runs", "points"]);
       const lessQ = rng.chance(0.5), ans = lessQ ? (hi - lo) / hi * 100 : (hi - lo) / lo * 100;
       const base = lessQ ? hi : lo;
-      const q = lessQ ? `${who[0]} scored **${lo}** marks and ${who[1]} scored **${hi}** marks. ${who[0]}'s marks are what percent **less** than ${who[1]}'s?`
-        : `${who[0]} scored **${lo}** marks and ${who[1]} scored **${hi}** marks. ${who[1]}'s marks are what percent **more** than ${who[0]}'s?`;
+      const q = lessQ ? `${who[0]} scored **${lo}** ${u} and ${who[1]} scored **${hi}** ${u}. ${who[0]}'s ${u} are what percent **less** than ${who[1]}'s?`
+        : `${who[0]} scored **${lo}** ${u} and ${who[1]} scored **${hi}** ${u}. ${who[1]}'s ${u} are what percent **more** than ${who[0]}'s?`;
       return mk(rng, P, ans, [
         [(hi - lo) / (lessQ ? lo : hi) * 100, `Divided the gap by ${lessQ ? lo : hi}, the wrong person's marks`],
         [hi - lo, "Gave the difference in marks as a percent"],
@@ -268,10 +275,10 @@
         `Gap ÷ the number after “than”: ${QB.frac(hi - lo, base)} = ${P(R(ans))}.`,
         `Always divide by the number that comes after “than”.`));
     }
-    const p = T(rng, [10, 15, 20, 25, 30, 40, 50, 60, 75, 80]), q2 = T(rng, [20, 25, 30, 40, 50, 60, 75, 80, 90]);
+    const p = T(rng, [5, 10, 12, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 75, 80, 90]), q2 = T(rng, [20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90]);
     if (q2 <= p) return null;
     const moreQ = rng.chance(0.5), ans = moreQ ? (q2 - p) / p * 100 : (q2 - p) / q2 * 100;
-    const Q = moreQ ? `If **${p}%** of A equals **${q2}%** of B, then A is what percent **more** than B?` : `If **${p}%** of A equals **${q2}%** of B, then B is what percent **less** than A?`;
+    const Q = T(rng, moreQ ? [`If **${p}%** of A equals **${q2}%** of B, then A is what percent **more** than B?`, `Suppose **${p}%** of A is equal to **${q2}%** of B. By what percent is A **more** than B?`] : [`If **${p}%** of A equals **${q2}%** of B, then B is what percent **less** than A?`, `Suppose **${p}%** of A is equal to **${q2}%** of B. By what percent is B **less** than A?`]);
     return mk(rng, P, ans, [
       [moreQ ? (q2 - p) / q2 * 100 : (q2 - p) / p * 100, "Compared with the wrong number (used the other base)"],
       [q2 - p, "Gave the difference of the two percentages"],
@@ -306,7 +313,7 @@
     if (d === "Medium") {
       const kind = rng.int(0, 2);
       if (kind === 0) {
-        const a = T(rng, [10, 15, 20, 25, 30, 40, 50]), b = T(rng, [10, 15, 20, 25, 30, 40, 50]);
+        const a = T(rng, [10, 12, 15, 20, 25, 30, 35, 40, 50, 60]), b = T(rng, [10, 12, 15, 20, 25, 30, 35, 40, 50, 60]);
         const n = net(a, -b);
         if (n === 0) return null;
         return mk(rng, sg, n, [
@@ -320,7 +327,7 @@
           `A rise of ${a}% followed by a fall of ${b}% does not bring you back: the fall acts on the bigger value.`), true);
       }
       if (kind === 1) {
-        const a = T(rng, [10, 20, 25, 30, 40, 50]), b = T(rng, [10, 20, 25, 30, 40, 50]), P0 = rng.int(2, 40) * 100;
+        const a = T(rng, [10, 15, 20, 25, 30, 35, 40, 50, 60]), b = T(rng, [10, 15, 20, 25, 30, 35, 40, 50, 60]), P0 = rng.int(2, 80) * 100;
         const fin = P0 * (1 + a / 100) * (1 - b / 100);
         if (!C(fin) || a === b) return null;
         return mk(rng, M, fin, [
@@ -328,12 +335,12 @@
           [P0, "Assumed the rise and fall cancel out"],
           [P0 * (1 + a / 100) - P0 * b / 100, `Took ${b}% of the original instead of the raised price`],
           [P0 * (1 - b / 100) * (1 + b / 100), "Mixed up the two percentages"],
-        ], finish(d, `A shopkeeper marks up a lamp costing **${M(P0)}** by **${a}%**, and then offers a **${b}%** discount on the marked price. What is the final selling price?`,
+        ], finish(d, T(rng, [`A shopkeeper marks up a lamp costing **${M(P0)}** by **${a}%**, and then offers a **${b}%** discount on the marked price. What is the final selling price?`, `A trader raises the price of a cycle that cost **${M(P0)}** by **${a}%**. Later he gives a **${b}%** discount on the new price. What is the final selling price?`, `A cloth merchant marks up a bolt of cloth priced at **${M(P0)}** by **${a}%**, then allows a **${b}%** discount on the marked price. What is the final selling price?`]),
           [`After mark-up: ${M(P0)} × ${R(1 + a / 100)} = ${M(R(P0 * (1 + a / 100)))}`, `After discount: ${M(R(P0 * (1 + a / 100)))} × ${R(1 - b / 100)} = **${M(R(fin))}**`],
           `Multiply once: ${P0} × ${R(1 + a / 100)} × ${R(1 - b / 100)}.`,
           `The ${b}% discount is on the marked price (${M(R(P0 * (1 + a / 100)))}), not on ${M(P0)}.`));
       }
-      const a = T(rng, [10, 20, 25, 30, 40, 50]), b = T(rng, [10, 20, 25, 30, 40, 50]), shrink = rng.chance(0.5);
+      const a = T(rng, [10, 15, 20, 25, 30, 35, 40, 50, 60]), b = T(rng, [10, 15, 20, 25, 30, 35, 40, 50, 60]), shrink = rng.chance(0.5);
       const n = net(a, shrink ? -b : b);
       if (n === 0) return null;
       return mk(rng, sg, n, [
@@ -398,7 +405,7 @@
     const item = T(rng, ITEMS);
     if (d === "Easy") {
       const up = rng.chance(0.5);
-      const x = up ? T(rng, [25, 60, 150, 300, 400, 900, 900]) : T(rng, [20, 50, 60, 75, 80, 37.5, 12.5]);
+      const x = up ? T(rng, [25, 60, 100, 150, 300, 400, 900]) : T(rng, [20, 37.5, 50, 60, 75, 80, 90]);
       const ans = up ? 100 * x / (100 + x) : 100 * x / (100 - x);
       return mk(rng, P, ans, [
         [x, "Assumed the percent is the same on both sides"],
@@ -406,8 +413,8 @@
         [100 - x, "Took the “remaining” percent"],
         [x / 2, "Halved the price change"],
         [100 - ans, "Gave the complement of the answer"],
-      ], finish(d, up ? T(rng, [`The price of ${item} rises by **${x}%**. By what percent must a family cut its consumption of ${item} to keep the monthly spending unchanged?`, `${item[0].toUpperCase() + item.slice(1)} becomes **${x}%** costlier. A household wants its ${item} bill to stay the same. By what percent should it reduce the quantity bought?`, `A hostel mess is told that ${item} now costs **${x}%** more. To keep the monthly expense on ${item} unchanged, by what percent must it cut usage?`])
-        : T(rng, [`The price of ${item} falls by **${x}%**. By what percent can a family increase its consumption of ${item} without spending more?`, `${item[0].toUpperCase() + item.slice(1)} becomes **${x}%** cheaper. Keeping the same bill, by what percent can the household increase its purchase?`, `A canteen finds that ${item} now costs **${x}%** less. By what percent can it raise its usage and still spend the same amount?`]),
+      ], finish(d, up ? T(rng, [`The price of ${item} rises by **${x}%**. By what percent must a family cut its consumption of ${item} to keep the monthly spending unchanged?`, `${item[0].toUpperCase() + item.slice(1)} becomes **${x}%** costlier. A household wants its ${item} bill to stay the same. By what percent should it reduce the quantity bought?`, `A hostel mess is told that ${item} now costs **${x}%** more. To keep the monthly expense on ${item} unchanged, by what percent must it cut usage?`, `In a mess, ${item} is now **${x}%** dearer. By what percent must the quantity bought come down so that the total spend stays unchanged?`, `The price of ${item} goes up by **${x}%**. Keeping the monthly bill on ${item} the same, by what percent should the family cut the quantity it buys?`])
+        : T(rng, [`The price of ${item} falls by **${x}%**. By what percent can a family increase its consumption of ${item} without spending more?`, `${item[0].toUpperCase() + item.slice(1)} becomes **${x}%** cheaper. Keeping the same bill, by what percent can the household increase its purchase?`, `A canteen finds that ${item} now costs **${x}%** less. By what percent can it raise its usage and still spend the same amount?`, `${item[0].toUpperCase() + item.slice(1)} is now **${x}%** cheaper. Keeping the same spend, by what percent can the family buy more?`, `After a price cut of **${x}%** on ${item}, by what percent can a household increase its quantity without spending more?`]),
         up ? [`Spending = price × quantity must stay constant. New price = ${100 + x}% of old.`, `Quantity must fall to 100/${100 + x} of old: reduction = ${x}/${100 + x} × 100 = **${P(R(ans))}**`]
           : [`New price = ${100 - x}% of old.`, `Quantity can rise to 100/${100 - x} of old: increase = ${x}/${100 - x} × 100 = **${P(R(ans))}**`],
         `Use x/(100 ${up ? "+" : "−"} x) × 100 = ${x}/${up ? 100 + x : 100 - x} × 100 = ${P(R(ans))}.`,
@@ -446,26 +453,26 @@
     }
     const kind = rng.int(0, 1);
     if (kind === 0) {
-      const x = T(rng, [20, 25, 30, 40, 50]), z = T(rng, [5, 10, 15, 20]), ans = 100 * (1 - (100 + z) / (100 + x));
+      const x = T(rng, [20, 25, 30, 40, 50, 60, 75, 80]), z = T(rng, [5, 10, 15, 20, 25, 30]), ans = 100 * (1 - (100 + z) / (100 + x));
       if (z >= x) return null;
       return mk(rng, P, ans, [
         [x - z, `Subtracted the two percents (${x} − ${z})`],
         [100 * x / (100 + x), "Found the cut needed to keep spending exactly the same, ignoring the allowed rise"],
         [100 * (x - z) / (100 + x) + z, "Mixed up the rise and the cut"],
         [100 * (x - z) / (100 + z), "Divided by the wrong base"],
-      ], finish(d, `The price of ${item} goes up by **${x}%**. By what percent must a family reduce its consumption so that its spending on ${item} rises by only **${z}%**?`,
+      ], finish(d, T(rng, [`The price of ${item} goes up by **${x}%**. By what percent must a family reduce its consumption so that its spending on ${item} rises by only **${z}%**?`, `${item[0].toUpperCase() + item.slice(1)} gets **${x}%** dearer. A family allows its spending on ${item} to rise by just **${z}%**. By what percent must it cut the quantity bought?`, `A canteen's ${item} bill is to rise by only **${z}%**, though the price of ${item} goes up by **${x}%**. By what percent must usage be reduced?`]),
         [`New spending = ${100 + z}% of old; new price = ${100 + x}% of old`, `Quantity factor = ${100 + z}/${100 + x}, so the reduction = 1 − ${100 + z}/${100 + x} = **${P(R(ans))}**`],
         `Quantity factor = (100 + ${z})/(100 + ${x}) = ${R((100 + z) / (100 + x) * 10000) / 10000}, so the cut is ${P(R(ans))}.`,
         `Here the target spending is ${100 + z}% (not 100%), so the usual x/(100 + x) formula must be adjusted.`));
     }
-    const x = T(rng, [10, 20, 25, 30, 40, 50]), y = T(rng, [5, 10, 15, 20, 25]), n = net(x, -y);
+    const x = T(rng, [10, 15, 20, 25, 30, 35, 40, 45, 50, 60]), y = T(rng, [5, 10, 12, 15, 20, 25, 30]), n = net(x, -y);
     if (n === 0) return null;
     return mk(rng, sg, n, [
       [x - y, "Subtracted the two percents"],
       [-y, "Looked only at the fall in consumption"],
       [x, "Looked only at the price rise"],
       [-n, "Gave the right size but the wrong direction"],
-    ], finish(d, `The price of ${item} rises by **${x}%** and a family reduces its consumption by **${y}%**. What is the percentage change in its monthly spending? (A fall is written with a minus sign.)`,
+    ], finish(d, T(rng, [`The price of ${item} rises by **${x}%** and a family reduces its consumption by **${y}%**. What is the percentage change in its monthly spending? (A fall is written with a minus sign.)`, `A household's ${item} bill is affected in two ways: the price goes up **${x}%**, and the family buys **${y}%** less. What is the percentage change in its monthly spending? (A fall is written with a minus sign.)`]),
       [`Spending = price × quantity, so the changes combine: ${x} − ${y} − ${R(x * y / 100)}`, `= **${sg(n)}**`],
       `Factor method: ${R(1 + x / 100)} × ${R(1 - y / 100)} = ${R((1 + x / 100) * (1 - y / 100))} → ${sg(n)}.`,
       `Spending depends on both price and quantity; the net change is ${sg(n)}, not ${x - y}%.`), true);
@@ -634,7 +641,7 @@
 
   /* ------------------------------------------------------------------ 8. income, expenditure, savings */
   QB.gen("quant/percentages/income-savings", { title: "Income, expenditure & savings", gen: wrap((rng, d) => {
-    const who = T(rng, ["Meena", "Karthik", "Farhan", "Divya", "Gurpreet", "Lakshmi"]);
+    const who = T(rng, ["Meena", "Karthik", "Farhan", "Divya", "Gurpreet", "Lakshmi", "Ananya", "Nisha", "Sunita", "Harpreet", "Pallavi", "Revathi"]);
     if (d === "Easy") {
       const S = rng.int(2, 15) * 4000, a = T(rng, [20, 25, 30, 35, 40]), b = T(rng, [10, 15, 20, 25]);
       if (a + b >= 90) return null;
@@ -671,7 +678,7 @@
         `The ${M(X)} is the ${100 - s}% that is NOT spent: do not treat it as ${s}%.`));
     }
     if (rng.chance(0.5)) {
-      const s = T(rng, [10, 15, 20, 25, 30, 40]), i = T(rng, [10, 20, 25, 30]), e = T(rng, [5, 10, 15, 20, 25]);
+      const s = T(rng, [10, 15, 20, 25, 30, 40]), i = T(rng, [10, 20, 25, 30, 40, 50]), e = T(rng, [5, 10, 15, 20, 25, 30]);
       const newS = 100 * (1 + i / 100) - (100 - s) * (1 + e / 100), ch = (newS - s) / s * 100;
       if (!C(ch) || newS <= 0 || ch === 0) return null;
       return mk(rng, sg, ch, [
@@ -679,12 +686,12 @@
         [i, "Assumed savings rise by the same percent as income"],
         [newS / (1 + i / 100), "Gave the new savings rate, not the change in savings"],
         [(newS - s), "Gave the change in rupee units (taking income as 100), not a percent"],
-      ], finish(d, `${who} saves **${s}%** of her income. Her income rises by **${i}%** and her expenditure rises by **${e}%**. By what percent does her savings amount change? (A fall is written with a minus sign.)`,
+      ], finish(d, T(rng, [`${who} saves **${s}%** of her income. Her income rises by **${i}%** and her expenditure rises by **${e}%**. By what percent does her savings amount change? (A fall is written with a minus sign.)`, `Each month ${who} puts aside **${s}%** of her income. Next, her income rises by **${i}%** and her spending rises by **${e}%**. By what percent does the amount she saves change? (A fall is written with a minus sign.)`]),
         [`Take income = 100: expenditure = ${100 - s}, savings = ${s}`, `New income = ${100 + i}, new expenditure = ${R((100 - s) * (1 + e / 100))}, new savings = ${R(newS)}`, `Change = (${R(newS)} − ${s})/${s} × 100 = **${sg(ch)}**`],
         `Savings is a small difference of two big numbers, so it moves much more than income does. Always rebuild it from income = 100.`,
         `Savings change is not i − e. The two changes apply to different bases (income and expenditure).`), true);
     }
-    const S = rng.int(2, 12) * 10000, s = T(rng, [10, 20, 25, 30, 40]), i = T(rng, [10, 20, 25]), e = T(rng, [5, 10, 15, 20]);
+    const S = rng.int(2, 30) * 10000, s = T(rng, [10, 20, 25, 30, 40, 45]), i = T(rng, [10, 15, 20, 25, 30]), e = T(rng, [5, 10, 12, 15, 20, 25]);
     const E = S * (100 - s) / 100, ns = S * (1 + i / 100) - E * (1 + e / 100), oldS = S - E;
     if (!C(ns) || ns <= 0) return null;
     return mk(rng, M, ns, [
@@ -692,7 +699,7 @@
       [S * (1 + i / 100) - E, "Forgot that the expenditure also rose"],
       [oldS * (1 + i / 100), "Raised the savings by the income percent"],
       [S * (1 + i / 100) - E * (1 + i / 100), "Raised expenditure by the income percent instead of its own"],
-    ], finish(d, `${who} earns **${M(S)}** a month and saves **${s}%** of it. Next year her income goes up by **${i}%** and her expenditure goes up by **${e}%**. How much will she save per month?`,
+    ], finish(d, T(rng, [`${who} earns **${M(S)}** a month and saves **${s}%** of it. Next year her income goes up by **${i}%** and her expenditure goes up by **${e}%**. How much will she save per month?`, `${who}'s monthly income is **${M(S)}**, and she saves **${s}%** of it. Her income rises by **${i}%** next year and her spending rises by **${e}%**. What will her monthly savings be?`, `Last year ${who} had a monthly income of **${M(S)}** and saved **${s}%**. This year her income is up **${i}%** and her expenses are up **${e}%**. How much does she save each month now?`]),
       [`Expenditure now = ${100 - s}% of ${M(S)} = ${M(E)}`, `New income = ${M(R(S * (1 + i / 100)))}, new expenditure = ${M(R(E * (1 + e / 100)))}`, `Savings = **${M(ns)}**`],
       `Savings = income − expenditure: each is changed by its own percent.`,
       `The saving rate (${s}%) does not stay fixed when income and expenditure rise at different rates.`));
