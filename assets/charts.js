@@ -4,7 +4,7 @@
    Pie/donut with several series draw one pie per series side by side. Works in light and dark; no DOM access at load time. */
 (function (root) {
   "use strict";
-  const PAL = ["#4a74e8", "#1b92a5", "#d9772f", "#8d63d2", "#d6485a", "#3f9a55", "#b8962e", "#6b7a99"];
+  const PAL = ["#5B9BEF", "#F06C9B", "#F7B538", "#3CC47C", "#9B7BEA", "#F08A4B", "#D9C23A", "#8C7A82"];   // neo-brutalist fills; bars get an ink outline in brutal.css
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const num = (v) => String(+Number(v).toFixed(2));
   const T_AX = 'fill="var(--muted)"', T_VAL = 'fill="var(--text)" font-weight="600"';

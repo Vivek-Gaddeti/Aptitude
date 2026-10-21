@@ -19,11 +19,11 @@
   const SEC_PAGE = { quant: "quant.html", reasoning: "reasoning.html", verbal: "verbal.html", di: "di.html", strategy: "strategy.html" };
   const LEARN_KEY = /^(quant|reasoning|verbal|di|strategy):([a-z0-9][a-z0-9-]*)$/;
   const REASONS = [
-    ["concept", "Concept", "Did not know the method", "var(--purple)"],
-    ["calc", "Calculation", "Right method, slip in the arithmetic", "var(--amber)"],
-    ["misread", "Misread", "Misread the question or an option", "var(--accent)"],
-    ["time", "Time", "Rushed or ran out of time", "var(--red)"],
-    ["guess", "Guessed", "Picked without working it out", "var(--green)"],
+    ["concept", "Concept", "Did not know the method", "var(--f-lilac, var(--purple))"],
+    ["calc", "Calculation", "Right method, slip in the arithmetic", "var(--f-yellow, var(--amber))"],
+    ["misread", "Misread", "Misread the question or an option", "var(--f-blue, var(--accent))"],
+    ["time", "Time", "Rushed or ran out of time", "var(--f-orange, var(--red))"],
+    ["guess", "Guessed", "Picked without working it out", "var(--f-green, var(--green))"],
     ["untagged", "Untagged", "No reason tagged yet. Open a question and tag why you missed it.", "var(--muted)"],
   ];
   const RMAP = Object.fromEntries(REASONS.map((r) => [r[0], r]));

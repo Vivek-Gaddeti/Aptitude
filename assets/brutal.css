@@ -37,7 +37,7 @@
   --sans: "Archivo", "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
   --display: "Archivo", "Segoe UI", system-ui, -apple-system, sans-serif;
   --mono: "Space Mono", "Cascadia Code", "JetBrains Mono", Consolas, Menlo, monospace;
-  --top-h: 64px;
+  --top-big: 64px; --top-small: 58px; --top-h: var(--top-big);
 }
 [data-theme="dark"] {
   --ink: #F3E3DC;
@@ -289,7 +289,8 @@ html .hm-goaledit { border: 2px solid var(--ink); border-radius: 0; }
 
 /* ---------- small screens ---------- */
 @media (max-width: 900px) {
-  .sidebar { box-shadow: 6px 0 0 var(--ink); }
+  .sidebar { box-shadow: none; }
+  body.sidebar-open .sidebar { box-shadow: 6px 0 0 var(--ink); }
 }
 @media (max-width: 600px) {
   :root { --sh: 4px 4px 0 var(--ink); }
@@ -322,3 +323,139 @@ html .hm-goaledit { border: 2px solid var(--ink); border-radius: 0; }
 /* solution boxes: full outline instead of a left stripe */
 .pr-box, .qz-short { border: var(--bw-s) solid var(--ink) !important; border-radius: 0; color: var(--text); }
 .pr-sol { border: var(--bw-s) dashed var(--ink); }
+
+/* ---------- header: less clutter ---------- */
+.topbar .hello { display: none; }          /* the greeting lives on the dashboard */
+.nav .ni { display: none; }                /* words are enough; icons crowded the bar */
+.nav a { padding: .38rem .6rem; }
+/* below 960px the nav turns icon-only (names stay as tooltips), so the bar never needs a sideways scroll */
+@media (max-width: 960px) {
+  .nav .ni { display: inline-block; width: 18px; height: 18px; }
+  .nav a > span:not(.nav-badge) { display: none; }
+  .nav a { padding: .4rem .45rem; }
+  .nav-chev { display: none; }
+}
+@media (max-width: 1200px) and (min-width: 961px) {
+  .brand-name { display: none; }
+  .nav a { padding: .36rem .45rem; font-size: .76rem; }
+  .topbar { gap: .6rem; }
+}
+/* phones: two-row header, the brand + tools on top and all seven sections in an evenly spaced row below */
+@media (max-width: 640px) {
+  :root { --top-big: 104px; --top-small: 104px; }
+  .topbar { flex-wrap: wrap; align-content: center; row-gap: 6px; padding: 6px .6rem 0; }
+  .topbar .nav { order: 10; flex: 1 0 100%; justify-content: space-between; border-top: var(--bw-s) solid var(--ink); margin: 0 -.6rem; padding: 4px .6rem 4px; overflow: visible; }
+  .topbar .nav a { padding: .45rem .55rem; }
+  .icon-btn { height: 36px; min-width: 36px; }
+  .topbar .brand { margin-right: auto; }
+}
+
+/* ---------- practice: results, speed drill, daily chip, question map ---------- */
+.pr-bar { background: var(--panel); border: var(--bw-s) solid var(--ink); border-radius: 0; }
+.pr-bar .fill { border-radius: 0; background: var(--panel-2); opacity: 1; border-top: var(--bw-s) solid var(--ink); }
+.pr-bar.ok .fill { background: var(--f-green); } .pr-bar.bad .fill { background: var(--f-pink); }
+.pr-bar .tick { height: 3px; background: var(--ink); opacity: 1; }
+.pr-bar em { color: var(--text); font-family: var(--mono); }
+.pr-hero.hot { background: var(--green-soft); }
+.pr-score b { font-weight: 900; }
+.sp-mode { border: var(--bw-s) solid var(--ink); background: var(--panel); transition: transform .08s, box-shadow .08s; }
+.sp-mode:hover { border-color: var(--ink); background: var(--f-yellow); color: #22121A; }
+.sp-mode:hover .sb, .sp-mode:hover .bs { color: #22121A; }
+.sp-mode.on { border-color: var(--ink); background: var(--page-c, var(--accent)); color: #22121A; box-shadow: var(--sh-s); }
+.sp-mode.on .nm, .sp-mode.on .sb, .sp-mode.on .bs, .sp-mode.on .bs b { color: #22121A; }
+.sp-box, .sp-in { border: var(--bw) solid var(--ink) !important; border-radius: 0 !important; }
+.pr-chip.daily { background: var(--f-orange); color: #22121A; }
+.pr-pal button { border: var(--bw-s) solid var(--ink); color: var(--text); font-family: var(--mono); }
+.pr-pal .c { background: var(--f-green); border-color: var(--ink); color: #22121A; }
+.pr-pal .w { background: var(--f-pink); border-color: var(--ink); color: #22121A; }
+.pr-pal .a { background: var(--f-blue); border-color: var(--ink); color: #22121A; }
+.pr-pal .cur { background: var(--f-yellow); color: #22121A; border: var(--bw) solid var(--ink); box-shadow: var(--sh-s); }
+.pr-pal .m::after { border-radius: 0; border: 1px solid var(--ink); }
+.pr-legend i { border-radius: 0; border: 1.5px solid var(--ink); }
+.pr-lvl i { border: 1.5px solid var(--ink); }
+.pr-lvl i.on.easy { background: var(--f-green); color: #22121A; } .pr-lvl i.on.med { background: var(--f-yellow); color: #22121A; } .pr-lvl i.on.hard { background: var(--f-pink); color: #22121A; }
+.pr-chart-ph { border: var(--bw-s) dashed var(--ink); }
+.pr-rushed { color: var(--text); }
+
+/* ---------- rough-work drawer (rough.js injects its own styles later, so these carry an extra "html") ---------- */
+html .rw-drawer { border-left: var(--bw) solid var(--ink); box-shadow: -6px 0 0 var(--ink); }
+html .rw-head h4 { font-weight: 900; text-transform: uppercase; }
+html .rw-tabs { background: var(--panel); border: var(--bw-s) solid var(--ink); padding: 0; gap: 0; border-radius: 0; }
+html .rw-tabs button { border-radius: 0; border-right: var(--bw-s) solid var(--ink); color: var(--text); text-transform: uppercase; font-weight: 800; padding: .45rem; }
+html .rw-tabs button:last-child { border-right: 0; }
+html .rw-tabs button.on { background: var(--ink); color: var(--bg); box-shadow: none; }
+html #rwBtn.on { background: var(--f-yellow); color: #22121A; border-color: var(--ink); }
+
+/* ---------- mock exam (mock.js injects its styles later, so these carry an extra "html") ---------- */
+html .mk-co { background: var(--f-pink); color: #22121A; border: 1.5px solid var(--ink); }
+html .mk-secs, html .mk-rank { border-top: var(--bw-s) dashed var(--ink); }
+html .mk-bar { background: var(--bg); border-bottom: var(--bw) solid var(--ink); }
+html .mk-tab { border: var(--bw-s) solid var(--ink); color: var(--text); font-family: var(--display); text-transform: uppercase; font-weight: 800; }
+html .mk-tab small { border: 1.5px solid var(--ink); background: var(--panel); color: var(--text); }
+html .mk-tab.cur { background: var(--accent); color: #fff; border-color: var(--ink); box-shadow: var(--sh-s); }
+html[data-theme="dark"] .mk-tab.cur { color: #22121A; }
+html .mk-tab.cur small { color: #22121A; }
+html .mk-pal button, html .mk-sw { border: var(--bw-s) solid var(--ink); color: var(--text); font-family: var(--mono); }
+html .mk-pal .an, html .mk-sw.an { background: var(--f-green); color: #22121A; border-color: var(--ink); }
+html .mk-pal .na, html .mk-sw.na { background: var(--f-pink); color: #22121A; border-color: var(--ink); }
+html .mk-pal .mr, html .mk-sw.mr, html .mk-pal .am, html .mk-sw.am { background: var(--f-lilac); color: #22121A; border-color: var(--ink); border-radius: 50%; }   /* marked keeps the round shape real tests use */
+html .mk-pal .am::after, html .mk-sw.am::after { background: var(--f-green); border: 1.5px solid var(--ink); }
+html .mk-pal .cur { outline: var(--bw) solid var(--ink); outline-offset: 2px; background: var(--f-yellow); color: #22121A; }
+
+/* ---------- revision + flashcards (revision.js injects its styles later, so these carry an extra "html") ---------- */
+html .rv-tabs { border: var(--bw-s) solid var(--ink); padding: 0; gap: 0; background: var(--panel); box-shadow: var(--sh-s); }
+html .rv-tabs a { border-right: var(--bw-s) solid var(--ink); color: var(--text); font-family: var(--display); font-weight: 800; text-transform: uppercase; font-size: .8rem; }
+html .rv-tabs a:last-child { border-right: 0; }
+html .rv-tabs a:hover { background: var(--f-yellow); color: #22121A; }
+html .rv-tabs a.on { background: var(--ink); color: var(--bg); }
+html .rv-tabs .n { border: 1.5px solid currentColor; background: transparent; color: inherit; font-family: var(--mono); }
+html .rv-tabs a.on .n { background: var(--page-c, var(--accent)); color: #22121A; border-color: var(--page-c, var(--accent)); }
+html .rv-big { background: var(--page-c, var(--accent)); color: #22121A; border: var(--bw) solid var(--ink); box-shadow: var(--sh-s); }
+html .rv-why { background: var(--rc); color: #22121A; border: 1.5px solid var(--ink); }
+html .rv-new { background: var(--f-lilac); color: #22121A; border: 1.5px solid var(--ink); }
+html .rv-cnt { border: 1.5px solid var(--ink); background: var(--panel); color: var(--text); }
+html .rv-cstats > div { border: var(--bw-s) solid var(--ink); }
+html .rv-flip { border-radius: 0; }
+html .rv-face { border: var(--bw) solid var(--ink) !important; border-radius: 0 !important; box-shadow: var(--sh) !important; background: var(--panel); }
+html .rv-back { background: var(--green-soft); }
+html .rv-flip:focus-visible .rv-face { box-shadow: var(--sh-h) !important; outline: var(--bw) solid var(--accent); }
+html .rv-nt { border: var(--bw-s) dashed var(--ink); background: var(--panel); }
+
+/* ---------- print: plain paper, thin rules, no shadows ---------- */
+@media print {
+  body { background: #fff !important; background-image: none !important; }
+  * { box-shadow: none !important; }
+  .card, .ch-card, .pr-card, details.box, .table-wrap { border-width: 1.5px !important; border-radius: 0 !important; }
+}
+html .mk-tab.cur small { background: #fff; color: #22121A; border-color: #22121A; }
+@media (max-width: 640px) {
+  html .rv-tabs { flex-wrap: wrap; overflow: visible; }
+  html .rv-tabs a { flex: 1 1 45%; border-bottom: var(--bw-s) solid var(--ink); }
+  html .rv-tabs a:nth-child(2n) { border-right: 0; }
+  html .rv-tabs a:nth-last-child(-n+2) { border-bottom: 0; }
+}
+
+/* ---------- learn pages, ✨ menu, practice tiles ---------- */
+/* glow cursor and aurora are hidden in this theme, so their switches would do nothing */
+.d-row:has([data-opt="glow"]), .d-row:has([data-opt="aurora"]) { display: none; }
+.d-menu { border: var(--bw) solid var(--ink) !important; box-shadow: var(--sh) !important; border-radius: 0 !important; }
+.d-sw { border-radius: 0 !important; border: 2px solid var(--ink); }
+.qz-opt { border: var(--bw-s) solid var(--ink); font-weight: 700; transition: transform .08s, box-shadow .08s; }
+.qz-opt:hover:not(:disabled) { border-color: var(--ink); background: var(--f-yellow); color: #22121A; box-shadow: var(--sh-s); transform: translate(-1px, -1px); }
+.qz-opt .k { border: 1.5px solid var(--ink); background: var(--panel); color: var(--text); font-family: var(--mono); }
+.qz-opt.ok { border-color: var(--ink); background: var(--f-green); color: #22121A; }
+.qz-opt.bad { border-color: var(--ink); background: var(--f-pink); color: #22121A; }
+.qz-opt.ok .k, .qz-opt.bad .k { background: #22121A; color: #fff; }
+.qz-res { border: var(--bw-s) solid var(--ink); border-radius: 0; }
+.qz-res.ok { background: var(--green-soft); } .qz-res.bad { background: var(--red-soft); }
+.pr-tile.t-daily { --tc: var(--f-orange); } .pr-tile.t-speed { --tc: var(--f-yellow); } .pr-tile.t-mock { --tc: var(--f-blue); } .pr-tile.t-weak { --tc: var(--f-lilac); }
+.pr-tile.t-daily.done { --tc: var(--f-green); }
+.pr-tile .ti { border: var(--bw-s) solid var(--ink); border-radius: 0; background: var(--tc); color: #22121A; }
+.pr-tile .ti .ico { color: #22121A; }
+.pr-icon { border: var(--bw-s) solid var(--ink); }
+.pr-icon.on { background: var(--f-yellow); color: #22121A; } .pr-icon.mk { background: var(--f-lilac); color: #22121A; }
+/* the sidebar's sliding marker sits on the left edge; the boxed active link already shows where you are */
+.sb-ind { display: none !important; }
+
+/* ---------- DI charts: flat fills with an ink outline, square corners ---------- */
+.di-chart rect[fill^="#"], .di-chart path[fill^="#"] { stroke: var(--ink); stroke-width: 1.5; rx: 0; }
