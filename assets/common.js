@@ -801,8 +801,8 @@
   // per-link colours by link index
   // [colour for the pill/icons, readable shade for text & buttons in light mode, readable shade in dark mode]
   // neo-brutalist palette: Dashboard raspberry, Quant pink, Reasoning green, Verbal yellow, DI blue, Practice orange, Revision lilac
-  const NAV_COLORS = [["#FF6F9C", "#D6245F", "#FF6F9C"], ["#FF8AB0", "#B8124A", "#FF8AB0"], ["#3DDC84", "#0B7A43", "#3DDC84"],
-    ["#FFD23F", "#8A5A00", "#FFD23F"], ["#8EC5FF", "#1F5FA8", "#8EC5FF"], ["#FF9F5A", "#A8460B", "#FF9F5A"], ["#B79CFF", "#5B3CC4", "#B79CFF"]];
+  const NAV_COLORS = [["var(--f-rasp)", "#D6245F", "#FF6B93"], ["var(--f-pink)", "#B8124A", "#F48FB1"], ["var(--f-green)", "#0B7A43", "#5BD98C"],
+    ["var(--f-yellow)", "#8A5A00", "#F2C94C"], ["var(--f-blue)", "#1F5FA8", "#82B4F5"], ["var(--f-orange)", "#A8460B", "#F5A26B"], ["var(--f-lilac)", "#5B3CC4", "#B9A3F5"]];
   const navIcon = (label) => { const ic = NAV_ICONS[label.replace("↗", "").trim()]; return ic ? `<svg class="ni ni-${ic[1]}" viewBox="0 0 24 24" aria-hidden="true">${NAV_SVG[ic[0]]}</svg>` : ""; };
   const dueCount = () => Object.values(Store.load().items).filter((it) => Store.isDue(it)).length;
   const badgeHTML = (n) => (n ? `<span class="nav-badge pulse">${n > 99 ? "99+" : n}</span>` : "");
@@ -1061,63 +1061,74 @@
   /* ------------------------------------------------------------- Topics sidebar (lessons, strategy)
      desktop: a column you can drag to resize (200 to 420 px, apt:sidebarW) and collapse (apt:sidebarClosed), instant, both remembered
      tablet / phone / narrow window: an overlay drawer (body.sidebar-open) opened by Topics on the rail or the menu button */
-  const SB_MIN = 200, SB_MAX = 420, SB_DEF = 270;
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) {} };
   const sbDrawerMode = () => document.documentElement.dataset.device !== "desktop" || innerWidth <= 900;
-  function sbSetWidth(w, save) {
-    w = Math.max(SB_MIN, Math.min(SB_MAX, Math.round(w)));
-    document.documentElement.style.setProperty("--sbw", w + "px");
-    const rz = document.querySelector(".sb-resizer"); if (rz) rz.setAttribute("aria-valuenow", w);
-    if (save) lsSet("apt:sidebarW", w === SB_DEF ? null : String(w));
-    return w;
+  /* Resizable / collapsible side column, shared by the lesson sidebar and the formula sheet's table of contents.
+     SidebarCtl.make({ wKey, cKey, cssVar, closedClass, min, max, def, label, hostClass }) returns { setWidth, setClosed, toggle, restore, resizer, isClosed }.
+     width lives in a CSS variable on <html>, the closed state is a class on <body>; both remembered in localStorage (wKey, cKey). */
+  function makeSidebarCtl(o) {
+    const MIN = o.min || 200, MAX = o.max || 420, DEF = o.def || 270, cls = o.resizerClass || "sb-resizer";
+    let rz = null;
+    function setWidth(w, save) {
+      w = Math.max(MIN, Math.min(MAX, Math.round(w)));
+      document.documentElement.style.setProperty(o.cssVar, w + "px");
+      if (rz) rz.setAttribute("aria-valuenow", w);
+      if (save) lsSet(o.wKey, w === DEF ? null : String(w));
+      return w;
+    }
+    function setClosed(c, save = true) {
+      document.body.classList.toggle(o.closedClass, !!c);
+      if (save) lsSet(o.cKey, c ? "1" : null);
+    }
+    const isClosed = () => document.body.classList.contains(o.closedClass);
+    const toggle = () => setClosed(!isClosed());
+    function restore() {
+      const w = parseInt(lsGet(o.wKey), 10);
+      setWidth(w >= MIN && w <= MAX ? w : DEF, false);
+      setClosed(lsGet(o.cKey) === "1", false);
+    }
+    function resizer(panel) {
+      rz = document.createElement("div");
+      rz.className = cls; rz.tabIndex = 0; rz.setAttribute("role", "separator"); rz.setAttribute("aria-orientation", "vertical");
+      rz.setAttribute("aria-label", o.label || "Resize sidebar"); rz.title = "Drag to resize, double-click to reset";
+      rz.setAttribute("aria-valuemin", MIN); rz.setAttribute("aria-valuemax", MAX);
+      panel.parentNode.insertBefore(rz, panel.nextSibling);
+      const cur = () => parseInt(getComputedStyle(document.documentElement).getPropertyValue(o.cssVar), 10) || DEF;
+      rz.setAttribute("aria-valuenow", cur());
+      rz.addEventListener("pointerdown", (e) => {
+        if (e.button) return;
+        e.preventDefault(); rz.setPointerCapture(e.pointerId); rz.classList.add("drag"); document.body.classList.add("sb-dragging");
+      });
+      rz.addEventListener("pointermove", (e) => { if (rz.hasPointerCapture(e.pointerId)) setWidth(e.clientX - panel.getBoundingClientRect().left, false); });
+      const end = (e) => {
+        if (!rz.classList.contains("drag")) return;
+        rz.classList.remove("drag"); document.body.classList.remove("sb-dragging");
+        try { rz.releasePointerCapture(e.pointerId); } catch (x) {}
+        setWidth(cur(), true);
+      };
+      rz.addEventListener("pointerup", end); rz.addEventListener("pointercancel", end);
+      rz.addEventListener("dblclick", () => { setWidth(DEF, true); });
+      rz.addEventListener("keydown", (e) => {
+        const d = e.key === "ArrowLeft" ? -16 : e.key === "ArrowRight" ? 16 : 0;
+        if (d) { e.preventDefault(); setWidth(cur() + d, true); }
+        else if (e.key === "Home") { e.preventDefault(); setWidth(MIN, true); }
+        else if (e.key === "End") { e.preventDefault(); setWidth(MAX, true); }
+        else if (e.key === "Enter") { e.preventDefault(); setWidth(DEF, true); }
+      });
+      return rz;
+    }
+    return { setWidth, setClosed, toggle, restore, resizer, isClosed };
   }
-  function sbSetClosed(c, save = true) {
-    document.body.classList.toggle("sb-closed", !!c);
-    if (save) lsSet("apt:sidebarClosed", c ? "1" : null);
-  }
+  const SB = makeSidebarCtl({ wKey: "apt:sidebarW", cKey: "apt:sidebarClosed", cssVar: "--sbw", closedClass: "sb-closed", min: 200, max: 420, def: 270, label: "Resize topics sidebar" });
+  const sbSetWidth = SB.setWidth, sbSetClosed = SB.setClosed, sbRestore = SB.restore, sbResizer = SB.resizer;
   function toggleTopics() {
     if (!document.getElementById("sidebar")) return;
     if (sbDrawerMode()) document.body.classList.toggle("sidebar-open");
-    else sbSetClosed(!document.body.classList.contains("sb-closed"));
+    else SB.toggle();
   }
   function closeDrawer() { document.body.classList.remove("sidebar-open"); }
-  // restore the remembered width / closed state as early as the sidebar exists (before the first paint of the page body)
-  function sbRestore() {
-    const w = parseInt(lsGet("apt:sidebarW"), 10);
-    sbSetWidth(w >= SB_MIN && w <= SB_MAX ? w : SB_DEF, false);
-    sbSetClosed(lsGet("apt:sidebarClosed") === "1", false);
-  }
-  function sbResizer(sb) {
-    const rz = document.createElement("div");
-    rz.className = "sb-resizer"; rz.tabIndex = 0; rz.setAttribute("role", "separator"); rz.setAttribute("aria-orientation", "vertical");
-    rz.setAttribute("aria-label", "Resize topics sidebar"); rz.title = "Drag to resize, double-click to reset";
-    rz.setAttribute("aria-valuemin", SB_MIN); rz.setAttribute("aria-valuemax", SB_MAX);
-    sb.parentNode.insertBefore(rz, sb.nextSibling);
-    const cur = () => parseInt(getComputedStyle(document.documentElement).getPropertyValue("--sbw"), 10) || SB_DEF;
-    rz.setAttribute("aria-valuenow", cur());
-    rz.addEventListener("pointerdown", (e) => {
-      if (e.button) return;
-      e.preventDefault(); rz.setPointerCapture(e.pointerId); rz.classList.add("drag"); document.body.classList.add("sb-dragging");
-    });
-    rz.addEventListener("pointermove", (e) => { if (rz.hasPointerCapture(e.pointerId)) sbSetWidth(e.clientX - sb.getBoundingClientRect().left, false); });
-    const end = (e) => {
-      if (!rz.classList.contains("drag")) return;
-      rz.classList.remove("drag"); document.body.classList.remove("sb-dragging");
-      try { rz.releasePointerCapture(e.pointerId); } catch (x) {}
-      sbSetWidth(cur(), true);
-    };
-    rz.addEventListener("pointerup", end); rz.addEventListener("pointercancel", end);
-    rz.addEventListener("dblclick", () => { sbSetWidth(SB_DEF, true); });
-    rz.addEventListener("keydown", (e) => {
-      const d = e.key === "ArrowLeft" ? -16 : e.key === "ArrowRight" ? 16 : 0;
-      if (d) { e.preventDefault(); sbSetWidth(cur() + d, true); }
-      else if (e.key === "Home") { e.preventDefault(); sbSetWidth(SB_MIN, true); }
-      else if (e.key === "End") { e.preventDefault(); sbSetWidth(SB_MAX, true); }
-      else if (e.key === "Enter") { e.preventDefault(); sbSetWidth(SB_DEF, true); }
-    });
-    return rz;
-  }
+  window.SidebarCtl = { make: makeSidebarCtl, desktop: () => !sbDrawerMode(), lsGet, lsSet };
   // keep the rail's Topics button honest about the drawer
   document.addEventListener("DOMContentLoaded", () => {
     new MutationObserver(() => { const b = document.getElementById("grTopics"); if (b) b.setAttribute("aria-expanded", document.body.classList.contains("sidebar-open")); })
