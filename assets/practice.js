@@ -16,7 +16,8 @@
   const esc = window.esc || ((s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])));
   const fmt = window.fmt || esc;
   const toast = window.toast || (() => {});
-  const swapLabel = window.swapLabel || ((l, s = 0) => `<span class="swap" data-s="${s}">${l.map((x) => `<span>${x}</span>`).join("")}</span>`);
+  const stampEl = (el) => { if (el && window.stamp) window.stamp(el); };
+  const stampAll = (sel) => main.querySelectorAll(sel).forEach(stampEl);
 
   const SK = "apt:prac:sess", LK = "apt:prac:setup", SPK = "apt:prac:speed";
   const LSK = "apt:lastSetup", SESK = "apt:session", SLK = "apt:prac:sessL";   // last setup, resumable-session record (read by the dashboard), localStorage mirror of the session
@@ -180,7 +181,7 @@
     const it = Store ? Store.item("pat:" + key) : {};
     return { n: it.n || 0, c: it.c || 0, avg: it.n ? (it.ts || 0) / it.n : 0 };
   }
-  const UI = { pats: false, more: false, why: false };      // which folds on the setup screen are open (survives re-renders)
+  const UI = { pats: false, why: false };      // which folds on the setup screen are open (survives re-renders)
   const SRC_L = { bank: "bank", gen: "generated", mix: "bank + generated" }, TIM_L = { none: "untimed", target: "target time per question", total: "total timer" };
   function setupView(pre) {
     view = "setup";
@@ -239,7 +240,7 @@
     if (!bankN && !genN) hint.push("Nothing matches these choices.");
 
     main.innerHTML = `
-      <div class="pr-enter pr-setupwrap">
+      <div class="pr-setupwrap">
       <h1 class="pr-h1">Practice</h1>
       <p class="lead">Pick a topic and start. Every answer is remembered, so your weak spots find you.</p>
       ${quickHTML(ix)}
@@ -249,14 +250,13 @@
         <div class="pr-field"><h2 class="pr-step"><span>2</span> Topic <small>pick one or more</small></h2>${topicChips || '<span class="muted">No topics yet.</span>'}</div>
         <details class="pr-fold" id="prPats"${UI.pats ? " open" : ""}><summary>Patterns: ${cfg.patterns.length ? `${patSel} of ${patTotal}` : `all ${patTotal}`} in ${esc(multiT ? "these topics" : topicLbl)}</summary>
           <div class="pr-foldbody">${cfg.patterns.length ? '<button type="button" class="pr-link" data-act="pat-all">Select all patterns</button>' : ""}${patRows || '<p class="muted">Pick a topic first.</p>'}</div></details>
-        <details class="pr-fold" id="prMore"${UI.more ? " open" : ""}><summary>More options</summary>
-          <div class="pr-foldbody pr-opts-grid">
-            <div class="pr-field"><div class="pr-lab">Difficulty</div><div class="pr-picks">${DIFFS.map((d) => `<button type="button" class="pr-pick d-${DCLS[d]}${cfg.diff.includes(d) ? " on" : ""}" data-act="diff" data-v="${d}" aria-pressed="${cfg.diff.includes(d)}">${d}</button>`).join("")}</div></div>
-            <div class="pr-field"><div class="pr-lab">Questions</div>${seg("count", [[10, "10"], [20, "20"], [30, "30"]], cfg.count)}</div>
-            <div class="pr-field"><div class="pr-lab">Source</div>${seg("source", [["bank", "Bank"], ["gen", "Generated"], ["mix", "Mix"]], cfg.source)}</div>
-            <div class="pr-field"><div class="pr-lab">Feedback</div>${seg("feedback", [["instant", "Instant"], ["test", "Test"]], cfg.feedback)}</div>
-            <div class="pr-field"><div class="pr-lab">Timing</div>${seg("timing", [["none", "Untimed"], ["target", "Target per question"], ["total", "Total timer"]], cfg.timing)}</div>
-          </div></details>
+        <div class="pr-opts" role="group" aria-label="Options">
+          <div class="pr-field"><div class="pr-lab">Difficulty</div><div class="pr-segc" role="group" aria-label="Difficulty">${DIFFS.map((d) => `<button type="button" class="${cfg.diff.includes(d) ? "on" : ""}" data-act="diff" data-v="${d}" aria-pressed="${cfg.diff.includes(d)}">${d}</button>`).join("")}</div></div>
+          <div class="pr-field"><div class="pr-lab">Questions</div>${seg("count", [[10, "10"], [20, "20"], [30, "30"]], cfg.count)}</div>
+          <div class="pr-field"><div class="pr-lab">Feedback</div>${seg("feedback", [["instant", "Instant"], ["test", "Test"]], cfg.feedback)}</div>
+          <div class="pr-field"><div class="pr-lab">Timing</div>${seg("timing", [["none", "Untimed"], ["target", "Per question"], ["total", "Total"]], cfg.timing)}</div>
+          <div class="pr-field"><div class="pr-lab">Source</div>${seg("source", [["bank", "Bank"], ["gen", "Generated"], ["mix", "Mix"]], cfg.source)}</div>
+        </div>
         ${hint.length ? `<p class="pr-hint">${ic("bulb")} ${esc(hint.join(" "))}</p>` : ""}
         <div class="pr-sumbar"><div class="pr-sumtxt"><b>${nQ} question${nQ === 1 ? "" : "s"} · ${esc(topicLbl)}</b>
           <span>${cfg.diff.length === 3 ? "All levels" : esc(cfg.diff.join(", "))} · ${SRC_L[cfg.source]} · ${cfg.feedback === "instant" ? "instant feedback" : "test mode"} · ${TIM_L[cfg.timing]}</span></div>
@@ -411,7 +411,7 @@
       links.push(`<a class="btn primary" href="#daily">Daily set</a>`, `<a class="btn" href="revision.html">Review & mistakes</a>`);
     }
     links.push(`<a class="btn" href="#setup">Back to practice</a>`);
-    main.innerHTML = `<div class="pr-enter"><div class="pr-card pr-empty"><span class="pe-ic">${ic(kind === "drill" ? "puzzle" : "search")}</span>
+    main.innerHTML = `<div><div class="pr-card pr-empty"><span class="pe-ic">${ic(kind === "drill" ? "puzzle" : "search")}</span>
       <h2>${title}</h2><p class="muted">${text}</p><div class="btn-row">${links.join("")}</div></div></div>`;
     window.scrollTo(0, 0);
   }
@@ -600,7 +600,7 @@
     const opts = q.opts.map((o, k) => {
       let cls = "", tag = "";
       if (fb) {
-        if (k === q.ans) { cls = "ok"; tag = "Correct ✓"; }
+        if (k === q.ans) { cls = "ok is-thunk"; tag = "Correct ✓"; }
         else if (answered && a.c === k) { cls = "bad"; tag = "Your answer ×"; }
         else cls = "dim";
       } else if (test && answered && a.c === k) cls = "sel";
@@ -610,7 +610,7 @@
 
     // bottom row: quiet tools on the left, the one primary on the right
     const last = !drill && i >= n - 1;
-    const nextBtn = `<button class="btn primary pr-next" data-act="next"${!test && !done ? " disabled" : ""}>${swapLabel([last ? "Finish" : "Next", "Finish"], last ? 1 : 0)} <kbd>Enter</kbd></button>`;
+    const nextBtn = `<button class="btn primary pr-next" data-act="next"${!test && !done ? " disabled" : ""}>${last ? "Finish" : "Next"} <kbd>Enter</kbd></button>`;
     const tools = `<button type="button" class="pr-icon${starred ? " on" : ""}" data-act="star" title="Bookmark (F)" aria-label="Bookmark" aria-pressed="${starred}">${ic(starred ? "star-fill" : "star")}</button>
       <button type="button" class="pr-icon${marked ? " mk" : ""}" data-act="mark" title="Mark for review (M)" aria-label="Mark for review" aria-pressed="${marked}">${ic("flag")}</button>
       <button type="button" class="pr-icon" data-act="pop" data-v="keys" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" aria-expanded="false"><b>?</b></button>`;
@@ -653,7 +653,7 @@
         </div>
         <button type="button" class="btn primary sr-next" data-act="next"${!test && !done ? " disabled" : ""}>${last ? "Finish" : "Next"}</button>
       </aside>`;
-    return `<div class="${fresh ? "pr-enter " : ""}pr-play${set ? " wide" : ""}">${head}${mainCol}</div>${rail}`;
+    return `<div class="pr-play${set ? " wide" : ""}">${head}${mainCol}</div>${rail}`;
   }
 
   function afterHTML(q, a, answered, it) {
@@ -804,7 +804,6 @@
     const secs = S.tq[i] || 0, r = QB.record(q, k, secs);
     S.ans[i] = { c: k, ok: r.ok, secs };
     if (S.mode === "drill") drillAdapt(r.ok);
-    if (r.ok && window.FX && FX.confetti && window.matchMedia && !matchMedia("(prefers-reduced-motion: reduce)").matches && Math.random() < 0.0) FX.confetti();
     persist();
     paint(false);
   }
@@ -851,21 +850,21 @@
     const i = S.idx, q = cur();
     S.mark[i] = !S.mark[i];
     if (Store) Store.patch(itemKey(q), { mark: !!S.mark[i] });
-    persist(); paint(false);
+    persist(); paint(false); stampAll('[data-act="mark"]');
   }
   function toggleStar() {
     const q = cur();
     if (!Store) return;
     const it = Store.toggleStar(itemKey(q));
     toast(it.star ? "Bookmarked" : "Bookmark removed", 1200, it.star ? "star-fill" : "star");
-    paint(false);
+    paint(false); stampAll('[data-act="star"]');
   }
   function setReason(v) {
     const i = S.idx, a = S.ans[i], q = cur();
     if (!a || a.c == null || a.ok) return;
     a.why = a.why === v ? null : v;
     if (Store) Store.patch(itemKey(q), { why: a.why });
-    persist(); paint(false);
+    persist(); paint(false); stampAll('.pr-reasons button.on');
   }
   function toggleBook() {
     const q = cur();
@@ -874,7 +873,7 @@
     if (it.status === "revise") Store.patch(itemKey(q), { status: it.doneAt ? "done" : null, next: now + 86400000 });
     else Store.patch(itemKey(q), { status: "revise", next: now, level: 0, doneAt: it.doneAt || now });
     toast(it.status === "revise" ? "Removed from the mistake book" : "Added to the mistake book", 1400, "check");
-    paint(false);
+    paint(false); stampAll('[data-act="book"]');
   }
 
   function solKey() {
@@ -1014,7 +1013,7 @@
     }).join("");
 
     const hot = acc >= 80 && answered >= 3;
-    main.innerHTML = `<div class="pr-enter">
+    main.innerHTML = `<div>
       <div class="pr-sbar"><a class="pr-back" href="#setup" data-act="newset">${ic("back")} Practice</a><div class="pr-crumb"><b>${esc(sessionLabel())}</b></div><span class="grow"></span><span class="pr-chip mode">${isTest() ? "Test" : "Instant"}</span></div>
       <h1 class="pr-h1">${S.mode === "drill" ? "Drill finished" : S.mode === "daily" ? "Daily set done" : "Set finished"}</h1>
       ${S.mode === "daily" ? `<p class="lead pr-dailydone">${dailyChip()} Nice work showing up today. A fresh set is built tomorrow from what you get wrong now.</p>` : ""}
@@ -1030,18 +1029,12 @@
       ${ptable ? `<div class="pr-card"><h5>By pattern <small>weakest first</small></h5><div class="pr-tbl-wrap"><table class="pr-table"><thead><tr><th>Pattern</th><th>Asked</th><th>Right</th><th>Accuracy</th><th>Avg time / target</th><th></th></tr></thead><tbody>${ptable}</tbody></table></div></div>` : ""}
       <div class="pr-card"><h5>Questions <small>tap one for the solution</small></h5><div class="pr-qlist">${list}</div></div>
       <div class="pr-actions pr-final">
-        ${badN + skipN ? `<button class="btn" data-act="retry">${ic("restart")} Retry wrong ones</button><button class="btn" data-act="mistakes">${swapLabel(["Add wrong to mistake book", "Added " + ic("check")], 0)}</button>` : ""}
+        ${badN + skipN ? `<button class="btn" data-act="retry">${ic("restart")} Retry wrong ones</button><button class="btn" data-act="mistakes">Add wrong to mistake book</button>` : ""}
         ${weakest ? `<a class="btn" href="#drill/${weakest.k}">Drill weakest pattern</a>` : ""}
         ${S.mode === "daily" ? `<a class="btn" href="#speed">${ic("bolt")} Speed drill</a>` : ""}
         <span class="grow"></span><a class="btn primary" href="#setup" data-act="newset">New set</a></div></div>`;
     window.scrollTo(0, 0);
-    if (S.mode === "daily" && !S.celebrated) {        // finishing the daily set always earns a soft celebration
-      S.celebrated = true; persist();
-      setTimeout(() => { if (typeof window.fxConfetti === "function") window.fxConfetti(); toast("Daily set done. See you tomorrow!", 2200, "check"); }, 350);
-    } else if (hot && !S.celebrated) {
-      S.celebrated = true; persist();
-      setTimeout(() => { if (window.FX && FX.bigConfetti) FX.bigConfetti(); else if (typeof window.fxConfetti === "function") window.fxConfetti(); }, 350);
-    }
+    if (S.mode === "daily" && !S.celebrated) { S.celebrated = true; persist(); toast("Daily set done. See you tomorrow!", 2200, "check"); }
   }
   function retryWrong() {
     const rows = reviewRows().filter((r) => r.st === "bad" || r.st === "skip");
@@ -1142,7 +1135,7 @@
     const sp = speedMeta();
     window.scrollTo(0, 0);
     if (SP.phase === "pick") {
-      main.innerHTML = `<div class="pr-enter">
+      main.innerHTML = `<div>
         <div class="pr-sbar"><a class="pr-back" href="#setup">${ic("back")} Practice</a><div class="pr-crumb"><b>Speed drill</b></div></div>
         <h1 class="pr-h1">Speed drill</h1>
         <p class="lead">${SPEED_SECS} seconds, as many as you can. Type the answer, press <kbd>Enter</kbd>, and the next one appears at once. No options to lean on, just quick sums.</p>
@@ -1177,7 +1170,7 @@
     const L = SP.list, n = L.length, ok = L.filter((x) => x.ok).length, misses = L.filter((x) => !x.ok);
     const best = sp.best[SP.mode] || 0, saved = SP.saved;
     const newBest = saved && saved.newBest;
-    main.innerHTML = `<div class="pr-enter">
+    main.innerHTML = `<div>
       <div class="pr-sbar"><button type="button" class="pr-back" data-act="sp-modes">${ic("back")} Modes</button><div class="pr-crumb"><b>Speed drill</b> <span class="sep">›</span> ${esc(speedName(SP.mode))}</div></div>
       <h1 class="pr-h1">${saved ? "Time!" : "Stopped early"}</h1>
       <div class="pr-card is-hero pr-hero${newBest ? " hot" : ""}">
@@ -1276,7 +1269,6 @@
       if (n) Store.bump();                                      // one activity tick per run keeps the streak honest without flooding the goal
       Store.save();
       SP.saved = { newBest };
-      if (newBest && was && typeof window.fxConfetti === "function") setTimeout(window.fxConfetti, 300);
     }
     paintSpeed();
   }
@@ -1348,7 +1340,7 @@
     if (view === "review") {
       if (act === "retry") return retryWrong();
       if (act === "mistakes") return addMistakes(el);
-      if (act === "row") { e.preventDefault(); const d = document.getElementById("prRow" + el.dataset.i); if (d) { d.open = true; d.scrollIntoView({ block: "center", behavior: "smooth" }); } return; }
+      if (act === "row") { e.preventDefault(); const d = document.getElementById("prRow" + el.dataset.i); if (d) { d.open = true; d.scrollIntoView({ block: "center" }); } return; }
       if (act === "newset") { e.preventDefault(); S = S && S.done ? S : S; return go("", true); }
     }
   });
@@ -1386,7 +1378,7 @@
   main.addEventListener("toggle", (e) => {
     const d = e.target;
     if (!d || d.tagName !== "DETAILS") return;
-    if (d.id === "prPats") UI.pats = d.open; else if (d.id === "prMore") UI.more = d.open; else if (d.id === "prWhy") UI.why = d.open;
+    if (d.id === "prPats") UI.pats = d.open; else if (d.id === "prWhy") UI.why = d.open;
   }, true);
 
   /* a set in progress: ask before the tab closes or reloads (answers are saved either way; the timer and set position are what is at stake) */

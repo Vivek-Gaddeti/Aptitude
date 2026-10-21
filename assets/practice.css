@@ -1,6 +1,6 @@
 /* =====================================================================
    practice.css : practice page (.pr-*) + inline quiz blocks (.qz-*, used on learn pages)
-   Loaded on every page, so every rule is namespaced.  Tokens only; motion only under data-anim="on".
+   Loaded on every page, so every rule is namespaced.  Tokens only; motion limited to press / stamp / thunk / bars (see brutal.css).
    ===================================================================== */
 :root { --c-quant: #FF8AB0; --c-reason: #3DDC84; --c-verbal: #FFD23F; --c-di: #8EC5FF; }
 .grow { flex: 1; }
@@ -14,8 +14,6 @@
 .pr-h1 { font-family: var(--display); margin: .1em 0 .2em; }
 .pr-card { background: var(--panel); border: 2px solid var(--ink); border-radius: var(--r-md); box-shadow: none; padding: 1rem 1.2rem; margin-bottom: 1rem; }
 .pr-link { border: 0; background: none; color: var(--accent); font: inherit; font-size: var(--fs-xs); cursor: pointer; margin-left: .6rem; text-transform: none; letter-spacing: 0; }
-@keyframes pr-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-:root[data-anim="on"] .pr-enter { animation: pr-in .45s cubic-bezier(.22,1,.36,1) both; }
 
 /* ---------- setup ---------- */
 .pr-setup { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1.25rem; align-items: start; margin-bottom: 1rem; }
@@ -78,7 +76,7 @@
 .pr-timer .tg { color: var(--muted); }
 .pr-timer.over .t { color: var(--amber); }
 .pr-timer.still .t { color: var(--muted); }
-:root[data-anim="on"] #prRing { transition: stroke-dashoffset .4s linear, stroke .4s; }
+#prRing { transition: stroke-dashoffset 150ms linear; }
 .pr-qcount { font: 700 var(--fs-sm) var(--display); color: var(--muted); white-space: nowrap; }
 .pr-qcount b { color: var(--text); font-size: var(--fs-lg); }
 .pr-seg { display: flex; gap: 3px; height: 6px; margin: .1rem 0 1.25rem; }
@@ -88,7 +86,6 @@
 .pr-seg i.a { background: var(--accent); border-color: transparent; opacity: .75; }
 .pr-seg i.s { background: var(--muted); border-color: transparent; opacity: .4; }
 .pr-seg i.cur { background: var(--accent); border-color: transparent; opacity: .55; }
-:root[data-anim="on"] .pr-seg i { transition: background .4s; }
 
 /* ---------- layout ---------- */
 .pr-qcard { padding: 1.5rem 1.75rem 1.25rem; }
@@ -103,7 +100,6 @@
 .pr-qtext.sm { font-size: 1.08rem; }
 .pr-opts { display: grid; gap: .6rem; }
 .pr-opt { display: flex; align-items: center; gap: .9rem; text-align: left; width: 100%; padding: .8rem 1rem; border-radius: var(--r-md); border: 1.5px solid var(--border); background: var(--panel); color: var(--text); font: inherit; font-size: 1.02rem; cursor: pointer; }
-:root[data-anim="on"] .pr-opt { transition: border-color .35s, background .35s, opacity .35s; }
 .pr-opt:hover { border-color: color-mix(in srgb, var(--page-c, var(--accent)) 55%, var(--border)); }
 .pr-opt .k { width: 30px; height: 30px; flex: none; border-radius: var(--r-sm); display: grid; place-items: center; font: 800 var(--fs-sm) var(--display); background: var(--panel-2); color: var(--muted); }
 .pr-opt .v { flex: 1; font-variant-numeric: tabular-nums; }
@@ -193,7 +189,7 @@
 .pr-bar .tick { position: absolute; left: -2px; right: -2px; height: 2px; background: var(--text); opacity: .75; }
 .pr-bar em { position: absolute; bottom: -18px; left: 0; right: 0; text-align: center; font-style: normal; font-size: var(--fs-2xs); }
 .pr-strip-t { margin-bottom: 1.2rem; }
-:root[data-anim="on"] .pr-bar .fill { transition: height .6s cubic-bezier(.22,1,.36,1); }
+.pr-bar .fill { transition: height 150ms linear; }
 .pr-qlist { display: grid; gap: .4rem; }
 .pr-qrow { min-width: 0; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--panel); }
 .pr-qrow summary { list-style: none; display: flex; align-items: center; gap: .7rem; padding: .55rem .8rem; cursor: pointer; }
@@ -217,9 +213,9 @@
 .pr-final { margin-top: 1.5rem; }
 
 /* ---------- confirm box ---------- */
-.pr-modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; }
+.pr-modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 70%, transparent); opacity: 0; pointer-events: none; }
 .pr-modal.show { opacity: 1; pointer-events: auto; }
-:root[data-anim="on"] .pr-modal { transition: opacity .35s ease; }
+.pr-modal { transition: opacity 100ms linear; }
 .pr-modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: 0 12px 40px rgba(0,0,0,.18); padding: 1.3rem 1.5rem; width: min(420px, calc(100vw - 2rem)); }
 .pr-modal-box h3 { margin: 0 0 .4rem; font-family: var(--display); }
 .pr-modal-box p { margin: 0 0 1.1rem; color: var(--muted); }
@@ -246,7 +242,6 @@
 .qz-text { font-size: 1.02rem; margin-bottom: .7rem; }
 .qz-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .45rem; }
 .qz-opt { display: flex; align-items: center; gap: .6rem; text-align: left; padding: .5rem .7rem; border-radius: var(--r-sm); border: 1.5px solid var(--border); background: var(--panel); color: var(--text); font: inherit; font-size: var(--fs-md); cursor: pointer; }
-:root[data-anim="on"] .qz-opt { transition: border-color .35s, background .35s, opacity .35s; }
 .qz-opt:hover:not(:disabled) { border-color: color-mix(in srgb, var(--page-c, var(--accent)) 55%, var(--border)); }
 .qz-opt .k { width: 24px; height: 24px; flex: none; border-radius: var(--r-xs); display: grid; place-items: center; font: 800 var(--fs-xs) var(--display); background: var(--panel-2); color: var(--muted); }
 .qz-opt:disabled { cursor: default; color: var(--text); }
@@ -292,7 +287,6 @@
 .sp-mode .bs b { color: var(--text); }
 .sp-mode.on { border-color: var(--accent); background: var(--accent-soft); }
 .sp-mode.on .nm { color: var(--accent); }
-:root[data-anim="on"] .sp-mode { transition: border-color .3s, background .3s; }
 .sp-go { min-width: 14rem; justify-content: center; }
 .sp-runs { display: grid; gap: .1rem; }
 .sp-run-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "m s a" "w s a"; gap: 0 .8rem; align-items: center; padding: .45rem 0; border-bottom: 1px dashed var(--border); }
@@ -343,11 +337,10 @@
    Scoped under main.pr so the shared .pr-* classes used by mock / revision keep their own look.
    Loud things: .btn.primary and .is-hero only (both defined in brutal.css). Everything else is flat: 2px ink, no shadow.
    ===================================================================== */
-main.pr .pr-card { border: 2px solid var(--ink) !important; box-shadow: none !important; transform: none !important; border-radius: 0 !important; }
+main.pr .pr-card { border: 2px solid var(--ink) !important; box-shadow: none !important; border-radius: 0 !important; }
 main.pr .pr-card.is-hero { border-width: 3px !important; box-shadow: 6px 6px 0 var(--ink) !important; }
 main.pr .btn:not(.primary) { border: 2px solid var(--ink) !important; box-shadow: none; text-transform: none; font-weight: 800; letter-spacing: 0; }
-main.pr .btn:not(.primary):hover { background: var(--panel-2); color: var(--text); transform: none; box-shadow: none; }
-main.pr .btn:not(.primary):active { transform: none; }
+main.pr .btn:not(.primary):hover { background: var(--panel-2); color: var(--text); }
 main.pr .btn.primary { text-transform: none; letter-spacing: 0; }
 main.pr .btn.primary kbd { background: transparent; color: inherit; border-color: currentColor; opacity: .85; }
 main.pr h2, main.pr h3 { text-transform: none; border: 0; padding: 0; font-weight: 800; letter-spacing: 0; }
@@ -382,7 +375,7 @@ main.pr a.pr-quick:hover { background: var(--panel-2); color: var(--text); }
 .pr-grp:last-child { margin-bottom: 0; }
 .pr-grp .pr-lab { margin-bottom: .35rem; }
 main.pr .pr-picks { display: flex; flex-wrap: wrap; gap: .4rem; }
-main.pr .pr-pick { min-height: 40px; padding: .3rem .8rem; border: 2px solid var(--ink); background: var(--panel); color: var(--text); font: 700 var(--fs-sm) var(--display); box-shadow: none; transform: none; border-radius: 0; text-align: left; }
+main.pr .pr-pick { min-height: 40px; padding: .3rem .8rem; border: 2px solid var(--ink); background: var(--panel); color: var(--text); font: 700 var(--fs-sm) var(--display); box-shadow: none; border-radius: 0; text-align: left; }
 main.pr .pr-pick:hover:not(:disabled) { background: var(--panel-2); color: var(--text); border-color: var(--ink); }
 main.pr .pr-pick.on { background: var(--ink); color: var(--bg); border-color: var(--ink); box-shadow: none; }
 main.pr .pr-pick.d-easy.on, main.pr .pr-pick.d-med.on, main.pr .pr-pick.d-hard.on { background: var(--ink); color: var(--bg); }
@@ -397,8 +390,10 @@ main.pr .pr-segc button.on { background: var(--ink); color: var(--bg); }
 .pr-fold > summary::before { content: ""; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); flex: none; margin-right: .2rem; }
 .pr-fold[open] > summary::before { transform: rotate(45deg); }
 .pr-foldbody { padding: .2rem 0 1.1rem; }
-.pr-opts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem 2rem; }
-.pr-opts-grid .pr-field { margin: 0 !important; }
+.pr-build .pr-opts { display: flex; flex-wrap: wrap; gap: .9rem 1.4rem; padding: .4rem 0 1.25rem; }
+.pr-build .pr-opts .pr-field { margin: 0; min-width: 0; }
+.pr-build .pr-opts .pr-lab { margin-bottom: .35rem; }
+.pr-build .pr-opts .pr-segc button { min-height: 40px; padding: .3rem .8rem; }
 .pr-pgrp { margin-bottom: 1rem; }
 .pr-phead { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: .4rem; }
 .pr-phead h3 { margin: 0; font-size: var(--fs-md); }
@@ -421,8 +416,8 @@ main.pr .pr-go { width: auto; min-width: 11rem; min-height: 52px; justify-conten
 .pr-play { max-width: 760px; margin: 0 auto; }
 .pr-play.wide { max-width: 1180px; }
 .pr-top { position: relative; display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; min-height: 44px; margin-bottom: .6rem; }
-main.pr .pr-back { min-height: 40px; padding: .3rem .8rem; border: 2px solid var(--ink) !important; background: var(--panel); color: var(--text); font: 700 var(--fs-sm) var(--display); text-transform: none; letter-spacing: 0; box-shadow: none; transform: none; border-radius: 0; display: inline-flex; align-items: center; gap: .35rem; }
-main.pr .pr-back:hover { background: var(--panel-2); color: var(--text); transform: none; box-shadow: none; }
+main.pr .pr-back { min-height: 40px; padding: .3rem .8rem; border: 2px solid var(--ink) !important; background: var(--panel); color: var(--text); font: 700 var(--fs-sm) var(--display); text-transform: none; letter-spacing: 0; box-shadow: none; border-radius: 0; display: inline-flex; align-items: center; gap: .35rem; }
+main.pr .pr-back:hover { background: var(--panel-2); color: var(--text); }
 .pr-back .ico { width: 16px; height: 16px; }
 .pr-sesbtn .ico { width: 14px; height: 14px; }
 .pr-top .pr-crumb { flex: 1 1 14rem; min-width: 0; gap: .4rem; color: var(--muted); font-size: var(--fs-sm); }
@@ -449,12 +444,13 @@ main.pr .pr-qcard { padding: 1.3rem 1.4rem 1.4rem; }
 main.pr .pr-qtext { font: 600 1.2rem/1.55 var(--sans); margin: 0 0 1.2rem; }
 main.pr .pr-qtext.sm { font-size: 1.1rem; }
 main.pr .pr-opts { display: grid; gap: .55rem; }
-main.pr .pr-opt { display: flex; align-items: center; gap: .85rem; width: 100%; min-height: 52px; padding: .65rem .9rem; border: 2px solid var(--ink); border-radius: 0; background: var(--panel); color: var(--text); box-shadow: none; transform: none; font: 600 1.05rem var(--sans); text-align: left; cursor: pointer; }
-main.pr .pr-opt:hover:not(.ok):not(.bad) { background: var(--panel-2); transform: none; box-shadow: none; border-color: var(--ink); }
+main.pr .pr-opt { display: flex; align-items: center; gap: .85rem; width: 100%; min-height: 52px; padding: .65rem .9rem; border: 2px solid var(--ink); border-radius: 0; background: var(--panel); color: var(--text); box-shadow: none; font: 600 1.05rem var(--sans); text-align: left; cursor: pointer; }
+main.pr .pr-opt:hover:not(.ok):not(.bad) { background: var(--panel-2); border-color: var(--ink); }
+main.pr .pr-opt.is-thunk { box-shadow: 3px 3px 0 var(--ink); }
 main.pr .pr-opt .k { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border: 2px solid var(--ink); background: var(--panel); color: var(--text); font: 700 var(--fs-sm) var(--mono); }
 main.pr .pr-opt .v { flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
 main.pr .pr-opt .tag { flex: none; font: 700 12px var(--mono); text-transform: uppercase; letter-spacing: .03em; }
-main.pr .pr-opt.sel { background: var(--ink); color: var(--bg); transform: none; box-shadow: none; }
+main.pr .pr-opt.sel { background: var(--ink); color: var(--bg); }
 main.pr .pr-opt.sel .k { background: var(--bg); color: var(--ink); border-color: var(--bg); }
 main.pr .pr-opt.ok { background: var(--green-soft); color: var(--text); border-color: var(--ink); }
 main.pr .pr-opt.ok .k { background: var(--f-green); color: #22121A; }
@@ -505,7 +501,8 @@ main.pr .pr-quiet .ico { width: 16px; height: 16px; }
 main.pr .pr-quiet kbd { background: var(--panel); }
 main.pr .pr-next { min-width: 9.5rem; min-height: 52px; justify-content: center; font-size: 1.05rem; }
 /* Next / Check: the same primary as every other button (accent fill, white text, 3px ink, 4px shadow), not the page colour */
-main.pr .pr-actions .btn.primary, main.pr .session-rail .sr-next { background: var(--accent); color: #fff; border: 3px solid var(--ink) !important; box-shadow: 4px 4px 0 var(--ink) !important; }
+main.pr .pr-actions .btn.primary, main.pr .session-rail .sr-next { background: var(--accent); color: #fff; border: 3px solid var(--ink) !important; box-shadow: 4px 4px 0 var(--ink); }
+main.pr .pr-actions .btn.primary:active, main.pr .session-rail .sr-next:active { box-shadow: 0 0 0 var(--ink); }
 main.pr .pr-actions .btn.primary:hover, main.pr .session-rail .sr-next:hover { background: var(--accent); color: #fff; filter: brightness(1.06); }
 [data-theme="dark"] main.pr .pr-actions .btn.primary, [data-theme="dark"] main.pr .session-rail .sr-next,
 [data-theme="dark"] main.pr .pr-actions .btn.primary:hover, [data-theme="dark"] main.pr .session-rail .sr-next:hover { color: #22121A; }
@@ -587,7 +584,7 @@ html[data-device="tablet"] main.pr .pr-split { grid-template-columns: minmax(0, 
   .pr-fold, .pr-sumbar { margin-left: -1rem; margin-right: -1rem; padding-left: 1rem; padding-right: 1rem; }
   .pr-secs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pr-sec:nth-child(2) { border-right: 0; } .pr-sec:nth-child(-n+2) { border-bottom: 2px solid var(--ink); }
-  .pr-opts-grid { grid-template-columns: minmax(0, 1fr); }
+  .pr-build .pr-opts { gap: .8rem 1rem; } .pr-build .pr-opts .pr-field { flex: 1 1 100%; } .pr-build .pr-opts .pr-segc { display: flex; } .pr-build .pr-opts .pr-segc button { flex: 1 1 0; padding-left: .4rem; padding-right: .4rem; }
   .pr-prow { grid-template-columns: minmax(0, 1fr) auto; } .pr-pmeta { grid-column: 1; grid-row: 2; }
   .pr-prow .pr-drill { grid-column: 2; grid-row: 1 / span 2; }
   .pr-sumbar { bottom: 0; z-index: 20; } .pr-sumtxt { min-width: 0; flex-basis: 100%; }
