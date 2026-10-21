@@ -6,8 +6,8 @@
   const root = document.documentElement;
   const ls = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-  // ✨ setting: "on" / "off" chosen with the top-bar button; if never chosen, follow the system "reduce motion" setting
-  function applyAnim() { const p = ls.get("anim"); root.dataset.anim = p === "on" || (p !== "off" && !reduced.matches) ? "on" : "off"; }
+  // Effects (Settings menu): OFF by default, only "on" when the person turned them on
+  function applyAnim() { root.dataset.anim = ls.get("anim") === "on" ? "on" : "off"; }
   applyAnim();
   if (reduced.addEventListener) reduced.addEventListener("change", () => { applyAnim(); document.dispatchEvent(new CustomEvent("fx:settings")); });
   const motionOK = () => root.dataset.anim === "on";

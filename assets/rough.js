@@ -293,16 +293,17 @@
   /* ---------- API ---------- */
   function open() {
     build(); if (isOpen) return; isOpen = true;
-    drawer.classList.add("show"); if (btn) btn.classList.add("on");
+    drawer.classList.add("show"); setOn(true);
     setTab(tab); fit();
     requestAnimationFrame(fit);
   }
   function close() {
     if (!built || !isOpen) return; isOpen = false;
-    drawer.classList.remove("show"); if (btn) btn.classList.remove("on");
+    drawer.classList.remove("show"); setOn(false);
     var a = doc.activeElement; if (a && drawer.contains(a)) a.blur();
     cur = null;
   }
+  function setOn(v) { doc.querySelectorAll("#rwBtn, .gr-rough").forEach(function (b) { b.classList.toggle("on", v); }); }
   function toggle() { isOpen ? close() : open(); }
   function clear() { strokes[ctx] = []; redraw(); }
   function setContext(id) {

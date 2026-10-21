@@ -45,7 +45,7 @@
     sync();
 
     // hover an item for a moment: a small card with its one-line summary and reading time
-    if (!finePointer.matches) return;
+    return;                                                           // calm theme: no hover preview cards
     const card = document.createElement("div");
     card.className = "sb-peek"; card.setAttribute("aria-hidden", "true");
     document.body.appendChild(card);

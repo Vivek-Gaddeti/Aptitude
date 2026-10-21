@@ -139,6 +139,8 @@
     else if (e.key === "Escape" && bg) { e.preventDefault(); e.stopPropagation(); close(); }
   }, true);
 
+  window.FindBox = { open, close };   // used by the tablet rail
+
   // a small 🔍 button in the header, next to the theme switch
   const theme = document.getElementById("themeBtn");
   if (theme) {

@@ -918,13 +918,8 @@ input[type="text"], input[type="search"], input:not([type]), textarea, .ed, .run
 
 /* ===== Aptitude Hub: lesson blocks (formulas, pattern cards), placeholders, finder bits ===== */
 .formulas { border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); margin: 1rem 0; overflow: hidden; }
-.fm-row { display: grid; grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 1.6fr) minmax(0, 1.4fr); gap: .5rem 1rem; align-items: center; padding: .6rem 1rem; }
-.fm-row + .fm-row { border-top: 1px solid var(--border); }
-.fm-name { font-weight: 600; font-size: var(--fs-md); }
-.fm-f code { display: inline-block; font-size: .92em; padding: .22rem .6rem; border-radius: var(--r-pill); background: var(--accent-soft); color: var(--page-ink, var(--accent)); white-space: normal; }
-[data-theme="dark"] .fm-f code { color: var(--page-ink-dark, var(--accent)); }
-.fm-note { color: var(--muted); font-size: var(--fs-sm); }
-@media (max-width: 720px) { .fm-row { grid-template-columns: 1fr; gap: .25rem; } }
+/* formulas block: a 3-column table (see brutal.css) */
+.fm-table { width: 100%; border-collapse: collapse; }
 
 .pat-card { border: 1px solid var(--border); border-left: 3px solid var(--page-c, var(--accent)); border-radius: var(--radius); background: var(--panel); padding: 1rem 1.15rem .9rem; margin: 1rem 0; box-shadow: var(--shadow); }
 .pat-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .4rem .8rem; margin-bottom: .2rem; }

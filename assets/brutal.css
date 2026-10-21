@@ -1,16 +1,18 @@
-/* ===== Neo-brutalist theme =====
+/* ===== Calm neo-brutalism =====
    Loaded LAST on every page, on top of style.css / practice.css / fx.css.
-   Thick ink outlines, hard offset shadows, square corners, flat saturated fills, Archivo + Space Mono.
-   Everything is driven by the tokens below, so most components restyle themselves;
-   the rules further down only thicken the borders and add shadows to the chunky pieces. */
+   Ink outlines, square corners, flat bright fills, Archivo + Space Mono, and ONE loud thing per screen:
+   only `.btn.primary` (3px border, accent fill, 4px hard shadow) and `.is-hero` (3px border, 6px hard shadow) are loud.
+   Everything else is flat: 2px ink border, no shadow, no hover lift. See the "calm" section at the end of this file. */
 
 :root {
   --ink: #22121A;                 /* outlines, hard shadows, body text */
-  --bw: 3px;                      /* main border width */
+  --bw: 2px;                      /* border width of everything flat */
   --bw-s: 2px;                    /* small pieces: chips, inputs, table rules */
-  --sh: 5px 5px 0 var(--ink);     /* card shadow */
-  --sh-s: 3px 3px 0 var(--ink);   /* button shadow */
-  --sh-h: 7px 7px 0 var(--ink);   /* lifted (hover) */
+  --bw-loud: 3px;                 /* .btn.primary and .is-hero only */
+  --sh: none; --sh-s: none; --sh-h: none;   /* flat: components that still read these get no shadow */
+  --sh-loud: 4px 4px 0 var(--ink);          /* .btn.primary */
+  --sh-hero: 6px 6px 0 var(--ink);          /* .is-hero */
+  --rail-w: 112px;                          /* tablet global rail width (hand side) */
 
   --bg: #FFF6F1;
   --panel: #FFFFFF;
@@ -41,9 +43,6 @@
 }
 [data-theme="dark"] {
   --ink: #F3E3DC;
-  --sh: 5px 5px 0 var(--ink);
-  --sh-s: 3px 3px 0 var(--ink);
-  --sh-h: 7px 7px 0 var(--ink);
   --bg: #1A1216;
   --panel: #251A20;
   --panel-2: #33242C;
@@ -68,13 +67,13 @@
 body {
   font-family: var(--sans);
   background-color: var(--bg);
-  background-image: radial-gradient(var(--dot) 1.4px, transparent 1.5px);
-  background-size: 22px 22px;
+  background-image: none;           /* no dot grid */
+  font-size: 1rem; line-height: 1.5; /* rem, so Settings > Text size scales it */
 }
 h1, h2, h3, .pr-h1, .dash-title { font-family: var(--display); font-weight: 900; letter-spacing: -.015em; }
 h1, .pr-h1 { text-transform: uppercase; font-size: clamp(1.9rem, 4vw, 2.8rem); line-height: 1; }
-h2 { text-transform: uppercase; font-size: 1.45rem; border-bottom: var(--bw) solid var(--ink); padding-bottom: .35em; }
-h3 { font-weight: 800; }
+h2 { text-transform: none; font-weight: 800; font-size: 1.35rem; letter-spacing: -.01em; border-bottom: var(--bw) solid var(--ink); padding-bottom: .3em; }
+h3 { font-weight: 800; text-transform: none; }
 a { color: var(--accent); }
 /* plain text links (no class) get a thick underline and a yellow highlighter on hover */
 a:not([class]) { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
@@ -459,3 +458,219 @@ html .mk-tab.cur small { background: #fff; color: #22121A; border-color: #22121A
 
 /* ---------- DI charts: flat fills with an ink outline, square corners ---------- */
 .di-chart rect[fill^="#"], .di-chart path[fill^="#"] { stroke: var(--ink); stroke-width: 1.5; rx: 0; }
+
+/* =====================================================================
+   CALM LAYER (last word). One loud thing per screen: `.btn.primary` and `.is-hero`. Everything else is flat.
+   Contracts used by other files: .btn.primary, .is-hero, html[data-device|hand|text], body.in-session, --rail-w.
+   ===================================================================== */
+
+/* ---- 1. flat by default: no shadows, no hover lift ---- */
+html *:not(.btn.primary):not(.is-hero) { box-shadow: none !important; text-shadow: none; }
+.btn.primary { border: var(--bw-loud) solid var(--ink) !important; box-shadow: var(--sh-loud) !important; background: var(--accent); color: #fff; }
+.btn.primary:hover { background: var(--accent); color: #fff; transform: none; box-shadow: var(--sh-loud) !important; filter: brightness(1.06); }
+.btn.primary:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink) !important; }
+[data-theme="dark"] .btn.primary { color: #22121A; }
+.btn.primary:disabled, .btn.primary[disabled] { box-shadow: none !important; opacity: .5; }
+.is-hero { border: var(--bw-loud) solid var(--ink) !important; box-shadow: var(--sh-hero) !important; background: var(--panel); }
+.btn:hover, .btn:active, .pr-back:hover, .pr-back:active, .icon-btn:hover, .icon-btn:active, a.card:hover, .pr-tile:hover, .cat-tile:hover, html .hm-tile:hover,
+.pr-opt:hover:not(:disabled), .qz-opt:hover:not(:disabled), .pr-go:hover, .pr-go:active, .pr-pick:hover { transform: none !important; }
+.btn:hover:not(.primary):not(:disabled), .pr-back:hover, .icon-btn:hover, .pr-pick:hover:not(:disabled), .pr-reasons button:hover, .pr-pal button:hover,
+.qz-opt:hover:not(:disabled), .sp-mode:hover, html .rv-tabs a:hover, .nav-menu a:hover { background: var(--panel-2); color: var(--text); }
+a.card:hover, .pr-tile:hover, .cat-tile:hover, html .hm-tile:hover { background: var(--panel-2); }
+.pr-tile:hover { background: var(--panel-2); }
+.btn { font-weight: 800; text-transform: none; letter-spacing: 0; }
+.btn.primary { font-weight: 900; }
+.btn.sm, .btn.on-green, .btn.on-amber, .btn.on-red { box-shadow: none !important; }
+.icon-btn { height: 44px; min-width: 44px; display: inline-grid; place-items: center; }
+.icon-btn:hover { background: var(--panel-2); color: var(--text); }
+.pr-go { box-shadow: none; }
+.pr-opt.sel { transform: none; }
+.pr-pal .cur { border-width: var(--bw); }
+.pr-tile:hover .pr-icon { transform: none; }
+html .mk-tab.cur, html .rv-big, .pr-pick.on, .sp-mode.on { box-shadow: none !important; }
+.toast { box-shadow: none !important; }
+
+/* ---- 2. type with a job each ---- */
+h1, .pr-h1 { text-transform: uppercase; }       /* page title only */
+.card h3, .card > h3:first-child, .pat-head h3, html .hm-tile-b b, html .rw-head h4, .pr-result.ok .big, .pr-result.bad .big,
+html .rv-tabs a, html .mk-tab, html .rw-tabs button, .pr-pick, .pr-segc button, .sp-mode .nm, .d-streak { text-transform: none; }
+.pr-result.ok .big, .pr-result.bad .big { font-weight: 800; }
+th, .pr-table th { font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; }
+.pat-lbl, .stat-label, .callout .label { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.callout .label { color: inherit; opacity: .8; }
+p, li { line-height: 1.5; }
+
+/* ---- 3. cards, callouts, chips: flat, 2px ink ---- */
+.card, .pat-card, .soon-card, .pr-card, .qz-q, .pr-tile, .cat-tile, .formulas, details.box, .diagram, .viz, .stepper,
+.table-wrap, .ex-card, .note-card, .pr-modal-box, .fd, .d-sheet, .rm-drawer, .learn-chart, .code-wrap, .solve, .pg, .try-box { border-width: var(--bw) !important; }
+.callout { background: var(--panel-2); border-width: var(--bw); }
+.callout.tip { background: var(--green-soft); } .callout.warn { background: var(--amber-soft); } .callout.danger { background: var(--red-soft); }
+.pat-head { background: var(--panel-2); border-bottom-width: var(--bw); }
+.pat-foot { border-top: var(--bw-s) solid var(--ink); }
+.logo-wrap, .brand .logo, .logo-wrap[data-mood] .logo { box-shadow: none; }
+a:not([class]):hover { background: transparent; color: var(--accent); text-decoration-thickness: 3px; }   /* no yellow highlighter */
+.d-menu, .nav-menu, .set-menu { border-width: var(--bw) !important; }
+
+/* ---- 4. quiet header: plain links, active = ink fill with the page background as text colour ---- */
+.topbar, .topbar.scrolled { border-bottom: var(--bw) solid var(--ink); }
+.topbar { gap: .8rem; }
+.brand { text-transform: none; font-weight: 900; font-size: 1.05rem; }
+.brand .logo { width: 36px; height: 36px; border-width: var(--bw); }
+.nav a, .nav.has-pill a { font-family: var(--display); font-weight: 700; text-transform: none; font-size: .95rem; letter-spacing: 0; color: var(--text);
+  border: var(--bw) solid transparent; min-height: 40px; box-shadow: none; }
+.nav a:hover, .nav.has-pill a:hover { background: var(--panel-2); border-color: transparent; color: var(--text); }
+.nav a.active, .nav.has-pill a.active, .nav a.active:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 800; box-shadow: none; }
+.nav a.active .nav-badge { border-color: var(--bg); }
+.nav-menu a.active { background: var(--panel-2); font-weight: 800; }
+.d-streak { background: var(--panel); color: var(--text); border: var(--bw) solid var(--ink); box-shadow: none; height: 40px; font-family: var(--mono); font-weight: 700; }
+.d-streak .f { color: var(--accent); }
+.topbar .hello, .nav-peek, .sb-peek, .sb-mascot, .h-snow, .season, .logo-ring { display: none !important; }
+
+/* ---- 5. sidebar (lessons) ---- */
+.sidebar a.item:hover { background: var(--panel-2); color: var(--text); border-color: transparent; }
+.sidebar a.item.active, [data-theme="dark"] .sidebar a.item.active { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 800; box-shadow: none; }
+.sidebar a.item.active .ck, .sidebar a.item.active .star { color: var(--bg); }
+.sidebar a.item { min-height: 40px; }
+.sidebar .group-title, .sidebar button.group-title { color: var(--muted); }
+
+/* ---- 6. lesson page: title, one-line lead, ONE action row, "Asked in" line ---- */
+.lead { font-size: 1.1rem; color: var(--muted); margin: .3rem 0 1rem; max-width: 62ch; }
+.doc-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1.2rem; margin: 0 0 .7rem; }
+.doc-actions .da-practise { order: 0; }
+.da-learn, .da-quiet { font: inherit; font-family: var(--display); color: var(--text); background: transparent; border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; padding: 0 .2rem; }
+.da-learn { font-weight: 800; }
+.da-learn .da-box { width: 24px; height: 24px; flex: none; border: var(--bw) solid var(--ink); background: var(--panel); display: grid; place-items: center; }
+.da-learn .da-box .ico { width: 16px; height: 16px; stroke-width: 3; opacity: 0; }
+.da-learn.on .da-box { background: var(--f-green); }
+.da-learn.on .da-box .ico { opacity: 1; color: #22121A; }
+.da-quiet { font-weight: 700; color: var(--muted); font-size: .92rem; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 4px; text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent); }
+.da-quiet:hover { color: var(--text); text-decoration-color: currentColor; }
+.da-quiet .ico { width: 16px; height: 16px; }
+.da-quiet.on-red.on { color: var(--red); }
+.da-quiet.on-amber.on { color: var(--amber); }
+.doc-actions .due { margin-left: 0; }
+.asked-in { margin: 0 0 1.2rem; }
+.brief { margin-top: .4rem; }
+.crumbs { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+/* formulas: a clean 3-column table, formula in plain Space Mono */
+.formulas { background: var(--panel); margin: 1rem 0; overflow-x: auto; }
+.fm-table { width: 100%; border-collapse: collapse; }
+.fm-table thead th { text-align: left; padding: .55rem 1rem; background: var(--panel-2); border-bottom: var(--bw) solid var(--ink); }
+.fm-table tbody th, .fm-table tbody td { text-align: left; vertical-align: top; padding: .65rem 1rem; border-bottom: var(--bw-s) solid color-mix(in srgb, var(--ink) 18%, transparent); font-size: .95rem; }
+.fm-table tbody tr:last-child > * { border-bottom: 0; }
+.fm-table .fm-name { font-family: var(--display); font-weight: 700; background: none; text-transform: none; font-size: .95rem; letter-spacing: 0; color: var(--text); width: 28%; }
+.fm-table .fm-f { width: 38%; }
+.fm-table .fm-f code { font-family: var(--mono); font-size: .92rem; font-weight: 700; background: none; border: 0; padding: 0; color: var(--text); white-space: normal; }
+.fm-table .fm-note { color: var(--muted); font-size: .9rem; }
+@media (max-width: 640px) {
+  .fm-table thead { display: none; }
+  .fm-table, .fm-table tbody, .fm-table tr, .fm-table tbody th, .fm-table tbody td { display: block; width: auto !important; }
+  .fm-table tr { padding: .6rem 0; border-bottom: var(--bw-s) solid color-mix(in srgb, var(--ink) 18%, transparent); }
+  .fm-table tr:last-child { border-bottom: 0; }
+  .fm-table tbody th, .fm-table tbody td { padding: .1rem 1rem; border: 0; }
+}
+
+/* ---- 7. floaters: skip link, sticky "Practise this topic", back to top ---- */
+.skip-link { position: fixed; left: 8px; top: -80px; z-index: 400; background: var(--ink); color: var(--bg); padding: .7rem 1rem; font-weight: 800; text-decoration: none; }
+.skip-link:focus { top: 8px; }
+.to-top[hidden], .sticky-practise[hidden] { display: none; }
+.to-top { position: fixed; z-index: 55; right: 20px; bottom: 20px; width: 48px; height: 48px; display: grid; place-items: center; cursor: pointer;
+  background: var(--panel); color: var(--text); border: var(--bw) solid var(--ink); }
+.to-top:hover { background: var(--panel-2); }
+.to-top .ico { width: 22px; height: 22px; }
+.sticky-practise { position: fixed; z-index: 56; right: 24px; bottom: 24px; min-height: 52px; display: inline-flex; align-items: center; gap: .5rem; text-decoration: none; }
+body.has-sticky .to-top { bottom: 92px; }
+html[data-device="phone"] .sticky-practise { left: 16px; right: 16px; bottom: 12px; justify-content: center; }
+html[data-device="phone"] .to-top { right: 16px; }
+html[data-device="phone"] body.has-sticky .to-top { bottom: 80px; }
+html[data-device="phone"] .content { padding-bottom: 6.5rem; }
+body.in-session .to-top, body.in-session .sticky-practise { display: none; }
+
+/* ---- 8. Settings popover (header button, or More in the tablet rail) ---- */
+.set-menu { position: fixed; z-index: 250; width: min(340px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow-y: auto; background: var(--panel); color: var(--text); border: var(--bw) solid var(--ink); padding: 1rem; }
+.set-h { font: 800 1.1rem var(--display); margin-bottom: .6rem; }
+.set-row { margin: 0 0 .85rem; }
+.set-lbl { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: .3rem; }
+.set-seg { display: flex; border: var(--bw) solid var(--ink); }
+.set-seg button { flex: 1; min-height: 44px; font: 700 .95rem var(--display); color: var(--text); background: var(--panel); border: 0; border-right: var(--bw-s) solid var(--ink); cursor: pointer; padding: 0 .4rem; }
+.set-seg button:last-child { border-right: 0; }
+.set-seg button:hover { background: var(--panel-2); }
+.set-seg button.on { background: var(--ink); color: var(--bg); }
+.set-note { color: var(--muted); font-size: .85rem; margin-top: .25rem; }
+.set-keys { margin-top: .3rem; padding-top: .6rem; border-top: var(--bw-s) solid var(--ink); }
+.set-pages { display: none; margin: 0 0 .85rem; }
+.set-pages a { display: flex; align-items: center; min-height: 44px; font-weight: 700; color: var(--text); text-decoration: none; border-bottom: var(--bw-s) solid color-mix(in srgb, var(--ink) 18%, transparent); }
+.set-pages a:hover { background: var(--panel-2); }
+html[data-device="tablet"] .set-pages { display: block; }
+
+/* ---- 9. tablet: global rail on the hand side (replaces the header) ---- */
+.g-rail { display: none; }
+html[data-device="tablet"] { --top-h: 0px; }
+html[data-device="tablet"] .topbar { display: none; }
+html[data-device="tablet"] body { padding-right: var(--rail-w); }
+html[data-device="tablet"][data-hand="left"] body { padding-right: 0; padding-left: var(--rail-w); }
+html[data-device="tablet"] .g-rail {
+  display: flex; flex-direction: column; position: fixed; z-index: 60; top: 0; bottom: 0; right: 0; width: var(--rail-w);
+  background: var(--panel); border-left: var(--bw) solid var(--ink); overflow: hidden;
+}
+html[data-device="tablet"][data-hand="left"] .g-rail { right: auto; left: 0; border-left: 0; border-right: var(--bw) solid var(--ink); }
+.gr-logo { flex: none; height: 68px; display: grid; place-items: center; border-bottom: var(--bw) solid var(--ink); text-decoration: none; }
+.gr-logo .logo { width: 44px; height: 44px; display: grid; place-items: center; background: var(--accent); color: #fff; border: var(--bw) solid var(--ink); font: 900 1rem var(--display); }
+[data-theme="dark"] .gr-logo .logo { color: #22121A; }
+.gr-nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; scrollbar-width: none; }
+.gr-nav > :first-child { margin-top: auto; }
+.gr-nav::-webkit-scrollbar { display: none; }
+.gr-tools { flex: none; display: flex; flex-direction: column; border-top: var(--bw) solid var(--ink); }
+.gr-item { position: relative; flex: none; width: 100%; min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 4px 2px;
+  font: 800 .78rem/1.1 var(--display); text-transform: none; letter-spacing: 0; color: var(--text); background: transparent; border: 0; border-bottom: var(--bw-s) solid color-mix(in srgb, var(--ink) 18%, transparent); text-decoration: none; cursor: pointer; }
+.gr-item:hover { background: var(--panel-2); color: var(--text); text-decoration: none; }
+.gr-item .ni, .gr-item .ico { display: block; width: 24px; height: 24px; flex: none; }
+.gr-item.active, .gr-item.on, .gr-item.active:hover { background: var(--ink); color: var(--bg); }
+.gr-item .nav-badge { position: absolute; top: 6px; right: 18px; }
+html[data-device="tablet"] body.in-session .g-rail { display: none; }
+/* in a session the page (practice.css / mock.js) pads itself for its own session rail, so the body gets no padding at all */
+html[data-device="tablet"] body.in-session, html[data-device="tablet"][data-hand="left"] body.in-session { padding-left: 0; padding-right: 0; }
+/* the lessons' sidebar slides over the content on narrow tablets: keep it clear of the rail */
+html[data-device="tablet"][data-hand="left"] .sidebar { left: var(--rail-w); }
+html[data-device="tablet"] .sidebar { z-index: 58; }
+html[data-device="tablet"] .toast { bottom: 1rem; }
+html[data-device="tablet"] .sticky-practise { right: calc(var(--rail-w) + 20px); }
+html[data-device="tablet"][data-hand="left"] .sticky-practise { right: auto; left: calc(var(--rail-w) + 20px); }
+html[data-device="tablet"] .to-top { right: calc(var(--rail-w) + 20px); }
+html[data-device="tablet"][data-hand="left"] .to-top { right: auto; left: calc(var(--rail-w) + 20px); }
+html[data-device="tablet"] .sticky-practise { min-height: 56px; }
+/* rough-work pad opens on the hand side, beside the rail (rough.js injects its styles later: hence "html") */
+html[data-device="tablet"] .rw-drawer { top: 0; right: var(--rail-w); width: min(420px, calc(100vw - var(--rail-w))); border-left: var(--bw) solid var(--ink); box-shadow: none; }
+html[data-device="tablet"][data-hand="left"] .rw-drawer { right: auto; left: var(--rail-w); transform: translateX(-105%); border-left: 0; border-right: var(--bw) solid var(--ink); }
+html[data-device="tablet"][data-hand="left"] .rw-drawer.show { transform: none; }
+html[data-device="tablet"] body.in-session .rw-drawer { right: var(--rail-w-session, 132px); }
+html[data-device="tablet"][data-hand="left"] body.in-session .rw-drawer { right: auto; left: var(--rail-w-session, 132px); }
+html .rw-drawer { border-left-width: var(--bw); box-shadow: none; }
+html[data-device="tablet"] .gsearch { z-index: 150; }
+
+/* ---- 10. text size ---- */
+html[data-text="lg"] { font-size: 112.5%; }
+
+/* ---- 11. touch targets ---- */
+@media (pointer: coarse) {
+  .btn, .btn.sm, .pr-pick, .pr-segc button, .sidebar a.item, input[type="text"], input[type="search"], input[type="number"], select { min-height: 44px; }
+}
+html[data-device="tablet"] .btn, html[data-device="phone"] .btn { min-height: 44px; }
+
+/* ---- 12. phones: header is two rows (brand + tools, then the seven sections) ---- */
+@media (max-width: 640px) {
+  :root { --top-big: 112px; --top-small: 112px; }
+  .topbar .nav { border-top: var(--bw-s) solid var(--ink); }
+  .topbar .nav a { min-height: 44px; justify-content: center; }
+  .icon-btn { height: 44px; min-width: 44px; }
+}
+@media print { .g-rail, .to-top, .sticky-practise, .skip-link, .set-menu { display: none !important; } html[data-device] body { padding: 0 !important; } }
+.doc-actions .due:empty { display: none; }
+.doc-actions { column-gap: 1rem; }
+html[data-device="phone"] .doc-actions .da-practise { flex: 1 1 100%; justify-content: center; }
+html[data-device="phone"] .doc-actions { row-gap: 0; }
+.d-top { display: none !important; }   /* replaced by .to-top (common.js) */
+html[data-device="tablet"] .rw-drawer { z-index: 59; }
+.pat-head { background: none; border-bottom: 0; padding-bottom: 0; }
+.pat-head h3 { margin: 0; }
