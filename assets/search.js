@@ -8,7 +8,7 @@
   style.textContent = `
   .gsearch{position:absolute;z-index:150;display:flex;align-items:center;margin:0;padding:.3rem;border:1px solid var(--border);
     border-radius:var(--r-pill);background:var(--panel);color:var(--text);font:600 var(--fs-lg) var(--sans);
-    box-shadow:0 8px 24px rgba(0,0,0,.2);white-space:nowrap;max-width:calc(100vw - 16px);transition:border-color .25s}
+    box-shadow:0 8px 24px rgba(0,0,0,.2);white-space:nowrap;max-width:calc(100vw - 16px)}
   .gsearch[hidden]{display:none}
   .gsearch button{display:inline-flex;align-items:center;gap:.45rem;border:0;cursor:pointer;font:inherit;color:inherit;background:none}
   .gs-go{padding:.45rem .9rem;border-radius:var(--r-pill)}
@@ -21,8 +21,6 @@
   .gsearch.asking .gs-in{display:block;width:min(300px,60vw);padding:.45rem .4rem;border:0;outline:0;background:none;color:var(--text);font:500 var(--fs-lg) var(--sans)}
   .gsearch.asking .gs-send{display:inline-flex;padding:.45rem .7rem;border-radius:var(--r-pill);color:var(--accent)}
   .gsearch.asking .gs-send:hover{background:color-mix(in srgb,var(--accent) 12%,var(--panel))}
-  :root[data-anim="on"] .gsearch.asking .gs-in,:root[data-anim="on"] .gsearch.asking .gs-send{animation:gs-in .25s cubic-bezier(.22,1,.36,1)}
-  @keyframes gs-in{from{opacity:0;transform:translateX(-6px)}}
   .gsearch svg{width:18px;height:18px;flex:none}`;
   document.head.appendChild(style);
 
