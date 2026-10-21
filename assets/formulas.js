@@ -70,9 +70,6 @@
 .ch-tnote { margin: .6rem 0 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
 .ch-empty, .ch-empty-all { text-align: center; color: var(--muted); padding: 2.5rem 1rem; border: 1px dashed var(--border); border-radius: var(--radius); }
 mark.ch-hl { background: var(--hl); color: #1d1d1f; border-radius: 3px; padding: 0 .06em; }
-[data-anim="on"] .ch-card { transition: border-color .4s ease-out, box-shadow .4s ease-out; }
-[data-anim="on"] .ch-card:hover { border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
-[data-anim="on"] .ch-chip, [data-anim="on"] .ch-toc a, [data-anim="on"] .ch-print { transition: background .35s ease-out, color .35s ease-out, border-color .35s ease-out; }
 @media (max-width: 900px) {
   .ch-body { grid-template-columns: minmax(0, 1fr); }
   .ch-toc { display: none; }

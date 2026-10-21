@@ -131,7 +131,7 @@
     const esc = root.esc || ((s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])));
     const fmt = root.fmt || esc;
     const toast = root.toast || (() => {});
-    const swapLabel = root.swapLabel || ((l, s = 0) => `<span class="swap" data-s="${s}">${l.map((x) => `<span>${x}</span>`).join("")}</span>`);
+    const swapLabel = (l, s = 0) => l[s];
     const LOCAL_ICONS = {
       warn: '<path d="M12 3.5 2.8 19.5h18.4z"/><path d="M12 10v4.5M12 17.2h.01"/>',
       bolt: '<path d="M13 2.5 5 13.5h6l-1 8 8-11h-6z"/>',
@@ -275,7 +275,7 @@
         ["section", "Sectional tests", "One section, one clock. Good for a focused weekly check."],
         ["full", "Full-length and quick", "Every section together, or a fifteen-minute warm-up."]];
       const ms = mocks().slice().reverse();
-      main.innerHTML = `<div class="pr-enter">
+      main.innerHTML = `<div>
         <h1 class="pr-h1">Mock tests</h1>
         <p class="lead">Timed, exam-style tests with section timers, a question palette and negative marking where the real test has it. Every answer also counts towards your practice stats.</p>
         ${liveBanner()}
@@ -291,7 +291,7 @@
     function historyView() {
       view = "history";
       const ms = mocks().slice().reverse();
-      main.innerHTML = `<div class="pr-enter"><div class="pr-sbar"><a class="pr-back" href="#">${ic("back")} Mock tests</a></div>
+      main.innerHTML = `<div><div class="pr-sbar"><a class="pr-back" href="#">${ic("back")} Mock tests</a></div>
         <h1 class="pr-h1">Your mock history</h1>
         <p class="lead">${ms.length ? plural(ms.length, "finished mock") + ", newest first." : "Nothing here yet."}</p>
         <div class="pr-card">${ms.length ? historyTable(ms) : `<p class="muted" style="margin:0"><a href="#">Pick a test</a> to start.</p>`}</div></div>`;
@@ -316,7 +316,7 @@
         return `<tr><td class="pn"><span class="pr-chip sec" style="--sc:var(${SEC_VAR[s.sec] || "--accent"})">${esc(secName(s.sec))}</span> <b>${esc(s.title)}</b></td><td class="num">${s.count}</td><td class="num">${s.minutes ? s.minutes + " min" : "shared"}</td><td class="muted small">${esc(shown)}</td></tr>`;
       }).join("");
       const live = R && !R.done;
-      main.innerHTML = `<div class="pr-enter">
+      main.innerHTML = `<div>
         <div class="pr-sbar"><a class="pr-back" href="#">${ic("back")} All mock tests</a></div>
         <h1 class="pr-h1">${esc(p.name)}</h1>
         <p class="lead">${esc(p.blurb || "")}</p>
@@ -384,11 +384,8 @@
     window.addEventListener("beforeunload", (e) => {
       if (view === "run" && R && !R.done) { e.preventDefault(); e.returnValue = ""; return ""; }
     });
-    let prevAnim = null;
     function enterFocus() {
       if (document.body.classList.contains("mk-focus")) return;
-      prevAnim = document.documentElement.dataset.anim || null;
-      document.documentElement.dataset.anim = "off";
       document.body.classList.add("mk-focus");
       document.body.classList.add("in-session");
     }
@@ -397,8 +394,6 @@
       document.body.classList.remove("mk-focus");
       document.body.classList.remove("in-session");
       palOpen = false;
-      if (prevAnim) document.documentElement.dataset.anim = prevAnim;
-      prevAnim = null;
     }
     const running = () => view === "run" && R && !R.done && document.visibilityState === "visible" && !modalOpen();
     const secsOf = (i) => (R.tq[i] || 0) + (i === R.idx && T.since ? (Date.now() - T.since) / 1000 : 0);
@@ -600,7 +595,11 @@
       paint(false);
     }
     function clearResp() { if (R.ans[R.idx] == null) return; delete R.ans[R.idx]; persist(); paint(false); }
-    function toggleMark() { if (R.mark[R.idx]) delete R.mark[R.idx]; else R.mark[R.idx] = true; persist(); paint(false); }
+    function toggleMark() {
+      if (R.mark[R.idx]) delete R.mark[R.idx]; else R.mark[R.idx] = true;
+      persist(); paint(false);
+      if (R.mark[R.idx] && root.stamp) main.querySelectorAll('[data-act="mark"]').forEach((b) => stamp(b));
+    }
     function step(dir) {
       const [f, l] = locked() ? range(R.sec) : [0, R.items.length - 1];
       const j = R.idx + dir;
@@ -770,7 +769,7 @@
       const nBad = rows.filter((r) => r.st === "bad").length, nSkip = rows.filter((r) => r.st === "skip").length, nMark = rows.filter((r) => r.a.marked).length;
       const filters = [["all", "All", rows.length], ["bad", "Wrong", nBad], ["skip", "Not attempted", nSkip], ["ok", "Right", rows.length - nBad - nSkip]].concat(nMark ? [["m", "Marked", nMark]] : []);
 
-      main.innerHTML = `<div class="pr-enter">
+      main.innerHTML = `<div>
         <div class="pr-sbar"><a class="pr-back" href="#">${ic("back")} Mock tests</a><div class="pr-crumb"><b>${esc(m.name || p.name)}</b> <span class="sep">·</span> ${esc(dateTxt(m.at))}</div><span class="grow"></span><span class="pr-chip mode">${esc(negShort(m.negative))}</span></div>
         <h1 class="pr-h1">Your result</h1>
         <div class="pr-card pr-hero is-hero mk-hero${pct >= 80 ? " hot" : ""}">
@@ -797,10 +796,6 @@
           ${nBad + nSkip ? `<button class="btn" data-act="mistakes" data-id="${esc(m.id)}">${swapLabel(["Add wrong to mistake book", "Added to mistake book"], 0)}</button>` : ""}
           <span class="grow"></span><a class="btn primary" href="#">All mock tests</a></div></div>`;
       window.scrollTo(0, 0);
-      if (pct >= 80 && !sessionStorage.getItem("apt:mock:cel:" + m.id)) {
-        try { sessionStorage.setItem("apt:mock:cel:" + m.id, "1"); } catch (e) {}
-        setTimeout(() => { if (root.FX && FX.bigConfetti) FX.bigConfetti(); else if (typeof root.fxConfetti === "function") root.fxConfetti(); }, 350);
-      }
     }
     function applyFilter(f, btn) {
       main.querySelectorAll(".mk-filters .pr-pick").forEach((b) => b.classList.toggle("on", b.dataset.f === f));
@@ -808,7 +803,7 @@
         const show = f === "all" || d.dataset.st === f || d.dataset.s === f || (f === "m" && d.dataset.m === "1");
         d.hidden = !show;
       });
-      if (btn && btn.closest("table")) { const l = document.getElementById("mkList"); if (l) l.scrollIntoView({ block: "start", behavior: "smooth" }); }
+      if (btn && btn.closest("table")) { const l = document.getElementById("mkList"); if (l) l.scrollIntoView({ block: "start" }); }
     }
     function addMistakes(id, btn) {
       const m = mocks().find((x) => x.id === id);
@@ -822,7 +817,7 @@
         n++;
       });
       Store.save();
-      if (root.setSwap && btn) setSwap(btn, 1);
+      if (btn) { btn.textContent = "Added to mistake book"; if (root.stamp) stamp(btn); }
       toast(plural(n, "question") + " (wrong and not attempted) in your mistake book", 2000, "check");
     }
 
@@ -855,7 +850,7 @@
           e.preventDefault();
           applyFilter("all");
           const d = document.getElementById("mkRow" + el.dataset.i);
-          if (d) { d.open = true; d.scrollIntoView({ block: "center", behavior: "smooth" }); }
+          if (d) { d.open = true; d.scrollIntoView({ block: "center" }); }
         }
       }
     });
@@ -1055,8 +1050,9 @@ html[data-device="tablet"] body.in-session .session-rail {
   display: flex; flex-direction: column; gap: .5rem; position: fixed; top: 0; bottom: 0; right: 0; z-index: 60;
   width: var(--rail-w-session, 132px); padding: .6rem; background: var(--panel); border-left: 3px solid var(--ink); box-sizing: border-box; }
 html[data-device="tablet"][data-hand="left"] body.in-session .session-rail { right: auto; left: 0; border-left: 0; border-right: 3px solid var(--ink); }
-html[data-device="tablet"] body.in-session .page.mk { max-width: none; padding-right: calc(var(--rail-w-session, 132px) + 1rem); }
-html[data-device="tablet"][data-hand="left"] body.in-session .page.mk { padding-right: 1rem; padding-left: calc(var(--rail-w-session, 132px) + 1rem); }
+html[data-device="tablet"] body.in-session .page.mk { max-width: none; width: auto; margin: 0; box-sizing: border-box; --mk-side: max(28px, calc((100% - var(--rail-w-session, 132px) - 904px) / 2));
+  padding: 24px calc(var(--rail-w-session, 132px) + var(--mk-side)) 96px var(--mk-side) !important; }
+html[data-device="tablet"][data-hand="left"] body.in-session .page.mk { padding: 24px var(--mk-side) 96px calc(var(--rail-w-session, 132px) + var(--mk-side)) !important; }
 .session-rail .sr-top { display: grid; gap: .5rem; }
 .session-rail .sr-mid { display: grid; gap: .5rem; align-content: end; margin-top: auto; overflow-y: auto; min-height: 0; }
 .session-rail .sr-sec { display: grid; gap: .35rem; align-content: start; overflow-y: auto; min-height: 0; }

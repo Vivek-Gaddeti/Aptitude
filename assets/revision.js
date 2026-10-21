@@ -50,7 +50,7 @@
   const line = (t) => F(String(t || "").replace(/\s*\n\s*/g, " "));
   const titleCase = (id) => { const s = String(id || "").replace(/-/g, " "); return s.charAt(0).toUpperCase() + s.slice(1); };
   const plural = (n, w, p) => n + " " + (n === 1 ? w : p || w + "s");
-  const animOn = () => document.documentElement.dataset.anim === "on";
+  const stampEl = (el) => { if (el && window.stamp) window.stamp(el); };
   const ss = {
     get(k) { try { return JSON.parse(sessionStorage.getItem(k)); } catch (e) { return null; } },
     set(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
@@ -266,7 +266,7 @@
     const learn = nL ? `<section class="pr-card rv-grp"><header class="rv-gh"><div class="rv-ghr"><h3>${ic("book")} Lessons to recall</h3><span class="rv-cnt">${nL}</span></div></header>
       <p class="muted small rv-hint">Recall the idea, the formulas and one trap without opening the page. Then be honest.</p>
       <div class="rv-llist">${M.dueL.sort((a, b) => (a.it.next || 0) - (b.it.next || 0)).map((r) => learnRow(r, "due")).join("")}</div></section>` : "";
-    return `<div class="rv-grid"><div class="rv-main pr-enter">${hero}${groups.map((g) => groupCard(topicHead(g.sec, g.topic, g.rows.length), g.rows, "due", g.rows.map((r) => r.k))).join("")}${learn}</div>${rail(M)}</div>`;
+    return `<div class="rv-grid"><div class="rv-main">${hero}${groups.map((g) => groupCard(topicHead(g.sec, g.topic, g.rows.length), g.rows, "due", g.rows.map((r) => r.k))).join("")}${learn}</div>${rail(M)}</div>`;
   }
   function rail(M) {
     const now = Date.now(), days = {}, F_ = Store.load().meta.fc || {};
@@ -313,7 +313,7 @@
         return { head: `${secChip(q.sec)}<h3>${E(patT(q))}</h3><span class="rv-cnt">${g[k].length}</span>`, sub: E(topicT(q.sec, q.topic)), rows: g[k].sort(recent) };
       });
     }
-    return `<div class="rv-grid"><div class="rv-main pr-enter">${tools}${groups.map((g) => groupCard(g.head, g.rows, "mistakes", g.rows.map((r) => r.k), g.sub)).join("")}</div>${mixRail(all)}</div>`;
+    return `<div class="rv-grid"><div class="rv-main">${tools}${groups.map((g) => groupCard(g.head, g.rows, "mistakes", g.rows.map((r) => r.k), g.sub)).join("")}</div>${mixRail(all)}</div>`;
   }
   function mixRail(all) {
     const n = all.length, g = {};
@@ -343,7 +343,7 @@
     const groups = byTopic(q, (a, b) => (b.it.updated || 0) - (a.it.updated || 0));
     const hero = q.length ? `<div class="pr-card is-hero rv-hero"><div class="rv-big"><b>${q.length}</b><span>starred</span></div><div class="rv-hero-t"><b>${plural(q.length, "question")}</b> you wanted to keep.<div class="muted small">Open one for its solution, or run them all as a set.</div></div><span class="grow"></span>
       <a class="btn primary" href="${qsHref(q.map((r) => r.k))}">${ic("play")} Practise all</a></div>` : "";
-    return `<div class="rv-grid"><div class="rv-main pr-enter">${hero}${groups.map((g) => groupCard(topicHead(g.sec, g.topic, g.rows.length), g.rows, "star", g.rows.length > 1 ? g.rows.map((r) => r.k) : [])).join("")}
+    return `<div class="rv-grid"><div class="rv-main">${hero}${groups.map((g) => groupCard(topicHead(g.sec, g.topic, g.rows.length), g.rows, "star", g.rows.length > 1 ? g.rows.map((r) => r.k) : [])).join("")}
       ${!q.length ? empty("star", "No starred questions", "Starred lessons are on the right. Star questions in practice to collect them here.") : ""}</div>${starRail(M)}</div>`;
   }
   function starRail(M) {
@@ -395,7 +395,7 @@
         ? empty("cards", "Vocabulary deck is on its way", "The word list has not been added yet. The formula deck is ready now.", `<div class="btn-row rv-ec"><a class="btn primary" href="#cards/formulas">${ic("cards")} Formula cards</a></div>`)
         : empty("cards", "No cards here", "Nothing matches this filter. Pick another section or topic.");
     } else stage = stageHTML(C);
-    return `<div class="rv-cwrap pr-enter">${top}${stats}<div id="rvStage">${stage}</div>
+    return `<div class="rv-cwrap">${top}${stats}<div id="rvStage">${stage}</div>
       <div class="rv-keys"><span><kbd>Space</kbd> flip</span><span><kbd>1</kbd> Again</span><span><kbd>2</kbd> Hard</span><span><kbd>3</kbd> Good</span><span><kbd>4</kbd> Easy</span></div></div>`;
   }
   function stageHTML(C) {
@@ -463,7 +463,8 @@
     Store.save();
     render(true);
     const nc = document.getElementById("rvCard");
-    if (nc) try { nc.focus({ preventScroll: true }); } catch (e) {}
+    if (nc) { stampEl(nc); try { nc.focus({ preventScroll: true }); } catch (e) {} }
+    else stampEl(main.querySelector(".rv-sum"));
   }
 
   /* ---------------------------------------------------------------- render + events */
@@ -481,9 +482,7 @@
     if (keepScroll) window.scrollTo(0, y);
     document.title = { due: "Due reviews", mistakes: "Mistake book", bookmarks: "Bookmarks", cards: "Flashcards" }[view] + " · Revision · Aptitude Hub";
   }
-  function after(el, fn) {
-    if (el && animOn()) { el.classList.add("rv-out"); setTimeout(fn, 320); } else fn();
-  }
+  function after(el, fn) { fn(); }
   function onClick(e) {
     const b = e.target.closest("[data-act]");
     if (!b || !main.contains(b)) return;
@@ -499,7 +498,9 @@
     if (act === "star") {
       const it = Store.toggleStar(k);
       toast(it.star ? "Starred" : "Bookmark removed", 1400, it.star ? "star-fill" : "");
-      return view === "bookmarks" && !it.star ? after(b.closest(".rv-row, .rv-lrow"), () => render(true)) : render(true);
+      render(true);
+      if (it.star) stampEl(main.querySelector('[data-act="star"][data-k="' + k.replace(/"/g, '\\"') + '"]'));
+      return;
     }
     if (act === "why") {
       const it = Store.item(k);
@@ -561,7 +562,6 @@
 .rv-tabs .n.z { color: var(--muted); opacity: .75; }
 .rv-tabs a.on .n { background: var(--page-c, var(--accent)); color: #fff; opacity: 1; }
 [data-theme="dark"] .rv-tabs a.on .n { color: #1a1a1d; }
-:root[data-anim="on"] .rv-tabs a { transition: background .3s ease, color .3s ease; }
 
 .rv-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1.25rem; align-items: start; }
 .rv-main { min-width: 0; }
@@ -606,7 +606,6 @@
 .rv-stim > summary { cursor: pointer; padding: .45rem .8rem; font: 700 var(--fs-sm) var(--display); color: var(--accent); display: flex; align-items: center; gap: .4rem; }
 .rv-stim-b { padding: .2rem 1rem 1rem; overflow-x: auto; }
 .rv-stim-b h3 { margin: .2rem 0 .5rem; font: 800 var(--fs-md) var(--display); }
-.rv-out { opacity: 0; transform: translateX(8px); transition: opacity .3s ease, transform .3s ease; }
 
 .rv-llist { display: grid; }
 .rv-lrow { display: flex; align-items: center; gap: .6rem; padding: .6rem .1rem; border-bottom: 1px dashed var(--border); flex-wrap: wrap; }
@@ -669,9 +668,8 @@
 .rv-prog b { color: var(--text); }
 .rv-pbar { flex: 1; height: 6px; border-radius: var(--r-pill); background: var(--panel-2); overflow: hidden; }
 .rv-pbar i { display: block; height: 100%; border-radius: var(--r-pill); background: var(--page-c, var(--accent)); }
-:root[data-anim="on"] .rv-pbar i { transition: width .45s cubic-bezier(.22,1,.36,1); }
+ .rv-pbar i { transition: width 150ms linear; }
 .pr-chip.rv-new { background: var(--purple-soft); color: var(--purple); }
-.rv-scene { perspective: 1600px; }
 .rv-flip { display: grid; cursor: pointer; border-radius: 20px; outline: none; }
 .rv-flip:focus-visible .rv-face { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent); }
 .rv-face { grid-area: 1 / 1; position: relative; min-height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .7rem; text-align: center;
@@ -679,10 +677,6 @@
 [data-theme="dark"] .rv-face { box-shadow: none; }
 .rv-back { background: color-mix(in srgb, var(--page-c, var(--accent)) 5%, var(--panel)); border-color: color-mix(in srgb, var(--page-c, var(--accent)) 28%, var(--border)); visibility: hidden; }
 .rv-flip.on .rv-front { visibility: hidden; } .rv-flip.on .rv-back { visibility: visible; }
-:root[data-anim="on"] .rv-flip { transform-style: preserve-3d; transition: transform .55s cubic-bezier(.22,1,.36,1); }
-:root[data-anim="on"] .rv-face { visibility: visible; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
-:root[data-anim="on"] .rv-back { transform: rotateY(180deg); }
-:root[data-anim="on"] .rv-flip.on { transform: rotateY(180deg); }
 .rv-ftop { position: absolute; top: .95rem; left: 1.1rem; right: 1.1rem; display: flex; align-items: center; gap: .5rem; font-size: var(--fs-xs); color: var(--muted); text-align: left; }
 .rv-ftop > span:last-child:not(.pr-chip) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rv-big-t { font: 800 1.65rem var(--display); line-height: 1.3; max-width: 32ch; overflow-wrap: anywhere; }
@@ -711,7 +705,6 @@
 .rv-rate .g1 b { color: var(--red); } .rv-rate .g2 b { color: var(--amber); } .rv-rate .g3 b { color: var(--green); } .rv-rate .g4 b { color: var(--accent); }
 .rv-rate .g1:hover { border-color: var(--red); background: var(--red-soft); } .rv-rate .g2:hover { border-color: var(--amber); background: var(--amber-soft); }
 .rv-rate .g3:hover { border-color: var(--green); background: var(--green-soft); } .rv-rate .g4:hover { border-color: var(--accent); background: var(--accent-soft); }
-:root[data-anim="on"] .rv-rate button { transition: border-color .3s ease, background .3s ease; }
 .rv-keys { display: flex; justify-content: center; gap: .9rem; flex-wrap: wrap; margin-top: 1.1rem; font-size: var(--fs-xs); color: var(--muted); }
 .rv-sum { text-align: center; padding: 2rem 1.5rem; }
 .rv-sum h3 { margin: .5rem 0 .3rem; font: 800 var(--fs-xl) var(--display); }

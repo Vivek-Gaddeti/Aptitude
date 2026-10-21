@@ -306,6 +306,7 @@
     n = Math.round(+n);
     if (!(n >= 1 && n <= 500)) { toast("Pick a goal between 1 and 500"); return; }
     const d = Store.load(); d.meta.goal = n; closePop(); Store.save(); toast(`Daily goal: ${n} questions`, 1800, "check");
+    const pg = main.querySelector(".db-prog"); if (pg && window.stamp) window.stamp(pg);
   }
   function resetAll() {
     if (!confirm("Delete ALL progress, mocks, bookmarks, notes and question history in this browser? Export first if unsure.")) return;
@@ -335,6 +336,7 @@
 .sc-quant { --sc: var(--f-pink); } .sc-reasoning { --sc: var(--f-green); } .sc-verbal { --sc: var(--f-yellow); } .sc-di { --sc: var(--f-blue); }
 .db { position: relative; display: flex; flex-direction: column; gap: 1.75rem; min-width: 0; }
 .db .db-mono { font-family: var(--mono); }
+.db-meter > span, .db-bar > span { transition: width 150ms linear; }
 .db-muted { color: var(--muted); font-size: .88rem; }
 .db-title { margin: 0; }
 .db-h2 { margin: 0 0 .75rem; font-weight: 800; text-transform: none; }
