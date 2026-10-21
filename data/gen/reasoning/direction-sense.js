@@ -1,9 +1,10 @@
 /* =====================================================================
    Direction sense: final direction after turns, distance & direction
    from the start, shadows at sunrise / sunset, coded directions.
-   Every answer is a compass direction shown with its bearing in degrees
-   (North 0, East 90, South 180, West 270) or a distance. Each generator
-   simulates the walk / turns so that the keyed answer is the real one.
+   Every answer is a plain compass direction ("North-West") or a distance.
+   Each generator simulates the walk / turns so that the keyed answer is the
+   real one, and carries a `check` that recomputes the bearing independently
+   (North 0, East 90, South 180, West 270) and proves the option is unique.
    ===================================================================== */
 (function () {
   const T = (rng, arr) => rng.pick(arr);
@@ -11,7 +12,9 @@
   const NAMES = ["North", "North-East", "East", "South-East", "South", "South-West", "West", "North-West"];
   const mod = (x) => (((x % 360) + 360) % 360);
   const nm = (deg) => NAMES[mod(deg) / 45];
-  const dlab = (deg) => `${nm(deg)} (${mod(deg)}°)`;
+  const NAMEJ = JSON.stringify(NAMES);
+  // check: marked option is the compass name of bearing expression `ex` (degrees) and appears once among the options
+  const chkD = (ex) => `q.opts[q.ans]===${NAMEJ}[((((${ex})%360)+360)%360)/45]&&q.opts.filter(o=>o===q.opts[q.ans]).length===1`;
   const finish = (d, q, sol, short, trap) => ({ d, q, sol, short, trap });
   function wrap(fn) {
     return function (rng, d) {
@@ -20,12 +23,12 @@
     };
   }
   // ans = bearing in degrees, wrongs = [[deg, why], ...]; pool = which bearings may fill empty slots
-  function mkD(rng, ans, wrongs, extra, cardinal) {
-    const used = new Set([mod(ans)]), pairs = [[dlab(ans), null]];
-    const add = (deg, why) => { deg = mod(deg); if (pairs.length === 4 || used.has(deg)) return; if (cardinal && deg % 90) return; used.add(deg); pairs.push([dlab(deg), why]); };
+  function mkD(rng, ans, wrongs, extra, cardinal, ex) {
+    const used = new Set([mod(ans)]), pairs = [[nm(ans), null]];
+    const add = (deg, why) => { deg = mod(deg); if (pairs.length === 4 || used.has(deg)) return; if (cardinal && deg % 90) return; used.add(deg); pairs.push([nm(deg), why]); };
     for (const [deg, why] of wrongs) add(deg, why);
     for (const deg of rng.shuffle(cardinal ? [0, 90, 180, 270] : [0, 45, 90, 135, 180, 225, 270, 315])) add(deg, "Does not follow from the turns");
-    return Object.assign({ time: TIME[extra.d] }, extra, QB.options(rng, pairs), { calc: String(mod(ans)) });
+    return Object.assign({ time: TIME[extra.d] }, extra, QB.options(rng, pairs), { check: chkD(ex) });
   }
   const NM = ["Ravi", "Meena", "Arjun", "Kavya", "Imran", "Sneha", "Rohit", "Divya", "Karan", "Anita", "Suresh", "Pooja", "Vikram", "Lakshmi", "Harish", "Farah"];
   const PLACE = ["a temple in Madurai", "a school in Pune", "a bus stop in Nagpur", "the railway station in Bhopal", "a park in Jaipur", "a market in Kochi", "the library in Lucknow", "a hospital in Indore", "a college gate in Vellore", "a ground in Ranchi"];
@@ -72,7 +75,7 @@
     turns.forEach((t, i) => { cur += t; steps.push(`${nm(cur - t)} ${t > 0 ? "+" : "−"} ${Math.abs(t)}° ${t > 0 ? "clockwise" : "anticlockwise"} → ${nm(cur)}`); });
     return mkD(rng, h, [[mirror, "Swapped left and right"], [ignoreLast, "Left out the last turn"], [h + 180, "Gave the opposite direction"], [h0, "Gave the starting direction"], [h + 90, "Turned one quarter too far"]],
       finish(d, q, [`Start facing ${nm(h0)}. Right/clockwise adds degrees, left/anticlockwise subtracts (N 0°, E 90°, S 180°, W 270°).`, steps.join("; "), `Final direction: **${nm(h)}**.`],
-        "Turn right = add 90°, turn left = subtract 90°, a U-turn = 180°; add them all up and reduce.", "Do not let the walking distances distract you: only the turns change the direction."), d !== "Hard");
+        "Turn right = add 90°, turn left = subtract 90°, a U-turn = 180°; add them all up and reduce.", "Do not let the walking distances distract you: only the turns change the direction."), d !== "Hard", `${h0}+(${turns.join(")+(")})`);
   }) });
 
   /* ------------------------------------------------------------ 2. distance and direction from start */
@@ -122,7 +125,7 @@
     const q = startFromEnd ? `${story}. In which direction is the starting point A from ${P.he === "she" ? "her" : "his"} final position?` : `${story}. In which direction is ${P.he} now from the starting point A?`;
     return mkD(rng, ansDeg, [[ansDeg + 180, startFromEnd ? "Gave the direction of the final position from A (the other way round)" : "Gave the direction of A from the final position (the other way round)"], [ansDeg + 90, "Mixed up East-West or North-South"], [ansDeg - 90, "Mixed up East-West or North-South"]],
       finish(d, q, solPath.concat([`Equal movements ${x > 0 ? "East" : "West"} and ${y > 0 ? "North" : "South"} put the final position **${nm(fromA)}** of A, so A is ${nm(fromA + 180)} of the final position.`, `Answer: **${nm(ansDeg)}**.`]),
-        "Net East-West and net North-South; equal amounts give a diagonal (NE, SE, SW, NW).", "Read carefully whether the question asks for the direction of the end from the start or the start from the end."), false);
+        "Net East-West and net North-South; equal amounts give a diagonal (NE, SE, SW, NW).", "Read carefully whether the question asks for the direction of the end from the start or the start from the end."), false, `Math.round(Math.atan2(${x},${y})*180/Math.PI)${startFromEnd ? "+180" : ""}`);
   }) });
 
   /* ------------------------------------------------------------ 3. shadows */
@@ -140,7 +143,7 @@
       const q = T(rng, [`${when[0].toUpperCase() + when.slice(1)}, ${P.n}'s shadow ${relTxt} ${the}. Which direction was ${P.he} facing?`, `${P.n} was standing in a field ${when}. ${P.he[0].toUpperCase() + P.he.slice(1)} noticed that ${P.he === "she" ? "her" : "his"} shadow ${relTxt} ${the}. In which direction was ${P.he} facing?`]);
       return mkD(rng, face, [[face + 180, "Took the shadow on the wrong side of the person"], [mod(sun - rel), "Put the shadow towards the sun"], [mod(shadow + rel), "Swapped left and right"], [shadow, "Gave the direction of the shadow, not the way the person faced"]],
         finish(d, q, [`The sun ${sunWord}. The shadow points ${nm(shadow)}.`, `The shadow ${relTxt.replace("fell ", "falls ")} the person, so ${rel === 0 ? "the person faces the way the shadow points" : rel === 180 ? "the person faces away from the way the shadow points" : rel > 0 ? "the person is turned 90° anticlockwise from the shadow direction" : "the person is turned 90° clockwise from the shadow direction"}: **${nm(face)}**.`],
-          "Shadow points away from the sun: West in the morning, East in the evening. Then place the person relative to the shadow.", "Shadows never point to the sun; check East or West by the time of day."), true);
+          "Shadow points away from the sun: West in the morning, East in the evening. Then place the person relative to the shadow.", "Shadows never point to the sun; check East or West by the time of day."), true, `${sun}+180-(${rel})`);
     }
     if (d === "Medium") {
       const face = mod(shadow - rel), turn = T(rng, [90, -90, 180, 270]);
@@ -148,7 +151,7 @@
       const q = `${when[0].toUpperCase() + when.slice(1)}, ${P.n}'s shadow ${relTxt} ${the}. ${P.he[0].toUpperCase() + P.he.slice(1)} then ${turnTxt(turn)}. Which direction is ${P.he} facing now?`;
       return mkD(rng, end, [[face, "Gave the original direction, before the turn"], [mod(face - turn), "Turned the wrong way"], [mod(end + 180), "Gave the opposite direction"], [mod(shadow + rel + turn), "Swapped left and right when placing the shadow"]],
         finish(d, q, [`The sun ${sunWord}; the shadow points ${nm(shadow)}, so ${P.n} first faces ${nm(face)}.`, `After the turn of ${sdeg(turn)}: **${nm(end)}**.`],
-          "Find the first direction from the shadow, then apply the turn.", "Work out the direction before the turn first; the turn is applied to that, not to the shadow."), true);
+          "Find the first direction from the shadow, then apply the turn.", "Work out the direction before the turn first; the turn is applied to that, not to the shadow."), true, `${sun}+180-(${rel})+(${turn})`);
     }
     // Hard: two people
     const Q = person(rng); if (Q.n === P.n) return null;
@@ -159,7 +162,7 @@
     const q = `${P.n} and ${Q.n} stand facing each other ${when}. ${P.n}'s shadow falls to the ${side[0]} of ${Q.n}. Which direction is ${askQ ? Q.n : P.n} facing?`;
     return mkD(rng, ans, [[mod(ans + 180), askQ ? `Gave ${P.n}'s direction instead of ${Q.n}'s` : `Gave ${Q.n}'s direction instead of ${P.n}'s`], [mod(shadow + side[1] + (askQ ? 0 : 180)), `Swapped ${side[0]} and ${side[0] === "right" ? "left" : "right"}`], [shadow, "Gave the direction of the shadow itself"], [sun, "Used the direction of the sun"]],
       finish(d, q, [`The sun ${sunWord}; ${P.n}'s shadow points ${nm(shadow)}.`, `The shadow falls to the ${side[0]} of ${Q.n}, so ${Q.n} faces ${nm(faceQ)} (${nm(faceQ)} ${side[0]} = ${nm(shadow)}).`, `${P.n} faces ${Q.n}, i.e. the opposite way: ${nm(faceP)}. Answer for ${askQ ? Q.n : P.n}: **${nm(ans)}**.`],
-        "The shadow's direction fixes the listener's right or left; the other person faces the opposite way.", "Two people facing each other face opposite directions; read which person the question asks about."), true);
+        "The shadow's direction fixes the listener's right or left; the other person faces the opposite way.", "Two people facing each other face opposite directions; read which person the question asks about."), true, `${sun}+180-(${side[1]})${askQ ? "" : "+180"}`);
   }) });
 
   /* ------------------------------------------------------------ 4. coded directions */
@@ -180,7 +183,7 @@
       const q = T(rng, [`${rule} If ${P.n} walks towards what is called **${NAME4[c]}**, in which actual direction is ${P.he} walking?`, `${rule} ${P.n} walks in the direction called **${NAME4[c]}**. What is the actual direction?`]);
       return mkD(rng, ans, [[perm[c] * 90, "Applied the code the wrong way round"], [c * 90, "Ignored the code"], [ans + 180, "Gave the opposite direction"]],
         finish(d, q, [`The code says: ${clauses.join("; ")}.`, `The direction called ${NAME4[c]} is the actual direction whose name was changed to ${NAME4[c]}: **${NAME4[realOf(c)]}**.`],
-          "Find the line of the code whose right-hand name matches the called direction; the left-hand name is the actual one.", "Look the name up on the correct side of 'is called': the actual direction comes first."), true);
+          "Find the line of the code whose right-hand name matches the called direction; the left-hand name is the actual one.", "Look the name up on the correct side of 'is called': the actual direction comes first."), true, `${JSON.stringify(perm)}.indexOf(${c})*90`);
     }
     if (d === "Medium") {
       const c = rng.int(0, 3), t = turn();
@@ -188,13 +191,13 @@
       const q = `${rule} ${P.n} faces what is called **${NAME4[c]}** and then ${turnTxt(t)}. In which actual direction is ${P.he} facing now?`;
       return mkD(rng, ans, [[mod(real0 - t), "Turned the wrong way"], [mod(perm[c] * 90 + t), "Applied the code the wrong way round"], [mod(c * 90 + t), "Ignored the code"], [real0, "Forgot the turn"]],
         finish(d, q, [`The called ${NAME4[c]} is actually ${NAME4[realOf(c)]}.`, `Facing ${NAME4[realOf(c)]} and turning ${sdeg(t)}: **${nm(ans)}**.`],
-          "Translate to real directions first, do the turns, and read off the real answer.", "Turns are physical (left and right do not change); only the names of the compass directions are swapped."), true);
+          "Translate to real directions first, do the turns, and read off the real answer.", "Turns are physical (left and right do not change); only the names of the compass directions are swapped."), true, `${JSON.stringify(perm)}.indexOf(${c})*90+(${t})`);
     }
     const c = rng.int(0, 3), t1 = turn(), t2 = T(rng, [90, -90, 180]);
     const real0 = realOf(c) * 90, mid = mod(real0 + t1), ans = mod(mid + t2);
     const q = `${rule} ${P.n} faces what is called **${NAME4[c]}**, ${turnTxt(t1)} and then ${turnTxt(t2)}. In which actual direction is ${P.he} facing at the end?`;
     return mkD(rng, ans, [[mod(real0 - t1 - t2), "Turned the wrong way both times"], [mod(perm[c] * 90 + t1 + t2), "Applied the code the wrong way round"], [mod(c * 90 + t1 + t2), "Ignored the code"], [mid, "Forgot the second turn"], [mod(ans + 180), "Gave the opposite direction"]],
       finish(d, q, [`The called ${NAME4[c]} is actually ${NAME4[realOf(c)]}.`, `Start ${NAME4[realOf(c)]}; after the first turn: ${nm(mid)}; after the second turn: **${nm(ans)}**.`],
-        "Translate once at the start, then work only with real directions.", "Do not translate the final answer back into the code unless the question asks for it."), true);
+        "Translate once at the start, then work only with real directions.", "Do not translate the final answer back into the code unless the question asks for it."), true, `${JSON.stringify(perm)}.indexOf(${c})*90+(${t1})+(${t2})`);
   }) });
 })();

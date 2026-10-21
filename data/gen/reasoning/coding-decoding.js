@@ -1,16 +1,19 @@
 /* =====================================================================
    Coding-decoding: letter shift, reverse / opposite letters, position-sum
    and number codes, mixed operations (TCS style).
-   Letter-word answers show their alphabet-position sum in brackets; the
-   generators enumerate the whole rule family so the intended rule is the
-   only one that explains the worked example(s).
+   Letter-word answers are plain words; each carries a `check` expression that
+   re-applies the rule independently. The generators enumerate the whole rule
+   family so the intended rule is the only one that explains the worked example(s).
    ===================================================================== */
 (function () {
   const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const pos = (c) => A.indexOf(c) + 1;
   const ch = (n) => A[(((n - 1) % 26) + 26) % 26];
   const sumOf = (w) => [...w].reduce((a, c) => a + pos(c), 0);
-  const lab = (w) => (w.length === 1 ? `${w} (${pos(w)})` : `${w} (position sum ${sumOf(w)})`);
+  const chkW = (expr) => `q.opts[q.ans]===(${expr})&&q.opts.filter(o=>o===q.opts[q.ans]).length===1`;
+  const J = (x) => JSON.stringify(x);
+  // JS expression text: shift word W (a JS expression) by the list V letter by letter (V repeats)
+  const shiftX = (W, V, sign) => `[...${W}].map((c,i)=>String.fromCharCode(65+((c.charCodeAt(0)-65${sign < 0 ? "-" : "+"}${J(V)}[i%${V.length}])%26+26)%26)).join("")`;
   const T = (rng, arr) => rng.pick(arr);
   const TIME = { Easy: 40, Medium: 65, Hard: 95 };
   const sg = (x) => (x < 0 ? "−" + -x : "+" + x);
@@ -22,16 +25,17 @@
       throw new Error("coding-decoding: no clean question found");
     };
   }
-  function mkL(rng, a, wrongs, extra) {
-    const sums = new Set([sumOf(a)]), words = new Set([a]);
-    const pairs = [[lab(a), null]];
+  // chk = JS expression (string) recomputing the answer independently of the generator's variables
+  function mkL(rng, a, wrongs, extra, chk) {
+    const words = new Set([a]);
+    const pairs = [[a, null]];
     for (const [w, why] of wrongs) {
       if (pairs.length === 4) break;
-      if (!w || words.has(w) || sums.has(sumOf(w))) continue;
-      words.add(w); sums.add(sumOf(w)); pairs.push([lab(w), why]);
+      if (!w || words.has(w)) continue;
+      words.add(w); pairs.push([w, why]);
     }
     if (pairs.length < 4) return null;
-    return Object.assign({ time: TIME[extra.d] }, extra, QB.options(rng, pairs), { calc: String(sumOf(a)) });
+    return Object.assign({ time: TIME[extra.d] }, extra, QB.options(rng, pairs), { check: chkW(chk) });
   }
   const W3 = ["CAT", "DOG", "SUN", "MAP", "PEN", "BOX", "FAN", "JAR", "KEY", "TEA", "BAT", "RAT", "HEN", "COW", "PIG", "BUS", "CAR", "INK", "OIL", "FOG", "LAW", "MUD", "NET", "OAK", "TIN", "WAX", "ZIP", "GEM", "HUT", "RUG"];
   const W4 = ["RAIN", "BOOK", "FISH", "LAMP", "MILK", "DOOR", "TREE", "ROAD", "SHIP", "COLD", "GOLD", "HAND", "LION", "MOON", "STAR", "WIND", "BELL", "CAKE", "DESK", "FARM", "GATE", "HILL", "JUNK", "KITE", "LAKE", "MANGO".slice(0, 4), "NAIL", "PARK", "ROSE", "SAND", "TENT", "WOOL", "YARN", "CORN", "DIAL", "FORK"];
@@ -85,7 +89,8 @@
       return mkL(rng, ans, wrongs, finish(d, q,
         [`Compare ${ex} with ${code} letter by letter (using positions): ${vTxt}.`, `Apply the same shifts to ${tgt}: **${ans}**.`],
         "Subtract the alphabet positions of the two words letter by letter; the differences are the code.",
-        "Check whether the shift is the same for every letter; if it changes, it follows a pattern by position."));
+        "Check whether the shift is the same for every letter; if it changes, it follows a pattern by position."),
+        shiftX(J(tgt), v, 1));
     }
     const code2 = f(tgt), ans = tgt;
     const inv = shiftBy(v.map((x) => -x));
@@ -98,7 +103,8 @@
     return mkL(rng, ans, wrongs, finish(d, q,
       [`From ${ex} → ${code}: ${vTxt}.`, `To decode ${code2}, undo each shift: **${ans}**.`],
       "Find the shift from the example, then move every letter of the code back by the same amount.",
-      "Decoding means going the opposite way: add where the code subtracted and subtract where it added."));
+      "Decoding means going the opposite way: add where the code subtracted and subtract where it added."),
+      shiftX(J(code2), v, -1));
   }) });
 
   /* ------------------------------------------------------------ 2. reverse / opposite letters */
@@ -137,7 +143,17 @@
     return mkL(rng, ans, wrongs, finish(d, q,
       [stated ? `Rule: ${R.txt}.` : `Compare ${ex} with ${code}: ${R.txt}.`, `Apply it to ${tgt}: **${ans}**.`],
       "Opposite letter = 27 − position (A↔Z, B↔Y, C↔X, …M↔N).",
-      "The opposite of a letter is 27 − its position, not 26 − its position."));
+      "The opposite of a letter is 27 − its position, not 26 − its position."),
+      (() => {
+        const W = `[...${J(tgt)}]`, O = "(c=>String.fromCharCode(155-c.charCodeAt(0)))";
+        const odd = (a) => `${a}.map((c,i)=>i%2===0?${O}(c):c)`;
+        const ex = {
+          opp: `${W}.map(${O})`, rev: `${W}.reverse()`, revopp: `${W}.reverse().map(${O})`,
+          oddopp: odd(W), evenopp: `${W}.map((c,i)=>i%2===1?${O}(c):c)`, revodd: odd(`${W}.reverse()`),
+          revfirst: `${W}.reverse().map((c,i,a)=>i===0||i===a.length-1?${O}(c):c)`,
+        }[R.id];
+        return `${ex}.join("")`;
+      })());
   }) });
 
   /* ------------------------------------------------------------ 3. position sum and number codes */
@@ -244,6 +260,17 @@
     return mkL(rng, ans, wrongs, finish(d, q,
       [`${ex} → ${code}: first ${P.txt}, then ${S.txt}.`, `Do the same to ${tgt}: ${P.f(tgt)} → **${ans}**.`],
       "Undo the shift in the code to see which rearrangement was used, then apply both steps in the same order.",
-      "Rearrange first and shift second (or the reverse) in the same order as the example, otherwise alternating shifts land on the wrong letters."));
+      "Rearrange first and shift second (or the reverse) in the same order as the example, otherwise alternating shifts land on the wrong letters."),
+      (() => {
+        const W = J(tgt);
+        const perm = {
+          rev: `[...${W}].reverse().join("")`,
+          ends: `${W}[${W}.length-1]+${W}.slice(1,-1)+${W}[0]`,
+          halves: `${W}.slice(${W}.length/2)+${W}.slice(0,${W}.length/2)`,
+          pairs: `[...${W}].map((c,i)=>${W}[i%2?i-1:i+1]).join("")`,
+          revhalves: `[...${W}.slice(0,${W}.length/2)].reverse().join("")+[...${W}.slice(${W}.length/2)].reverse().join("")`,
+        }[P.id];
+        return shiftX(`(${perm})`, S.v, 1);
+      })());
   }) });
 })();

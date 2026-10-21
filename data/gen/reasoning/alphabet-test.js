@@ -1,14 +1,15 @@
 /* =====================================================================
    Alphabet test: letter positions and dictionary order.
-   Numeric answers are shown as numbers; letter answers show their
-   alphabet position in brackets so that every option is checkable.
+   Numeric answers are shown as numbers (checked with calc); letter and word
+   answers are plain text, proved by a `check` expression that recomputes them.
    ===================================================================== */
 (function () {
   const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const pos = (c) => A.indexOf(c) + 1;
   const ch = (n) => A[(((n - 1) % 26) + 26) % 26];
   const sumOf = (w) => [...w].reduce((a, c) => a + pos(c), 0);
-  const lab = (w) => (w.length === 1 ? `${w} (${pos(w)})` : `${w} (position sum ${sumOf(w)})`);
+  const J = (x) => JSON.stringify(x);
+  const chkW = (expr) => `q.opts[q.ans]===(${expr})&&q.opts.filter(o=>o===q.opts[q.ans]).length===1`;
   const T = (rng, arr) => rng.pick(arr);
   const TIME = { Easy: 35, Medium: 60, Hard: 95 };
   const N = (x) => QB.num(x);
@@ -20,12 +21,13 @@
       throw new Error("alphabet-test: no clean question found");
     };
   }
-  function mkL(rng, a, wrongs, extra) {
+  // chk = JS expression (string) that recomputes the letter independently of the generator's variables
+  function mkL(rng, a, wrongs, extra, chk) {
     if (a.length !== 1) throw new Error("single letters only");
-    const used = new Set([a]), pairs = [[lab(a), null]];
-    for (const [w, why] of wrongs) { if (pairs.length === 4) break; if (!w || used.has(w)) continue; used.add(w); pairs.push([lab(w), why]); }
+    const used = new Set([a]), pairs = [[a, null]];
+    for (const [w, why] of wrongs) { if (pairs.length === 4) break; if (!w || used.has(w)) continue; used.add(w); pairs.push([w, why]); }
     if (pairs.length < 4) return null;
-    return Object.assign({ time: TIME[extra.d] }, extra, QB.options(rng, pairs), { calc: String(pos(a)) });
+    return Object.assign({ time: TIME[extra.d] }, extra, QB.options(rng, pairs), { check: chkW(chk) });
   }
   function mkN(rng, ans, wrongs, extra) {
     if (!(ans >= 0) || !Number.isInteger(ans)) return null;
@@ -51,7 +53,7 @@
       const n = rng.int(2, 14), ans = ch(27 - n);
       const q = T(rng, [`Which letter is the **${ord(n)}** from the right end of the English alphabet?`, `Counting from Z backwards, which letter is **${ord(n)}**?`, `What is the **${ord(n)}** letter from the end of the alphabet?`, `In the English alphabet, which letter is the **${ord(n)}** counting from the right?`]);
       return mkL(rng, ans, [[ch(n), "Counted from the left end instead"], [ch(26 - n), "Off by one: used 26 − N instead of 27 − N"], [ch(28 - n), "Off by one the other way"]],
-        finish(d, q, [`Position from the left = 27 − ${n} = ${27 - n}`, `That letter is **${ans}**.`], "Nth from the right = (27 − N)th from the left.", "27 − N, not 26 − N: Z itself is the 1st from the right."));
+        finish(d, q, [`Position from the left = 27 − ${n} = ${27 - n}`, `That letter is **${ans}**.`], "Nth from the right = (27 − N)th from the left.", "27 − N, not 26 − N: Z itself is the 1st from the right."), `String.fromCharCode(91-${n})`);
     }
     if (kind === 2) {                                     // position from the right end
       const p = rng.int(3, 24), x = ch(p), ans = 27 - p;
@@ -65,7 +67,7 @@
       const x = ch(a), y = ch(b), ans = ch(a + g / 2);
       const q = T(rng, [`Which letter is exactly in the middle of **${x}** and **${y}** in the alphabet?`, `Find the letter that lies midway between **${x}** and **${y}**.`]);
       return mkL(rng, ans, [[ch(a + g / 2 + 1), "One letter too far"], [ch(a + g / 2 - 1), "One letter too short"], [ch((a + b + 1) / 2 | 0), "Rounded the average wrongly"], [ch(a + g / 2 + 2), "Two letters too far"]],
-        finish(d, q, [`${x} = ${a}, ${y} = ${b}`, `Middle position = (${a} + ${b}) ÷ 2 = ${a + g / 2}, which is **${ans}**`], "Average the two positions.", "Check that exactly the same number of letters lies on each side."));
+        finish(d, q, [`${x} = ${a}, ${y} = ${b}`, `Middle position = (${a} + ${b}) ÷ 2 = ${a + g / 2}, which is **${ans}**`], "Average the two positions.", "Check that exactly the same number of letters lies on each side."), `String.fromCharCode(64+(${a}+${b})/2)`);
     }
     if (kind === 4) {                                     // Nth to the right / left
       const p = rng.int(3, 24), n = d === "Easy" ? rng.int(2, 5) : rng.int(3, 9), dirR = rng.chance(0.5), np = dirR ? p + n : p - n;
@@ -73,7 +75,7 @@
       const x = ch(p), ans = ch(np);
       const q = T(rng, [`Which letter is the **${ord(n)}** to the ${dirR ? "right" : "left"} of **${x}** in the English alphabet?`, `Starting from **${x}** and moving ${n} places to the ${dirR ? "right" : "left"} in the alphabet, which letter do you reach?`]);
       return mkL(rng, ans, [[ch(dirR ? p - n : p + n), "Moved in the wrong direction"], [ch(np + 1), "One place too far"], [ch(np - 1), "One place too short"]],
-        finish(d, q, [`${x} = ${p}`, `${p} ${dirR ? "+" : "−"} ${n} = ${np}, which is **${ans}**`], "Right means add, left means subtract on the A-to-Z line.", "Remember the alphabet is written A at the left end and Z at the right."));
+        finish(d, q, [`${x} = ${p}`, `${p} ${dirR ? "+" : "−"} ${n} = ${np}, which is **${ans}**`], "Right means add, left means subtract on the A-to-Z line.", "Remember the alphabet is written A at the left end and Z at the right."), `String.fromCharCode(64+${p}${dirR ? "+" : "-"}${n})`);
     }
     if (kind === 5) {                                     // Nth to the left of Mth from right
       const m = rng.int(3, 12), n = rng.int(2, 8), pp = 27 - m - n;
@@ -81,7 +83,7 @@
       const ans = ch(pp);
       const q = T(rng, [`Which letter is the **${ord(n)}** to the left of the **${ord(m)}** letter from the right end of the alphabet?`, `Find the **${ord(n)}** letter to the left of the letter that is **${ord(m)}** from the right end of the alphabet.`]);
       return mkL(rng, ans, [[ch(27 - m + n), "Moved to the right instead of the left"], [ch(pp + 1), "One place off"], [ch(pp - 1), "One place off"], [ch(m + n), "Counted everything from the left end"]],
-        finish(d, q, [`${ord(m)} from the right = position 27 − ${m} = ${27 - m}`, `${n} places to the left = ${27 - m} − ${n} = ${pp}, which is **${ans}**`], "Convert the right-end position to a left position first (27 − M), then move.", "Turn the right-end count into a left-end count before you move."));
+        finish(d, q, [`${ord(m)} from the right = position 27 − ${m} = ${27 - m}`, `${n} places to the left = ${27 - m} − ${n} = ${pp}, which is **${ans}**`], "Convert the right-end position to a left position first (27 − M), then move.", "Turn the right-end count into a left-end count before you move."), `String.fromCharCode(64+27-${m}-${n})`);
     }
     if (kind === 6) {                                     // letters between nth-left and mth-right
       const n = rng.int(3, 11), m = rng.int(3, 11), r = 27 - m;
@@ -107,7 +109,7 @@
       const x = ch(p), ans = ch(np);
       const q = T(rng, [`If the English alphabet is written in reverse order (Z to A), which letter is the **${ord(n)}** to the right of **${x}**?`, `The alphabet is rewritten backwards as Z, Y, X, …, A. Which letter is the **${ord(n)}** to the right of **${x}** in this new order?`]);
       return mkL(rng, ans, [[ch(p + n), "Used the normal A-to-Z order"], [ch(np + 1), "One place too short"], [ch(np - 1), "One place too far"]],
-        finish(d, q, [`In reverse order, moving right means moving toward A, so the position falls: ${p} − ${n} = ${np}`, `That letter is **${ans}**.`], "Reverse order: right = down in position, left = up.", "The direction flips when the alphabet is reversed."));
+        finish(d, q, [`In reverse order, moving right means moving toward A, so the position falls: ${p} − ${n} = ${np}`, `That letter is **${ans}**.`], "Reverse order: right = down in position, left = up.", "The direction flips when the alphabet is reversed."), `String.fromCharCode(64+${p}-${n})`);
     }
     if (kind === 9) {                                     // odd letters only
       const odd = []; for (let i = 1; i <= 26; i += 2) odd.push(ch(i));
@@ -116,7 +118,7 @@
       const x = odd[i0], ans = odd[i0 + n];
       const q = T(rng, [`From the English alphabet every second letter, B, D, F, …, is deleted, leaving A, C, E, G, … Which letter is the **${ord(n)}** to the right of **${x}** now?`, `The letters B, D, F, H, … (every even-numbered letter) are removed from the alphabet. In what is left, which letter is the **${ord(n)}** to the right of **${x}**?`]);
       return mkL(rng, ans, [[ch(pos(x) + n), "Used the full alphabet, forgetting the deleted letters"], [odd[i0 + n + 1], "One place too far in the shortened list"], [odd[i0 + n - 1], "One place too short in the shortened list"]],
-        finish(d, q, [`Remaining letters: ${odd.join(" ")}`, `Start at ${x} and move ${n} places right in this list: **${ans}**`], "Write out the shortened list and count along it.", "Count in the new list, not in the full alphabet."));
+        finish(d, q, [`Remaining letters: ${odd.join(" ")}`, `Start at ${x} and move ${n} places right in this list: **${ans}**`], "Write out the shortened list and count along it.", "Count in the new list, not in the full alphabet."), `String.fromCharCode(65+2*(${i0}+${n}))`);
     }
     // kind === 10: pairs with equal gaps in word and alphabet
     const WS = ["PLANET", "BRIDGE", "MARKET", "FLOWER", "DOCTOR", "SILVER", "CANDLE", "ORANGE", "WINDOW", "GARDEN", "TABLES", "HEARTS", "BOUNDS", "STRAND", "FRIEND", "DEFINE", "POINTS", "SMOOTH", "BASKET", "ACTION"];
@@ -166,7 +168,7 @@
       const q = `The letters of the word **${w}** are arranged in alphabetical order. Which letter is **${ord(n)}** from the ${fromRight ? "right" : "left"}?`;
       const alt = fromRight ? s[n - 1] : s[w.length - n];
       return mkL(rng, ans, [[alt, "Counted from the wrong end"], [w[n - 1], "Took the letter at that place in the original word"], [s[Math.min(w.length - 1, Math.max(0, (fromRight ? w.length - n : n - 1) + 1))], "One place too far"], [s[Math.max(0, (fromRight ? w.length - n : n - 1) - 1)], "One place too short"], [T(rng, [...w].filter((c) => c !== ans)), "Used an unsorted letter"]],
-        finish(d, q, [`Sorted letters: ${s.join(" ")}`, `The ${ord(n)} from the ${fromRight ? "right" : "left"} is **${ans}**.`], "Write the letters in A-to-Z order first, then count.", "Count from the end the question names; right and left give different letters."));
+        finish(d, q, [`Sorted letters: ${s.join(" ")}`, `The ${ord(n)} from the ${fromRight ? "right" : "left"} is **${ans}**.`], "Write the letters in A-to-Z order first, then count.", "Count from the end the question names; right and left give different letters."), `[...${J(w)}].sort()${fromRight ? ".reverse()" : ""}[${n - 1}]`);
     }
     if (kind === 3) {                             // rank in a list sharing prefixes
       const cl = T(rng, CLUSTERS), n = rng.int(4, Math.min(5, cl.length)), words = rng.shuffle(cl).slice(0, n);
@@ -181,8 +183,8 @@
       const sorted = words.slice().sort(), k = rng.int(1, 4), target = sorted[k - 1], ans = words.indexOf(target);
       const list = words.map((w, i) => `(${i + 1}) ${w}`).join("  ");
       const q = T(rng, [`Arrange the words in dictionary order: **${list}**. Which word comes **${ord(k)}**?`, `The words **${list}** are put in dictionary order. Which one is **${ord(k)}** in the order?`]);
-      const o = { opts: words.map((w, i) => `Word ${i + 1}: ${w}`), ans, why: words.map((w, i) => (i === ans ? null : `${w} is at position ${sorted.indexOf(w) + 1}, not ${k}`)) };
-      return Object.assign({ time: TIME[d] }, finish(d, q, [`Dictionary order: ${sorted.join(" < ")}`, `The ${ord(k)} word is ${target}, which is **Word ${ans + 1}**.`], "Sort by first letter, then second letter, then third.", "Do not count a longer word before the shorter word it starts with."), o, { calc: String(ans + 1) });
+      const o = { opts: words, ans, why: words.map((w, i) => (i === ans ? null : `${w} is at position ${sorted.indexOf(w) + 1}, not ${k}`)) };
+      return Object.assign({ time: TIME[d] }, finish(d, q, [`Dictionary order: ${sorted.join(" < ")}`, `The ${ord(k)} word is ${target}, which is the correct option.`], "Sort by first letter, then second letter, then third.", "Do not count a longer word before the shorter word it starts with."), o, { check: chkW(`${J(words)}.slice().sort()[${k - 1}]`) });
     }
     if (kind === 5) {                             // number of letters that keep their place after sorting
       const w = T(rng, DISTINCT.concat(PW)); const s = [...w].sort();

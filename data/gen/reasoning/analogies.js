@@ -8,8 +8,7 @@
   const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const pos = (c) => A.indexOf(c) + 1;
   const ch = (n) => A[(((n - 1) % 26) + 26) % 26];
-  const sumOf = (w) => [...w].reduce((a, c) => a + pos(c), 0);
-  const lab = (w) => (w.length === 1 ? `${w} (${pos(w)})` : `${w} (position sum ${sumOf(w)})`);
+  const chkW = (expr) => `q.opts[q.ans]===(${expr})&&q.opts.filter(o=>o===q.opts[q.ans]).length===1`;
   const T = (rng, arr) => rng.pick(arr);
   const TIME = { Easy: 35, Medium: 60, Hard: 90 };
   const N = (x) => QB.num(x);
@@ -20,16 +19,17 @@
       throw new Error("analogies: no clean question found");
     };
   }
-  function mkL(rng, a, wrongs, extra) {
-    const sums = new Set([sumOf(a)]), words = new Set([a]);
-    const pairs = [[lab(a), null]];
+  // chk = JS expression (as a string) that recomputes the answer text independently of the generator's variables
+  function mkL(rng, a, wrongs, extra, chk) {
+    const words = new Set([a]);
+    const pairs = [[a, null]];
     for (const [w, why] of wrongs) {
       if (pairs.length === 4) break;
-      if (!w || words.has(w) || sums.has(sumOf(w))) continue;
-      words.add(w); sums.add(sumOf(w)); pairs.push([lab(w), why]);
+      if (!w || words.has(w)) continue;
+      words.add(w); pairs.push([w, why]);
     }
     if (pairs.length < 4) return null;
-    return Object.assign({ time: TIME[extra.d] }, extra, QB.options(rng, pairs), { calc: String(sumOf(a)) });
+    return Object.assign({ time: TIME[extra.d] }, extra, QB.options(rng, pairs), { check: chkW(chk) });
   }
   const finish = (d, q, sol, short, trap) => ({ d, q, sol, short, trap });
 
@@ -146,6 +146,11 @@
     return mkL(rng, ans, wrongs, finish(d, q,
       [`Work out the rule from the first pair${nex === 2 ? " and confirm it with the second" : ""}: ${how}`, `Apply it to **${x}**: **${ans}**.`],
       "Write the alphabet positions of both words and compare them letter by letter; if they do not match in order, try the reversed word.",
-      "Check the direction of every shift and whether the word was reversed; a correct shift on the wrong order gives a tempting wrong option."));
+      "Check the direction of every shift and whether the word was reversed; a correct shift on the wrong order gives a tempting wrong option."),
+      (() => {
+        const src = (kind === "revshift" || kind === "revopp") ? `[...${JSON.stringify(x)}].reverse()` : `[...${JSON.stringify(x)}]`;
+        const op = (kind === "opp" || kind === "revopp") ? "String.fromCharCode(155-c.charCodeAt(0))" : `String.fromCharCode(65+((c.charCodeAt(0)-65+${JSON.stringify(v)}[i])%26+26)%26)`;
+        return `${src}.map((c,i)=>${op}).join("")`;
+      })());
   }) });
 })();

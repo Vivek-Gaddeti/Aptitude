@@ -1,8 +1,8 @@
 /* =====================================================================
    Calendars: generators for the catalog patterns marked gen:true
    (day-of-the-week-for, n-days-after-monday, repeating-calendar-years).
-   Weekday answers are shown as "Thursday (4)" (Sunday = 0 ... Saturday = 6) so
-   that tools/verify.js can machine-check them against JavaScript's Date (UTC).
+   Weekday answers are plain names ("Thursday"); each question carries a `check`
+   expression that recomputes the weekday independently (JavaScript Date, UTC).
    ===================================================================== */
 (function () {
   const T = (rng, arr) => rng.pick(arr);
@@ -11,7 +11,6 @@
   const MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const NAMES = ["Aarav", "Meera", "Rohit", "Sneha", "Kiran", "Divya", "Arjun", "Pooja", "Vikram", "Ananya", "Suresh", "Neha", "Imran", "Lakshmi", "Harsh", "Kavya", "Manoj", "Riya", "Farhan", "Tanvi", "Gopal", "Isha", "Naveen", "Shreya", "Deepak", "Nisha", "Rahul", "Swati", "Karthik", "Preeti"];
   const LEAD = ["", "", "Warm-up: ", "Mock test: ", "Try this: ", "Practice question: ", "Campus drive: ", "Interview round: ", "Quick one: "];
-  const NOTE = " *(In the options, Sunday = 0, Monday = 1, … Saturday = 6.)*";
   const isLeap = (y) => y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0);
   const utc = (y, m, d) => Date.UTC(y, m, d);
   const dow = (y, m, d) => new Date(utc(y, m, d)).getUTCDay();
@@ -21,7 +20,10 @@
   const mdays = (y, m) => [31, isLeap(y) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][m];
   const doy = (y, m, d) => { let n = d; for (let i = 0; i < m; i++) n += mdays(y, i); return n; };
   const dstr = (y, m, d) => `${d} ${MON[m]} ${y}`;
-  const dayTxt = (i) => `${DAY[i]} (${i})`;
+  const dayTxt = (i) => DAY[i];
+  const DAYJ = JSON.stringify(DAY);
+  // check: marked option equals the weekday named by index expression `ex`, and appears once among the options
+  const chk = (ex) => `q.opts[q.ans]===${DAYJ}[${ex}]&&q.opts.filter(o=>o===q.opts[q.ans]).length===1`;
 
   function wrap(fn) {
     return function (rng, d) {
@@ -49,7 +51,7 @@
     [mod7(x - 2), "Two odd days too few"],
     [mod7(x + 3), "Three odd days too many"],
   ]);
-  const fin = (d, q, sol, short, trap, calc, check) => { const r = { d, q, sol, short, trap, calc }; if (check) r.check = check; return r; };
+  const fin = (d, q, sol, short, trap, calc, check) => { const r = { d, q, sol, short, trap }; if (calc != null) r.calc = calc; if (check) r.check = check; return r; };
 
   /* ------------------------------------------------------------------ 1. day of the week for a date */
   const EVT = ["a train ticket is dated", "a certificate was issued on", "an exam was held on", "a letter is dated", "a cricket match began on", "a shop opened on", "a flight was booked for", "an agreement was signed on"];
@@ -65,7 +67,7 @@
         `1 January ${y} was a **${DAY[aw]}**. On which day of the week did **${dstr(y, m, dd)}** fall?`,
         `In ${y}, New Year's Day was a ${DAY[aw]}. ${nm} notes that ${ev} ${dstr(y, m, dd)}. What day of the week is that?`,
         `If 1 January ${y} fell on a ${DAY[aw]}, what day was ${dstr(y, m, dd)}?`,
-      ]) + NOTE;
+      ]);
       sol = [`Days from 1 January to ${dstr(y, m, dd)} = ${n}`, `${n} = 7 × ${Math.floor(n / 7)} + ${n % 7}, so ${n % 7} odd days`, `${DAY[aw]} + ${n % 7} = **${DAY[ans]}**`];
       short = `Count the days after 1 January (${n}), take the remainder when divided by 7, and move that many days forward from ${DAY[aw]}.`;
       trap = "Counting 1 January itself as day 1 shifts the answer by one day; the number of days AFTER 1 January is what matters.";
@@ -73,7 +75,7 @@
         [mod7(aw + (n + 1) % 7), "Counted the starting day as well (one day too many)"],
         [mod7(aw + Math.floor(n / 7)), "Moved forward by the number of weeks instead of the remainder"],
         [aw, "Took the number of days as a whole number of weeks"],
-      ]), fin(d, q, sol, short, trap, `new Date(Date.UTC(${y},${m},${dd})).getUTCDay()`, `new Date(Date.UTC(${y},0,1)).getUTCDay()===${aw}`));
+      ]), fin(d, q, sol, short, trap, undefined, chk(`new Date(Date.UTC(${y},${m},${dd})).getUTCDay()`) + `&&new Date(Date.UTC(${y},0,1)).getUTCDay()===${aw}`));
     }
     if (d === "Medium") {
       y = rng.int(2001, 2040); [m, dd] = rd(y);
@@ -87,7 +89,7 @@
         `**${dstr(ay, am, ad)}** was a **${DAY[aw]}**. What day of the week was **${dstr(y, m, dd)}**?`,
         `${nm} knows that ${dstr(ay, am, ad)} fell on a ${DAY[aw]}. On which day of the week did ${dstr(y, m, dd)} fall?`,
         `Given that ${ev} ${dstr(ay, am, ad)}, a ${DAY[aw]}, find the day of the week on ${dstr(y, m, dd)}.`,
-      ]) + NOTE;
+      ]);
       const fw = N > 0 ? "after" : "before";
       sol = [`Days from ${dstr(ay, am, ad)} to ${dstr(y, m, dd)} = ${Math.abs(N)} (${lp} leap day${lp === 1 ? "" : "s"} included)`, `${Math.abs(N)} = 7 × ${Math.floor(Math.abs(N) / 7)} + ${Math.abs(N) % 7}, so ${Math.abs(N) % 7} odd days ${fw}`, `${DAY[aw]} ${N > 0 ? "+" : "−"} ${Math.abs(N) % 7} = **${DAY[ans]}**`];
       short = "Odd days = (ordinary years + 2 × leap years) mod 7, plus the extra days of the months; do not forget 29 February.";
@@ -96,7 +98,7 @@
         [mod7(ans - (N > 0 ? 1 : -1) * Math.sign(1) * lp), lp ? "Ignored the leap day(s) in the gap" : "Moved in the wrong direction"],
         [mod7(aw - (N > 0 ? -1 : 1) * (Math.abs(N) % 7)), "Moved in the wrong direction (before instead of after, or the reverse)"],
         [aw, "Assumed the gap is a whole number of weeks"],
-      ]), fin(d, q, sol, short, trap, `new Date(Date.UTC(${y},${m},${dd})).getUTCDay()`, `new Date(Date.UTC(${ay},${am},${ad})).getUTCDay()===${aw}`));
+      ]), fin(d, q, sol, short, trap, undefined, chk(`new Date(Date.UTC(${y},${m},${dd})).getUTCDay()`) + `&&new Date(Date.UTC(${ay},${am},${ad})).getUTCDay()===${aw}`));
     }
     // Hard: no anchor, century odd days
     y = T(rng, [rng.int(1801, 1999), rng.int(1901, 2099), rng.int(1951, 2099)]); [m, dd] = rd(y);
@@ -108,7 +110,7 @@
       `On which day of the week did **${dstr(y, m, dd)}** fall?`,
       `${nm} reads that ${ev} ${dstr(y, m, dd)}. Which day of the week was that?`,
       `Find the day of the week on ${dstr(y, m, dd)}.`,
-    ]) + NOTE;
+    ]);
     const c100 = Math.floor(Y1 / 100) * 100;
     sol = [
       `Take the ${Y1} completed years before ${y}: ${c100 > 0 ? c100 + " years give " + cOdd + " odd day" + (cOdd === 1 ? "" : "s") + " (100 → 5, 200 → 3, 300 → 1, 400 → 0)" : "no full centuries"}`,
@@ -122,7 +124,7 @@
       [mod7(ans - 1), "Counted the completed years up to the date's own year (or missed the date itself)"],
       [mod7(ans + (isLeap(y) && m > 1 ? 0 : 0) + (cOdd === 0 ? 5 : cOdd - 0 === 5 ? -5 : 1)), "Used a wrong odd-day value for the century"],
       [mod7(ans + Math.floor(r / 4)), "Counted the leap years twice"],
-    ]), fin(d, q, sol, short, trap, `new Date(Date.UTC(${y},${m},${dd})).getUTCDay()`));
+    ]), fin(d, q, sol, short, trap, undefined, chk(`new Date(Date.UTC(${y},${m},${dd})).getUTCDay()`)));
   }) });
 
   /* ------------------------------------------------------------------ 2. n days after a given day */
@@ -139,7 +141,7 @@
         `${nm} starts a course on a ${dx}. What day of the week will it be ${N} days after the start?`,
         `If it is ${dx} today, what will be the day after ${N} days?`,
         `A parcel is booked on a ${dx} and arrives ${N} days later. On which day does it arrive?`,
-      ]) + NOTE;
+      ]);
       sol = [`${N} = 7 × ${Math.floor(N / 7)} + ${k}, so only ${k} odd day${k === 1 ? "" : "s"} matter`, `${dx} + ${k} = **${DAY[ans]}**`];
       short = `Divide ${N} by 7 and keep the remainder (${k}); move that many days forward.`;
       trap = "Use the remainder after dividing by 7, not the quotient.";
@@ -152,7 +154,7 @@
         const back = rng.int(1, 3); // day before yesterday etc.
         const td = mod7(x + 2);       // x = day before yesterday -> today = x + 2
         ans = mod7(td + 1 + N);
-        q = lead + `If the day before yesterday was **${dx}**, what day of the week will it be **${N} days** after tomorrow?` + NOTE;
+        q = lead + `If the day before yesterday was **${dx}**, what day of the week will it be **${N} days** after tomorrow?`;
         sol = [`Day before yesterday is ${dx}, so today is ${DAY[td]} and tomorrow is ${DAY[mod7(td + 1)]}`, `${N} = 7 × ${Math.floor(N / 7)} + ${N % 7}`, `${DAY[mod7(td + 1)]} + ${N % 7} = **${DAY[ans]}**`];
         short = "Fix today first, then count from tomorrow with the remainder after dividing by 7.";
         trap = "Counting from today (instead of tomorrow) or from the day before yesterday shifts the answer.";
@@ -164,7 +166,7 @@
         q = lead + T(rng, [
           `Today is **${dx}**. What day of the week was it **${N} days ago**?`,
           `${nm} finds an old receipt dated ${N} days before a ${dx}. On which day of the week was it issued?`,
-        ]) + NOTE;
+        ]);
         sol = [`${N} = 7 × ${Math.floor(N / 7)} + ${N % 7}, so ${N % 7} odd days backwards`, `${dx} − ${N % 7} = **${DAY[ans]}**`];
         short = "Going back, subtract the remainder after dividing by 7.";
         trap = "Adding the remainder instead of subtracting it gives the day after.";
@@ -173,7 +175,7 @@
       } else {
         const date = rng.int(1, 9), tgt = date + rng.int(8, 21) + (rng.chance(0.4) ? 7 : 0);
         ans = mod7(x + tgt - date);
-        q = lead + `If the **${date}th** of a certain month is a **${dx}**, what day of the week is the **${tgt}th** of the same month?`.replace(/(\d)th/g, (m0, n0) => n0 + ({ 1: "st", 2: "nd", 3: "rd" }[n0] || "th")) + NOTE;
+        q = lead + `If the **${date}th** of a certain month is a **${dx}**, what day of the week is the **${tgt}th** of the same month?`.replace(/(\d)th/g, (m0, n0) => n0 + ({ 1: "st", 2: "nd", 3: "rd" }[n0] || "th"));
         q = q.replace(/\b(\d+)(st|nd|rd|th)\b/g, (m1, n1) => { const n = +n1, s = (n % 100 >= 11 && n % 100 <= 13) ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th"); return n + s; });
         sol = [`Difference in dates = ${tgt} − ${date} = ${tgt - date} days`, `${tgt - date} = 7 × ${Math.floor((tgt - date) / 7)} + ${(tgt - date) % 7}`, `${dx} + ${(tgt - date) % 7} = **${DAY[ans]}**`];
         short = "Same month: the day shifts by (difference in dates) mod 7.";
@@ -188,7 +190,7 @@
         const td = mod7(x + 1);
         const dir = rng.chance(0.5);
         ans = dir ? mod7(x + 2 + N) : mod7(x + 2 - N);
-        q = lead + (dir ? `Yesterday was **${dx}**. What day of the week will it be **${N} days** from tomorrow?`.replace("from tomorrow", "after tomorrow") : `Yesterday was **${dx}**. What day of the week was it **${N} days before** tomorrow?`) + NOTE;
+        q = lead + (dir ? `Yesterday was **${dx}**. What day of the week will it be **${N} days** from tomorrow?`.replace("from tomorrow", "after tomorrow") : `Yesterday was **${dx}**. What day of the week was it **${N} days before** tomorrow?`);
         sol = [`Yesterday was ${dx}, so today is ${DAY[td]} and tomorrow is ${DAY[mod7(td + 1)]}`, `${N} = 7 × ${Math.floor(N / 7)} + ${N % 7}`, `${DAY[mod7(td + 1)]} ${dir ? "+" : "−"} ${N % 7} = **${DAY[ans]}**`];
         short = "Move to tomorrow first, then apply the remainder (forward or backward).";
         trap = "Counting from today or from yesterday shifts the answer by one or two days.";
@@ -201,18 +203,18 @@
         const m1 = (m0 + span) % 12, y1 = y + Math.floor((m0 + span) / 12);
         const wk = dow(y, m0, 1);
         ans = dow(y1, m1, 1);
-        q = lead + `**1 ${MON[m0]} ${y}** was a **${DAY[wk]}**. What day of the week was **1 ${MON[m1]} ${y1}**?` + NOTE;
+        q = lead + `**1 ${MON[m0]} ${y}** was a **${DAY[wk]}**. What day of the week was **1 ${MON[m1]} ${y1}**?`;
         sol = [`Days from 1 ${MON[m0]} to 1 ${MON[m1]}: ${Array.from({ length: span }, (_, i) => mdays(y + Math.floor((m0 + i) / 12), (m0 + i) % 12)).join(" + ")} = ${days}`, `${days} = 7 × ${Math.floor(days / 7)} + ${days % 7}`, `${DAY[wk]} + ${days % 7} = **${DAY[ans]}**`];
         short = "Add up the days of the months in between, keep the remainder mod 7, and move forward.";
         trap = "Using 30 days for every month (or 28 for February in a leap year) shifts the answer.";
         const wrongM = [30 * span, 31 * span, days + 1, days - 1];
-        return build(rng, dayTxt, ans, wrongM.map((w, i) => [mod7(wk + w), ["Treated every month as 30 days", "Treated every month as 31 days", "Counted one day too many", "Counted one day too few"][i]]).concat(dayWrongs(ans, [])), fin(d, q, sol, short, trap, `new Date(Date.UTC(${y1},${m1},1)).getUTCDay()`, `new Date(Date.UTC(${y},${m0},1)).getUTCDay()===${wk}`));
+        return build(rng, dayTxt, ans, wrongM.map((w, i) => [mod7(wk + w), ["Treated every month as 30 days", "Treated every month as 31 days", "Counted one day too many", "Counted one day too few"][i]]).concat(dayWrongs(ans, [])), fin(d, q, sol, short, trap, undefined, chk(`new Date(Date.UTC(${y1},${m1},1)).getUTCDay()`) + `&&new Date(Date.UTC(${y},${m0},1)).getUTCDay()===${wk}`));
       } else {
         const wks = rng.int(3, 40), ex = rng.int(1, 6);
         N = wks * 7 + ex;
         const hrs = rng.int(1, 4);
         ans = mod7(x + N);
-        q = lead + `${nm} left home on a **${dx}** and returned **${wks} weeks and ${ex} day${ex === 1 ? "" : "s"}** later. On which day of the week did ${nm} return?` + NOTE;
+        q = lead + `${nm} left home on a **${dx}** and returned **${wks} weeks and ${ex} day${ex === 1 ? "" : "s"}** later. On which day of the week did ${nm} return?`;
         sol = [`${wks} weeks is a whole number of weeks, so it leaves 0 odd days`, `Only the extra ${ex} day${ex === 1 ? "" : "s"} count: ${dx} + ${ex} = **${DAY[ans]}**`];
         short = "Whole weeks do not change the day; only the leftover days do.";
         trap = `Adding the ${wks} weeks as days shifts the answer.`;
@@ -220,7 +222,7 @@
         extraW = [[mod7(x + wks + ex), "Added the weeks as if each were one day"], [mod7(x + wks), "Ignored the extra days"], [mod7(x + ex - 1), "Counted one day too few"]];
       }
     }
-    return build(rng, dayTxt, ans, extraW.concat(dayWrongs(ans, [])), fin(d, q, sol, short, trap, calc));
+    return build(rng, dayTxt, ans, extraW.concat(dayWrongs(ans, [])), fin(d, q, sol, short, trap, undefined, chk(calc)));
   }) });
 
   /* ------------------------------------------------------------------ 3. repeating calendar years */

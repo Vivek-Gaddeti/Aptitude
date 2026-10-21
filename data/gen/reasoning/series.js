@@ -1,14 +1,13 @@
 /* =====================================================================
    Series: letter series, alphanumeric series, letter clusters, repeating
-   patterns. Letter answers carry their alphabet position in brackets so
-   that every option is machine-checkable.
+   patterns. Letter answers are plain text; each generated question carries a
+   `check` expression that recomputes the answer and proves it is unique.
    ===================================================================== */
 (function () {
   const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const pos = (c) => A.indexOf(c) + 1;
   const ch = (n) => A[(((n - 1) % 26) + 26) % 26];
-  const sumOf = (w) => [...w].reduce((a, c) => a + pos(c), 0);
-  const lab = (w) => (w.length === 1 ? `${w} (${pos(w)})` : `${w} (position sum ${sumOf(w)})`);
+  const chkW = (expr) => `q.opts[q.ans]===(${expr})&&q.opts.filter(o=>o===q.opts[q.ans]).length===1`;
   const T = (rng, arr) => rng.pick(arr);
   const TIME = { Easy: 35, Medium: 60, Hard: 90 };
   const sg = (x) => (x < 0 ? "−" + -x : "+" + x);
@@ -18,30 +17,32 @@
       throw new Error("series: no clean question found");
     };
   }
-  // ans = correct word, wrongs = [[word, why], ...]; options show the letter positions
-  function mkL(rng, a, wrongs, extra) {
-    const sums = new Set([sumOf(a)]), words = new Set([a]);
-    const pairs = [[lab(a), null]];
+  // ans = correct word, wrongs = [[word, why], ...]
+  // chk = JS expression (as a string) that recomputes the answer text independently of the generator's variables
+  function mkL(rng, a, wrongs, extra, chk) {
+    const words = new Set([a]);
+    const pairs = [[a, null]];
     for (const [w, why] of wrongs) {
       if (pairs.length === 4) break;
-      if (!w || words.has(w) || sums.has(sumOf(w))) continue;
-      words.add(w); sums.add(sumOf(w)); pairs.push([lab(w), why]);
+      if (!w || words.has(w)) continue;
+      words.add(w); pairs.push([w, why]);
     }
     if (pairs.length < 4) return null;
-    return Object.assign({ time: TIME[extra.d] }, extra, QB.options(rng, pairs), { calc: String(sumOf(a)) });
+    return Object.assign({ time: TIME[extra.d] }, extra, QB.options(rng, pairs), { check: chkW(chk) });
   }
   const finish = (d, q, sol, short, trap) => ({ d, q, sol, short, trap });
   const inRange = (arr) => arr.every((x) => x >= 1 && x <= 26);
 
   /* ------------------------------------------------------------ 1. letter series */
   QB.gen("reasoning/series/letter-series", { title: "Letter series", gen: wrap((rng, d) => {
-    let p = [], rule, hide, steps;
+    let p = [], rule, hide, steps, pex = null;
     const sign = () => (rng.chance(0.3) ? -1 : 1);
     if (d === "Easy") {
       const s = rng.int(1, 4) * sign(), n = rng.int(6, 7), st = rng.int(1, 26);
       for (let i = 0; i < n; i++) p.push(st + s * i);
       rule = `every letter is ${Math.abs(s)} place${Math.abs(s) > 1 ? "s" : ""} ${s > 0 ? "after" : "before"} the previous one (${sg(s)} each time)`;
       hide = rng.chance(0.6) ? n - 1 : rng.int(2, n - 2);
+      pex = `${st}+${s}*${hide}`;
     } else if (d === "Medium") {
       const n = rng.int(7, 8), st = rng.int(1, 26);
       if (rng.chance(0.5)) {
@@ -50,11 +51,13 @@
         p.push(st); for (let i = 1; i < n; i++) p.push(p[i - 1] + (i % 2 ? a : b));
         rule = `the gaps alternate ${sg(a)}, ${sg(b)}, ${sg(a)}, ${sg(b)}, …`;
         hide = rng.chance(0.6) ? n - 1 : rng.int(3, n - 2);
+        pex = `${st}+Math.ceil(${hide}/2)*${a}+Math.floor(${hide}/2)*${b}`;
       } else {
         const a = rng.int(1, 4) * sign(), b = rng.int(1, 4) * sign(), s2 = rng.int(1, 26);
         for (let i = 0; i < n; i++) p.push(i % 2 === 0 ? st + a * (i / 2) : s2 + b * ((i - 1) / 2));
         rule = `two series are woven together: the 1st, 3rd, 5th… letters move ${sg(a)} each time and the 2nd, 4th, 6th… letters move ${sg(b)}`;
         hide = n - 1;
+        pex = `${hide % 2 === 0 ? st + "+" + a + "*" + (hide / 2) : s2 + "+" + b + "*" + ((hide - 1) / 2)}`;
       }
     } else {
       const k = rng.int(0, 2), n = k === 2 ? 9 : rng.int(7, 8), st = rng.int(1, 26);
@@ -63,17 +66,20 @@
         p.push(st); for (let i = 1; i < n; i++) p.push(p[i - 1] + (s0 + inc * (i - 1)));
         rule = `the gaps keep changing: ${sg(s0)}, ${sg(s0 + inc)}, ${sg(s0 + 2 * inc)}, … (each gap is ${inc > 0 ? "bigger" : "smaller"} by ${Math.abs(inc)})`;
         hide = n - 1;
+        pex = `${st}+${s0}*${hide}+${inc}*${hide}*(${hide}-1)/2`;
       } else if (k === 1) {
         const a = rng.int(2, 5), b = rng.int(1, 4), s2 = rng.int(1, 26);
         for (let i = 0; i < n; i++) p.push(i % 2 === 0 ? st + a * (i / 2) : s2 - b * ((i - 1) / 2));
         rule = `two series are woven together: the 1st, 3rd, 5th… letters move ${sg(a)} each time, while the 2nd, 4th, 6th… move ${sg(-b)}`;
         hide = n - 1;
+        pex = `${hide % 2 === 0 ? st + "+" + a + "*" + (hide / 2) : s2 + "-" + b + "*" + ((hide - 1) / 2)}`;
       } else {
         const g = [rng.int(1, 4), rng.int(1, 4) * sign(), rng.int(1, 4)];
         if (g[0] === g[1] || g[1] === g[2]) return null;
         p.push(st); for (let i = 1; i < n; i++) p.push(p[i - 1] + g[(i - 1) % 3]);
         rule = `the gaps repeat in a cycle of three: ${sg(g[0])}, ${sg(g[1])}, ${sg(g[2])}`;
         hide = n - 1;
+        pex = `${st}+Array.from({length:${hide}},(_,i)=>[${g.join(",")}][i%3]).reduce((a,b)=>a+b,0)`;
       }
     }
     if (!inRange(p)) return null;
@@ -95,7 +101,7 @@
     ], finish(d, q,
       [`Positions: ${p.map((x) => `${ch(x)}=${x}`).join(", ")}`, `Rule: ${rule}`, `The missing letter is **${ans}** (position ${p[hide]}).`],
       "Write the alphabet positions under each letter and look at the gaps; the rule appears at once.",
-      "Do not judge the series by the first gap alone: check that the same gap works for every pair."));
+      "Do not judge the series by the first gap alone: check that the same gap works for every pair."), `String.fromCharCode(64+(${pex || p[hide]}))`);
   }) });
 
   /* ------------------------------------------------------------ 2. alphanumeric series */
@@ -187,7 +193,8 @@
     return mkL(rng, ans, wrongs, finish(d, q,
       [`Look at each position separately. From one cluster to the next: ${stepTxt}.`, `Cluster ${shown + 1} = **${ans}**.`],
       "Track the 1st, 2nd and 3rd letters as three small series; each has its own step.",
-      "Clusters often look random until you stop reading them as words and track one position at a time."));
+      "Clusters often look random until you stop reading them as words and track one position at a time."),
+      `${JSON.stringify(base)}.map((b,j)=>String.fromCharCode(64+b+${JSON.stringify(step)}[j]*${shown})).join("")`);
   }) });
 
   /* ------------------------------------------------------------ 4. repeating patterns */
@@ -222,6 +229,7 @@
     return mkL(rng, ans, wrongs, finish(d, q,
       [`The block **${unit.join("")}** repeats (${Lg} letters at a time).`, `Writing it out in full: ${full.join(" ")}`, `Blank${nb > 1 ? "s" : ""} in order: **${ans}**.`],
       `Find the block that repeats (here ${Lg} letters) and read the blank${nb > 1 ? "s" : ""} off from the same place in another repeat.`,
-      "Count the position inside the block, not the position from the start of the whole row."));
+      "Count the position inside the block, not the position from the start of the whole row."),
+      `${JSON.stringify(idx)}.map(i=>${JSON.stringify(unit.join(""))}[i%${Lg}]).join("")`);
   }) });
 })();

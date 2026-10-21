@@ -121,15 +121,17 @@
   }
   QB.gen("reasoning/classification/letter-groups", { title: "Classification: letter groups", gen: wrap((rng, d) => {
     const m = d === "Hard" ? rng.int(3, 4) : 3;
-    let rule, mkSat, mkUns, txt, neg;
+    let rule, mkSat, mkUns, txt, neg, pred;
     if (d === "Easy") {
       const k = T(rng, ["gap", "gap", "cons"]);
       if (k === "gap") {
         const g = rng.int(1, 3), g2 = T(rng, [1, 2, 3, 4].filter((x) => x !== g));
         rule = "gap"; txt = `the letters go up by ${g} place${g > 1 ? "s" : ""} each time`; neg = `its letters go up by ${g2}, not ${g}`;
         mkSat = () => ap(rng, m, g); mkUns = () => ap(rng, m, g2);
+        pred = `w=>[...w].every((c,i,a)=>i===0||c.charCodeAt(0)-a[i-1].charCodeAt(0)===%s)`.replace("%s", g);
       } else {
         rule = "cons"; txt = "all the letters are consonants"; neg = "it contains a vowel";
+        pred = "w=>![...w].some(c=>\"AEIOU\".includes(c))";
         mkSat = () => sortedRand(rng, m, cons);
         mkUns = () => { let w; do { w = sortedRand(rng, m, [...A]); } while (![...w].some((c) => vow.includes(c)) || [...w].filter((c) => vow.includes(c)).length > 1); return w; };
       }
@@ -140,29 +142,35 @@
         rule = "desc"; txt = "the letters run backwards through the alphabet"; neg = "its letters run forwards";
         mkSat = () => ap(rng, m, -(rng.int(1, 3))); mkUns = () => ap(rng, m, g2) ;
         void g;
+        pred = "w=>[...w].every((c,i,a)=>i===0||c.charCodeAt(0)<a[i-1].charCodeAt(0))";
       } else if (k === "sumE") {
         const par = rng.int(0, 1);
         rule = "sumE"; txt = `the positions of the letters add up to an ${par ? "odd" : "even"} number`; neg = `the positions add up to an ${par ? "even" : "odd"} number`;
+        pred = `w=>[...w].reduce((a,c)=>a+c.charCodeAt(0)-64,0)%2===${par}`;
         mkSat = () => { let w; do { w = sortedRand(rng, m, [...A]); } while (sum(w) % 2 !== par); return w; };
         mkUns = () => { let w; do { w = sortedRand(rng, m, [...A]); } while (sum(w) % 2 === par); return w; };
       } else {
         const g = rng.int(2, 4);
         rule = "gap"; txt = `each letter is ${g} places after the one before it`; neg = `the gaps between its letters are not all ${g}`;
+        pred = `w=>[...w].every((c,i,a)=>i===0||c.charCodeAt(0)-a[i-1].charCodeAt(0)===%s)`.replace("%s", g);
         mkSat = () => ap(rng, m, g); mkUns = () => { let w; do { w = sortedRand(rng, m, [...A]); } while (apGap(w) !== null); return w; };
       }
     } else {
       const k = T(rng, ["ends27", "sum3", "mid"]);
       if (k === "ends27") {
         rule = "ends27"; txt = "the first and last letters are opposite letters (their positions add up to 27)"; neg = "its first and last letters are not opposites";
+        pred = "w=>w.charCodeAt(0)+w.charCodeAt(w.length-1)===155";
         mkSat = () => { const a = rng.int(1, 13); const mid = []; for (let i = 0; i < m - 2; i++) mid.push(ch(rng.int(1, 26))); return ch(a) + mid.join("") + ch(27 - a); };
         mkUns = () => { let w; do { w = Array.from({ length: m }, () => ch(rng.int(1, 26))).join(""); } while (pos(w[0]) + pos(w[m - 1]) === 27); return w; };
       } else if (k === "sum3") {
         rule = "sum3"; txt = "the positions of the letters add up to a multiple of 3"; neg = "its positions do not add up to a multiple of 3";
+        pred = "w=>[...w].reduce((a,c)=>a+c.charCodeAt(0)-64,0)%3===0";
         mkSat = () => { let w; do { w = sortedRand(rng, m, [...A]); } while (sum(w) % 3 !== 0); return w; };
         mkUns = () => { let w; do { w = sortedRand(rng, m, [...A]); } while (sum(w) % 3 === 0); return w; };
       } else {
         if (m !== 3) return null;
         rule = "mid"; txt = "the middle letter is exactly halfway between the other two"; neg = "its middle letter is not halfway between the other two";
+        pred = "w=>2*w.charCodeAt(1)===w.charCodeAt(0)+w.charCodeAt(2)";
         mkSat = () => { const g = rng.int(1, 5) * (rng.chance(0.3) ? -1 : 1); return ap(rng, 3, g); };
         mkUns = () => { let w; do { w = sortedRand(rng, 3, [...A]); } while (apGap(w) !== null); return w; };
       }
@@ -181,11 +189,11 @@
       `Which letter group does not belong with the others? **${list}**`,
       `Choose the letter group that is different from the rest: **${list}**`,
     ]);
-    const o = { opts: groups.map((w, i) => `Group ${i + 1}: ${w}`), ans: odd, why: groups.map((w, i) => (i === odd ? null : `${w} follows the common rule, so it is not the odd one`)) };
+    const o = { opts: groups, ans: odd, why: groups.map((w, i) => (i === odd ? null : `${w} follows the common rule, so it is not the odd one`)) };
     return Object.assign({ time: TIME[d] }, finish(d, q,
-      [`Write the alphabet positions of each group: ${groups.map((w) => `${w} = ${wpos(w).join("-")}`).join("; ")}.`, `In ${tri.join(", ")} ${txt}; in **${one}** ${neg}.`, `The odd one out is **Group ${odd + 1}: ${one}**.`],
+      [`Write the alphabet positions of each group: ${groups.map((w) => `${w} = ${wpos(w).join("-")}`).join("; ")}.`, `In ${tri.join(", ")} ${txt}; in **${one}** ${neg}.`, `The odd one out is **${one}**.`],
       "Convert each group to alphabet positions, then compare gaps, order, vowels and sums.",
       "More than one property may split the groups 2 and 2; the rule is the one that puts three together."),
-    o, { calc: String(odd + 1) });
+    o, { check: `q.opts[q.ans]===${JSON.stringify(one)}&&q.opts.filter(o=>o===q.opts[q.ans]).length===1&&(p=>q.opts.filter(p).length===3&&!p(q.opts[q.ans]))(${pred})` });
   }) });
 })();

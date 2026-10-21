@@ -57,7 +57,9 @@
     return Object.assign({ time: TIME[extra.d] }, extra, o);
   }
   const LEAD = ["", "", "Warm-up: ", "Mock test: ", "Try this: ", "Practice question: ", "Campus drive: ", "Interview round: ", "Quick one: "];
-  const fin = (d, q, sol, short, trap, calc) => ({ d, q, sol, short, trap, calc });
+  const fin = (d, q, sol, short, trap, calc, check) => { const r = { d, q, sol, short, trap }; if (calc != null) r.calc = calc; if (check) r.check = check; return r; };
+  // check for an H:MM answer: marked option equals the clock reading of `ex` minutes after 12:00 and is unique among the options
+  const chkT = (ex) => `(f=>q.opts[q.ans]===f(${ex})&&q.opts.filter(o=>o===q.opts[q.ans]).length===1)(x=>{x=((x%720)+720)%720;return (Math.floor(x/60)||12)+":"+String(x%60).padStart(2,"0")})`;
   const clk = (h, m) => `**${h}:${pad(m)}**`;
 
   /* ------------------------------------------------------------------ 1. angle at a time */
@@ -204,7 +206,7 @@
         [`Error after ${n} hours = ${g} × ${n} = ${err} minutes`, `The clock ${word} time, so it shows the true time ${gain ? "plus" : "minus"} ${err} min`, `Shown time = **${tf(ans)}**`],
         `Total error = rate × hours = ${g} × ${n} = ${err} min; ${gain ? "add" : "subtract"} it to the true time.`,
         `A clock that ${word} time is ${gain ? "ahead of" : "behind"} the true time, so the error is ${gain ? "added" : "subtracted"}.`,
-        ratioCalc(tf(ans))), true);
+        undefined, chkT(`${(s + n) * 60}+${sg}*${g}*${n}`)), true);
     }
     if (d === "Medium") {
       const g = T(rng, gain ? [5, 6, 10, 12, 15, 20] : [4, 5, 6, 10, 12, 15]), n = rng.int(2, 8), m0 = T(rng, [10, 15, 20, 25, 30, 40, 45, 50]), s = rng.int(1, 8);
@@ -228,7 +230,7 @@
         [`In 60 minutes of true time the clock moves ${rate} minutes`, `Clock time elapsed = ${tf(shown)} − ${tf(start)} = ${C} min`, `True time elapsed = ${C} × 60 ÷ ${rate} = ${n * 60} min`, `True time = ${tf(start)} + ${n} h = **${tf(real)}**`],
         `Clock minutes : true minutes = ${rate} : 60. Divide the clock's elapsed time by ${rate} and multiply by 60.`,
         `The clock's elapsed time is NOT the true elapsed time: scale it by 60/${rate}.`,
-        ratioCalc(tf(real))), true);
+        undefined, chkT(`${start}+(${shown}-${start})*60/${rate}`)), true);
     }
     // Hard
     if (rng.chance(0.5)) {
@@ -279,8 +281,6 @@
       `If the interval is SHORTER than 65 5/11 min the clock ${"gains"}; if longer it loses. Do not use 65 min as the standard.`,
       String(gabs)), false);
   }) });
-  // calc string for a time shown as H:MM: compare as the ratio H/MM
-  function ratioCalc(s) { if (s == null) return "0"; const p = s.split(":"); return `${+p[0]}/${+p[1]}`; }
 
   /* ------------------------------------------------------------------ 4. clock in a mirror */
   QB.gen("quant/clocks/clock-in-a-mirror", { title: "Clock seen in a mirror", gen: wrap((rng, d) => {
@@ -307,7 +307,7 @@
         [`Real time now = 11:60 − ${reading} = ${tf(real)}`, `After ${n} min: ${tf(real)} + ${n} min = **${tf(ans)}**`],
         `Real time = 11:60 − mirror reading; then add the ${n} minutes to the REAL time.`,
         "The elapsed minutes belong to the real clock, not to the mirror image.",
-        ratioCalc(tf(ans))), true);
+        undefined, chkT(`720-${R}+${n}`)), true);
     }
     let t, h, m;
     if (d === "Easy") { h = rng.int(1, 12); m = T(rng, [15, 30, 45]); }
@@ -341,6 +341,6 @@
       [`Mirror image time = 11:60 − actual time (equivalently 12:00 − time)`, `11:60 − ${shownT.replace(/^(\d+):/, "$1:")} = **${tf(ansT)}**`],
       "Subtract from 11:60 (or from 12:00): the hours go to 11 − H and the minutes to 60 − M.",
       "Subtracting only the hours or only the minutes gives a wrong reflection.",
-      ratioCalc(tf(ansT))), true);
+      undefined, chkT(`720-${back ? mir : t}`)), true);
   }) });
 })();
