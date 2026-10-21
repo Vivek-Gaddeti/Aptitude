@@ -751,10 +751,11 @@
     "DI": ["chart", "grow"], "Practice": ["target", "blink"], "Mock tests": ["timer", "wiggle"], "Placement strategy": ["compass", "spin"],
     "Revision": ["repeat", "spin"], "Review & mistakes": ["repeat", "spin"], "Cheat sheet": ["sigma", "tilt"],
   };
-  // soft per-link colours by link index: Dashboard blue, Quant mint, Reasoning lavender, Verbal pink, DI teal, Practice peach, Revision indigo
+  // per-link colours by link index
   // [colour for the pill/icons, readable shade for text & buttons in light mode, readable shade in dark mode]
-  const NAV_COLORS = [["#4f7cff", "#4268d6", "#6d93ff"], ["#1fae7a", "#177f59", "#2fc28d"], ["#8b6cf0", "#785dce", "#9d84f3"],
-    ["#e2609a", "#b34c7a", "#e874a8"], ["#22a3b6", "#197a88", "#33b5c8"], ["#ec8a4f", "#a35f37", "#ef9a65"], ["#6d6af0", "#5552c9", "#8f8cf5"]];
+  // neo-brutalist palette: Dashboard raspberry, Quant pink, Reasoning green, Verbal yellow, DI blue, Practice orange, Revision lilac
+  const NAV_COLORS = [["#FF6F9C", "#D6245F", "#FF6F9C"], ["#FF8AB0", "#B8124A", "#FF8AB0"], ["#3DDC84", "#0B7A43", "#3DDC84"],
+    ["#FFD23F", "#8A5A00", "#FFD23F"], ["#8EC5FF", "#1F5FA8", "#8EC5FF"], ["#FF9F5A", "#A8460B", "#FF9F5A"], ["#B79CFF", "#5B3CC4", "#B79CFF"]];
   const navIcon = (label) => { const ic = NAV_ICONS[label.replace("↗", "").trim()]; return ic ? `<svg class="ni ni-${ic[1]}" viewBox="0 0 24 24" aria-hidden="true">${NAV_SVG[ic[0]]}</svg>` : ""; };
   const dueCount = () => Object.values(Store.load().items).filter((it) => Store.isDue(it)).length;
   const badgeHTML = (n) => (n ? `<span class="nav-badge pulse">${n > 99 ? "99+" : n}</span>` : "");

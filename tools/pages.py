@@ -28,10 +28,11 @@ HEAD = '''<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&display=optional">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap">
 <link rel="stylesheet" href="assets/style.css">
 <link rel="stylesheet" href="assets/fx/fx.css">
 <link rel="stylesheet" href="assets/practice.css">
+<link rel="stylesheet" href="assets/brutal.css">
 <script>try{{var h=document.documentElement,t=localStorage.getItem('theme');if(t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches)h.dataset.theme='dark';var a=localStorage.getItem('anim');h.dataset.anim=a==='on'||(a!=='off'&&!matchMedia('(prefers-reduced-motion: reduce)').matches)?'on':'off'}}catch(e){{}}</script>
 </head>
 <body>

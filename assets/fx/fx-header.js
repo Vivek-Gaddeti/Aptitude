@@ -202,7 +202,7 @@
     sT = 0;
     const y = scrollY;
     if (!small && y > 70) small = true; else if (small && y < 12) small = false;   // gap avoids flicker
-    root.style.setProperty("--top-h", small ? "48px" : "56px");
+    root.style.setProperty("--top-h", small ? "var(--top-small, 48px)" : "var(--top-big, 56px)");   // sizes come from the CSS
     if (bar) bar.classList.toggle("scrolled", y > 4);
   }
   window.addEventListener("scroll", () => { if (!sT) sT = requestAnimationFrame(onScroll); }, { passive: true });
