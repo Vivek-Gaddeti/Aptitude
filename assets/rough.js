@@ -267,7 +267,12 @@
     if (window.ResizeObserver) new ResizeObserver(fit).observe(canvas);
     window.addEventListener("resize", fit);
     new MutationObserver(function () { tintAll(); redraw(); }).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
-    var hd = doc.getElementById("topbar"); if (hd && hd.offsetHeight) drawer.style.setProperty("--rw-top", hd.getBoundingClientRect().bottom + "px");
+  }
+  // the drawer starts under the header as it is right now (0 when the header is hidden: tablet rail, focus mode)
+  function placeTop() {
+    var hd = doc.getElementById("topbar"), top = 0;
+    if (hd && hd.offsetHeight && getComputedStyle(hd).display !== "none") top = Math.max(0, hd.getBoundingClientRect().bottom);
+    drawer.style.setProperty("--rw-top", top + "px");
   }
 
   function setCtxLabel() { if (el.ctx) el.ctx.textContent = ctx && ctx !== "default" ? "saved for this question" : ""; }
@@ -290,6 +295,7 @@
   /* ---------- API ---------- */
   function open() {
     build(); if (isOpen) return; isOpen = true;
+    placeTop();
     drawer.classList.add("show"); setOn(true);
     setTab(tab); fit();
     requestAnimationFrame(fit);

@@ -182,7 +182,7 @@
       qc.set(id, q);
       return q;
     };
-    const persist = () => { if (R) ssx.set(RUNK, R); };
+    const persist = () => { if (R && view !== "suspended") ssx.set(RUNK, R); };
     const sectional = () => !R.p.minutes;
     const locked = () => sectional() || !!R.p.sectionLock;
     const range = (s) => { let f = -1, l = -1; R.items.forEach((it, i) => { if (it.s === s) { if (f < 0) f = i; l = i; } }); return [f, l]; };
@@ -275,18 +275,27 @@
         ["section", "Sectional tests", "One section, one clock. Good for a focused weekly check."],
         ["full", "Full-length and quick", "Every section together, or a fifteen-minute warm-up."]];
       const ms = mocks().slice().reverse();
+      const gf = galleryFilter();
+      const chips = [["all", "All"], ["company", "Company"], ["section", "Sectional"], ["full", "Full"]];
       main.innerHTML = `<div>
         <h1 class="pr-h1">Mock tests</h1>
         <p class="lead">Timed, exam-style tests with section timers, a question palette and negative marking where the real test has it. Every answer also counts towards your practice stats.</p>
         ${liveBanner()}
+        <div class="pr-picks mk-gfilter" role="group" aria-label="Filter tests">${chips.map(([k, t]) => `<button type="button" class="pr-pick${gf === k ? " on" : ""}" data-act="gfilter" data-f="${k}" aria-pressed="${gf === k}">${t}</button>`).join("")}</div>
         ${groups.map(([k, t, sub]) => {
           const ps = presets().filter((p) => (p.kind || "company") === k);
-          return ps.length ? `<section class="mk-group"><div class="mk-gh"><h2>${t}</h2><span class="muted small">${sub}</span></div><ul class="mk-list">${ps.map((p) => cardHTML(p, p.id === "quick-15" && !(R && !R.done))).join("")}</ul></section>` : "";
+          return ps.length ? `<section class="mk-group" data-kind="${k}"${gf !== "all" && gf !== k ? " hidden" : ""}><div class="mk-gh"><h2>${t}</h2><span class="muted small">${sub}</span></div><ul class="mk-list">${ps.map((p) => cardHTML(p, p.id === "quick-15" && !(R && !R.done))).join("")}</ul></section>` : "";
         }).join("")}
         <section class="mk-group"><div class="mk-gh"><h2>Your mock history</h2>${ms.length > 8 ? `<a class="small" href="#history">See all ${ms.length}</a>` : ""}</div>
           <div class="pr-card">${ms.length ? historyTable(ms.slice(0, 8)) : `<p class="muted" style="margin:0">No mocks yet. Start with <a href="#start/quick-15">Quick 15</a> to get a feel for the exam screen.</p>`}</div></section>
       </div>`;
       window.scrollTo(0, 0);
+    }
+    function galleryFilter() { const v = ssx.get("apt:mock:gf"); return ["company", "section", "full"].includes(v) ? v : "all"; }
+    function setGalleryFilter(f) {
+      ssx.set("apt:mock:gf", f);
+      main.querySelectorAll(".mk-gfilter .pr-pick").forEach((b) => { const on = b.dataset.f === f; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
+      main.querySelectorAll(".mk-group[data-kind]").forEach((g) => { g.hidden = !(f === "all" || g.dataset.kind === f); });
     }
     function historyView() {
       view = "history";
@@ -299,7 +308,7 @@
     }
 
     /* ================================================================ INSTRUCTIONS */
-    let pendingStart = null;
+    let pendingStart = null, freshId = null;
     function startView(id, seedQ) {
       view = "start";
       const p = presetById(id);
@@ -428,7 +437,7 @@
       T.iv = setInterval(tick, 250);
       paint(true);
     }
-    function paint(fresh) {
+    function paint(fresh, enter) {
       if (!R || view !== "run") return;
       const y = window.scrollY;
       main.innerHTML = examHTML();
@@ -436,8 +445,18 @@
         const q = getQ(R.items[R.idx].id);
         if (root.RoughPad && RoughPad.setContext) RoughPad.setContext("mock:" + q.id);
         window.scrollTo(0, 0);
+        if (enter && root.Motion && Motion.enter) { const qe = document.getElementById("mkQ"); if (qe) Motion.enter(qe); }
       } else window.scrollTo(0, y);
       tick();
+    }
+    // fullscreen toggle: common.js handles every [data-fs-btn] click and repaints it when the state changes
+    function fsBtn(cls) {
+      const F = root.Fullscreen;
+      let ok = false, on = false;
+      try { ok = !!(F && F.supported && F.supported()); on = !!(F && F.active && F.active()); } catch (e) {}
+      if (!ok) return "";
+      const t = on ? "Exit fullscreen" : "Fullscreen";
+      return `<button type="button" class="${cls}" data-fs-btn="act" aria-pressed="${on}" title="${t}" aria-label="${t}">${ic(on ? "collapse" : "expand")}<span>${t}</span></button>`;
     }
     function timerHTML() {
       return `<div class="pr-timer mk-timer" id="mkTimer" title="${sectional() ? "Time left in this section" : "Time left"}"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="14" fill="none" stroke="var(--panel-2)" stroke-width="4"/>
@@ -517,6 +536,7 @@
         <div class="sr-mid">
           <button type="button" data-act="pal" aria-expanded="${palOpen}" class="${palOpen ? "on" : ""}">${ic("list")} Palette</button>
           <button type="button" data-act="rough" title="Rough-work pad (W)">${ic("pencil")} Rough</button>
+          ${fsBtn("")}
           <button type="button" data-act="clear"${a == null ? " disabled" : ""}>Clear</button>
           <button type="button" data-act="mark" class="${marked ? "on" : ""}" aria-pressed="${marked}">${ic("flag")} ${marked ? "Unmark" : "Mark"}</button>
         </div>
@@ -529,6 +549,7 @@
         ${tabsHTML()}<span class="grow"></span>
         <button type="button" class="btn sm mk-rough" data-act="rough" title="Rough-work pad (W)">${ic("pencil")}<span>Rough</span> <kbd>W</kbd></button>
         ${timerHTML()}
+        ${fsBtn("btn sm mk-fs")}
         <button type="button" class="btn sm mk-quit" data-act="quit" title="Quit without saving">Quit</button>
       </div>`;
       return `<div class="mk-exam">${bar}<div class="mk-grid"><div class="mk-main">${mainCol}</div>${rail}</div>${sessRail}</div>`;
@@ -540,6 +561,8 @@
       const t = document.getElementById("mkT");
       if (t) {
         t.textContent = mmss(Math.ceil(Math.max(0, rem) / 1000));
+        const ttl = t.textContent + " \u00b7 " + R.p.name;
+        if (document.title !== ttl) document.title = ttl;
         const ring = document.getElementById("mkRing"), box = document.getElementById("mkTimer");
         ring.style.strokeDashoffset = String(RING * clamp(1 - rem / dur, 0, 1));
         box.classList.toggle("over", rem <= 5 * 60000 && rem > 60000);
@@ -585,7 +608,7 @@
       R.seen[i] = true;
       resume();
       persist();
-      paint(true);
+      paint(true, true);
     }
     function choose(k) {
       const q = getQ(R.items[R.idx].id);
@@ -671,6 +694,7 @@
       R = null;
       ssx.del(RUNK);
       exitFocus();
+      freshId = res.id;
       go("result/" + res.id, true);
     }
 
@@ -796,6 +820,15 @@
           ${nBad + nSkip ? `<button class="btn" data-act="mistakes" data-id="${esc(m.id)}">${swapLabel(["Add wrong to mistake book", "Added to mistake book"], 0)}</button>` : ""}
           <span class="grow"></span><a class="btn primary" href="#">All mock tests</a></div></div>`;
       window.scrollTo(0, 0);
+      const fresh = freshId === m.id;
+      freshId = null;
+      const sc = main.querySelector(".pr-score b");
+      if (sc && root.Motion && Motion.on && Motion.on() && Motion.countUp) Motion.countUp(sc, m.score, { ms: 700, fmt: scoreTxt });
+      if (fresh && root.Motion && Motion.on && Motion.on()) {
+        const hero = main.querySelector(".mk-hero");
+        if (pct >= 80 && Motion.confetti) { const r = hero ? hero.getBoundingClientRect() : { left: innerWidth / 2, top: 120, width: 0, height: 0 }; Motion.confetti({ x: r.left + r.width / 2, y: r.top + Math.min(r.height / 2, 80) }); }
+        if (others.length && others.every((x) => x.score < m.score) && Motion.celebrate) Motion.celebrate("best", "New best");
+      }
     }
     function applyFilter(f, btn) {
       main.querySelectorAll(".mk-filters .pr-pick").forEach((b) => b.classList.toggle("on", b.dataset.f === f));
@@ -828,6 +861,7 @@
       const act = el.dataset.act;
       if (act === "discard") { R = null; ssx.del(RUNK); return route(); }
       if (view === "start" && act === "begin") return begin();
+      if (view === "gallery" && act === "gfilter") return setGalleryFilter(el.dataset.f);
       if (view === "run" && R) {
         if (act === "opt") return choose(+el.dataset.i);
         if (act === "next") return saveNext();
@@ -877,7 +911,14 @@
       if (k === "ArrowRight") { e.preventDefault(); return step(1); }
     });
 
-    window.addEventListener("hashchange", safeRoute);
+    /* the app shell (fullscreen) replaces this page with a frame of itself: save the exam, stop the timer, and stay inert
+       (no ticks, no time-up submit, no routing, no unload prompt). The frame continues the same exam from sessionStorage. */
+    document.addEventListener("apt:suspend", () => {
+      try { if (R) { flush(); persist(); } } catch (e) {}
+      clearInterval(T.iv); T.iv = null;
+      view = "suspended";
+    });
+    window.addEventListener("hashchange", () => { if (view !== "suspended") safeRoute(); });
     safeRoute();
   }
 
@@ -957,6 +998,8 @@ body.mk-focus .page.mk { max-width: 1440px; padding-top: 0; }
 .mk-rough { display: inline-flex; align-items: center; gap: .35rem; }
 .mk-rough .ico { width: 15px; height: 15px; }
 .mk-quit { color: var(--muted); }
+.mk-fs { display: inline-flex; align-items: center; gap: .35rem; } .mk-fs .ico { width: 15px; height: 15px; }
+@media (max-width: 640px) { .mk-fs span { display: none; } }
 .mk-timer { min-width: 8.6rem; box-shadow: none; border: 2px solid var(--line); background: var(--panel); }
 .mk-timer .t, .session-rail .mk-rt { font-family: var(--mono); font-weight: 700; }
 .mk-timer .tg { font-size: 12px; }
@@ -978,8 +1021,8 @@ body.mk-focus .page.mk { max-width: 1440px; padding-top: 0; }
 .mk-exam .pr-icon { min-width: 44px; min-height: 44px; }
 .mk-wide { width: 100%; justify-content: center; display: flex; align-items: center; gap: .35rem; }
 .mk-secbox { display: grid; gap: .5rem; }
-.mk-pal { display: grid; grid-template-columns: repeat(5, 1fr); gap: .4rem; }
-.mk-pal button { aspect-ratio: 1.25; min-height: 44px; border-radius: 0; border: 2px solid var(--line-control); background: var(--panel); font: 700 var(--fs-xs) var(--mono); color: var(--text); position: relative; cursor: pointer; padding: 0; }
+.mk-pal { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: .4rem; }
+.mk-pal button { aspect-ratio: 1; min-width: 0; min-height: 44px; width: 100%; border-radius: 0; border: 2px solid var(--line-control); background: var(--panel); font: 700 var(--fs-xs) var(--mono); color: var(--text); position: relative; cursor: pointer; padding: 0; }
 .mk-pal button:hover { background: var(--panel-2); }
 .mk-pal .na, .mk-sw.na { background: var(--red-soft); color: var(--text); }
 .mk-pal .an, .mk-sw.an { background: var(--green-soft); color: var(--text); }
@@ -1074,6 +1117,7 @@ html[data-device="tablet"] body.in-session .mk-palpop.open {
   background: var(--panel); border: 3px solid var(--line-control); padding: 1rem; box-sizing: border-box; }
 html[data-device="tablet"][data-hand="left"] body.in-session .mk-palpop.open { right: auto; left: calc(var(--rail-w-session, 132px) + .6rem); }
 .mk-palpop .mk-pal { grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); }
+.mk-gfilter { margin: 1rem 0 0; }
 .mk-palpop .btn { margin-top: .6rem; }
 html[data-device="tablet"] body.in-session .mk-bar .mk-tabs,
 html[data-device="tablet"] body.in-session .mk-bar .mk-timer,
@@ -1089,6 +1133,28 @@ html[data-device="tablet"] body.in-session .mk-exam .pr-qtext { font-size: 1.3re
   html[data-device="tablet"] body.in-session .mk-qcard > .pr-qhead, html[data-device="tablet"] body.in-session .mk-qcard > .pr-setnav, html[data-device="tablet"] body.in-session .mk-qcard > .mk-actions { grid-column: 1 / -1; }
   html[data-device="tablet"] body.in-session .mk-qcard .pr-opts { grid-column: 2; grid-row: 2 / span 2; }
   html[data-device="tablet"] body.in-session .mk-qcard .pr-qtext { grid-column: 1; grid-row: 2 / span 2; } }
+
+/* portrait tablet: the session rail becomes a bottom bar */
+html[data-device="tablet"][data-orient="portrait"] body.in-session { --sbar-h: 88px; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail {
+  top: auto; bottom: 0; left: 0; right: 0; width: auto; height: var(--sbar-h); flex-direction: row; align-items: stretch; gap: .5rem; padding: .5rem .6rem;
+  border-left: 0; border-right: 0; border-top: 3px solid var(--line); }
+html[data-device="tablet"][data-orient="portrait"][data-hand="left"] body.in-session .session-rail { left: 0; right: 0; border-right: 0; }
+html[data-device="tablet"][data-orient="portrait"][data-hand="left"] body.in-session .session-rail .sr-go { order: -1; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail .sr-top { display: flex; flex-direction: row; align-items: stretch; gap: .5rem; flex: none; text-align: left; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail .sr-end { min-height: 0; width: 72px; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail .mk-rt { min-height: 0; min-width: 104px; font-size: 1.7rem; padding: 0 .5rem; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail .sr-sec { display: flex; flex: 1 1 0; min-width: 0; overflow-x: auto; overflow-y: hidden; gap: .35rem; align-content: normal; scrollbar-width: none; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail .sr-sec:empty { display: none; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail .sr-tab { min-height: 0; min-width: 64px; flex: 0 0 auto; font-size: 12px; padding: .2rem .5rem; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail .sr-mid { display: flex; flex: none; gap: .35rem; margin: 0 0 0 auto; overflow: visible; align-content: normal; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail .sr-mid button { min-height: 0; min-width: 62px; flex-direction: column; gap: .1rem; font-size: 12px; padding: .2rem .35rem; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail button.sr-go { min-height: 0; width: 176px; flex: none; box-shadow: 3px 3px 0 var(--ink); font-size: 1rem; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .page.mk { --mk-side: max(24px, calc((100% - 904px) / 2));
+  padding: 16px var(--mk-side) calc(var(--sbar-h) + 16px) !important; }
+html[data-device="tablet"][data-orient="portrait"][data-hand="left"] body.in-session .page.mk { padding: 16px var(--mk-side) calc(var(--sbar-h) + 16px) !important; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .mk-palpop.open { top: auto; bottom: calc(var(--sbar-h) + .6rem); right: .6rem; left: auto; width: min(460px, calc(100vw - 1.2rem)); max-height: calc(100vh - var(--sbar-h) - 1.4rem); }
+html[data-device="tablet"][data-orient="portrait"][data-hand="left"] body.in-session .mk-palpop.open { right: auto; left: .6rem; }
 
 @media (max-width: 1100px) {
   .mk-grid, .mk-split, .mk-two { grid-template-columns: minmax(0, 1fr); }

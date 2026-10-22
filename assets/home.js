@@ -35,7 +35,8 @@
     ["time", "Time pressure", "Time pressure is your top reason. On the first pass skip anything that runs past its target time and come back to it at the end."],
     ["guess", "Guessed", "Many answers are guesses. Cut two options first (wrong units, wrong size, wrong last digit), then back-solve from the options that are left."],
   ];
-  let year = new Date().getFullYear(), pop = null;
+  let year = new Date().getFullYear(), pop = null, counted = false, sealTimer = null;
+  const motionOn = () => !!(window.Motion && Motion.on && Motion.on());
 
   /* ---------- small helpers ---------- */
   const N = (n) => Number(n || 0).toLocaleString("en-IN");
@@ -124,7 +125,15 @@
       return { id: m.id, name: m.name || (preset && preset.name) || "Mock test", at: m.at || 0, p, score: m.score, max: m.max, acc: m.acc };
     }).sort((a, z) => a.at - z.at);
 
-    return { d, goal, todayN: d.activity[today()] || 0, streak: Store.streak(), best: Store.bestStreak(),
+    // activity this week (Monday to Sunday) vs last week, for the This week card and the welcome line
+    const act = d.activity || {}, tk = today(), now = new Date(), mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+    const wk = { cur: 0, prev: 0, days: 0, best: null };
+    for (let i = 0; i < 14; i++) {
+      const t = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() - 7 + i), v = act[today(t.getTime())] || 0;
+      if (i < 7) wk.prev += v; else { wk.cur += v; if (v > 0) wk.days++; if (v > 0 && (!wk.best || v > wk.best.n)) wk.best = { n: v, day: t.toLocaleDateString(undefined, { weekday: "long" }) }; }
+    }
+    const lastDay = Object.keys(act).filter((k) => act[k] > 0).sort().pop() || "";
+    return { wk, away: !!lastDay && lastDay < tk, d, goal, todayN: d.activity[today()] || 0, streak: Store.streak(), best: Store.bestStreak(),
       tot, sections, weak, rated: rated.length, why, wrongs, tagged, nextLesson, daily, speedBest, due, mocks, presets: MK.length };
   }
 
@@ -155,22 +164,49 @@
     const week = [];
     for (let i = 6; i >= 0; i--) { const t = Date.now() - i * 864e5; week.push({ l: DAYS[new Date(t).getDay()], on: (M.d.activity[today(t)] || 0) > 0, now: i === 0 }); }
     const w = Math.min(100, (M.todayN / M.goal) * 100);
-    return `<section class="is-hero db-hero">
+    let seal = "";
+    if (done) {
+      const drop = (M.d.meta || {}).goalSeal !== today() && motionOn();
+      seal = `<span class="db-seal${drop ? " drop" : ""}" role="img" aria-label="Daily goal done">GOAL DONE</span>`;
+      if (M.d.meta.goalSeal !== today() && !sealTimer) sealTimer = setTimeout(() => { sealTimer = null; const dd = Store.load(); dd.meta = dd.meta || {}; dd.meta.goalSeal = today(); Store.save(); }, 1000);
+    }
+    return `<section class="is-hero db-hero">${seal}
       <div class="db-hero-main">
         <span class="db-label">Today</span>
         <h2 class="db-hero-t">Today's set</h2>
         <p class="db-hero-d">${desc}</p>
-        <div class="db-prog"><div class="db-prog-h"><span class="db-label">Daily goal</span><span class="db-mono"><b>${N(Math.min(M.todayN, 9999))}</b> / ${M.goal}</span></div>
+        <div class="db-prog"><div class="db-prog-h"><span class="db-label">Daily goal</span><span class="db-mono"><b data-cu="${Math.min(M.todayN, 9999)}">${N(Math.min(M.todayN, 9999))}</b> / ${M.goal}</span></div>
           <div class="db-meter" role="progressbar" aria-valuemin="0" aria-valuemax="${M.goal}" aria-valuenow="${Math.min(M.todayN, M.goal)}" aria-label="Questions today"><span style="width:${w.toFixed(1)}%"></span></div></div>
         <div class="db-actions"><a class="btn primary db-cta" href="${cta.href}">${cta.t} ${ICON(I.arrow)}</a>
           <button type="button" class="db-link" data-pop="goal">Change daily goal</button></div>
       </div>
       <div class="db-streak" aria-label="Streak">
-        <div class="db-streak-n"><b>${M.streak}</b><span>day streak</span></div>
+        <div class="db-streak-n"><b data-cu="${M.streak}">${M.streak}</b><span>day streak</span></div>
         <div class="db-week" aria-label="Last 7 days">${week.map((x) => `<span class="${x.on ? "on" : ""}${x.now ? " now" : ""}"><i></i>${x.l}</span>`).join("")}</div>
         <div class="db-mono db-muted">Best ${M.best}${M.tot.n ? ` · ${N(M.tot.n)} answered · ${pct(M.tot.c / M.tot.n)} right` : ""}</div>
       </div>
     </section>`;
+  }
+
+  function welcome(M) {
+    if (!M.away) return "";
+    const st = M.streak, parts = [];
+    if (st > 0) {
+      const dueS = M.due ? `${plural(M.due, "review")} ${M.due === 1 ? "is" : "are"} due and your` : "Your";
+      parts.push(`${dueS} streak is ${plural(st, "day")}.`);
+    } else parts.push("Pick up where you left off.");
+    return `<p class="db-welcome">Welcome back. ${parts[0]}</p>`;
+  }
+
+  function weekCard(M) {
+    const W = M.wk, diff = W.cur - W.prev;
+    const dtxt = diff === 0 ? "same as last week" : `${diff > 0 ? "+" : "−"}${N(Math.abs(diff))} vs last week`;
+    return `<section class="db-card db-wkcard"><div class="db-card-h"><h3>This week</h3><span class="db-muted">Monday to Sunday</span></div>
+      <div class="db-wkc"><div class="db-wkc-main"><b class="db-mono">${N(W.cur)}</b><span class="db-label">questions</span>
+        <span class="db-delta ${diff > 0 ? "up" : diff < 0 ? "down" : ""}">${dtxt}</span></div>
+        <div class="db-wkc-s"><div><b class="db-mono">${W.days}</b><span class="db-label">active days</span></div>
+        <div><b class="db-mono">${W.best ? N(W.best.n) : "0"}</b><span class="db-label">${W.best ? "best day, " + esc(W.best.day) : "best day"}</span></div>
+        <div><b class="db-mono">${N(W.prev)}</b><span class="db-label">last week</span></div></div></div></section>`;
   }
 
   function shortcuts(M) {
@@ -253,12 +289,14 @@
     const M = model(), H = heat(M.d.activity, M.goal);
     const hasAct = Object.values(M.d.activity).some((v) => v > 0);
     const panels = [];
+    if (hasAct) panels.push(weekCard(M));
     if (M.weak.length) panels.push(weakCard(M));
     if (M.tagged) panels.push(reasonsCard(M));
     if (M.tot.n) panels.push(accuracyCard(M));
     if (M.mocks.length) panels.push(mockCard(M));
     main.innerHTML = `<div class="db">
       <h1 class="db-title">Dashboard</h1>
+      ${welcome(M)}
       ${resumeCard()}
       ${hero(M)}
       ${shortcuts(M)}
@@ -276,6 +314,10 @@
         <span class="db-muted">Saved only in this browser.</span></footer>
     </div>
     <div class="dash-pop card" id="dashPop" hidden></div>`;
+    if (!counted) {                       // count-up only on the first render, never on store:change re-renders
+      counted = true;
+      if (motionOn() && Motion.countUp) main.querySelectorAll("[data-cu]").forEach((b) => { if (+b.dataset.cu > 0) Motion.countUp(b, +b.dataset.cu, { ms: 500 }); });
+    }
     const yr = $("#hmYear");
     if (yr) yr.onchange = () => { year = +yr.value; yearOpen = true; render(); };
     const dt = $("#hm");
@@ -339,6 +381,23 @@
 .db-meter > span, .db-bar > span { transition: width 150ms linear; }
 .db-muted { color: var(--muted); font-size: .88rem; }
 .db-title { margin: 0; }
+.db-welcome { margin: -1rem 0 0; color: var(--muted); font-size: 1.02rem; }
+.db-hero { position: relative; }
+.db-seal { position: absolute; top: 1rem; right: 1.1rem; z-index: 1; padding: .3rem .8rem; border: 3px solid var(--accent); outline: 2px solid var(--ink); outline-offset: 2px; color: var(--accent); background: var(--panel);
+  font: 900 .95rem/1 var(--mono); letter-spacing: .14em; transform: rotate(-8deg); pointer-events: none; white-space: nowrap; }
+@media (prefers-reduced-motion: no-preference) {
+  html[data-motion="lively"] .db-seal.drop { animation: db-seal-drop 120ms steps(2) both; }
+}
+@keyframes db-seal-drop { from { transform: rotate(-8deg) scale(1.15); } to { transform: rotate(-8deg) scale(1); } }
+.db-wkc { display: flex; flex-wrap: wrap; gap: 1rem 2rem; padding: 1rem; align-items: center; }
+.db-wkc-main { display: flex; flex-direction: column; gap: .2rem; }
+.db-wkc-main b { font-size: 2.6rem; line-height: 1; font-weight: 900; }
+.db-delta { font: 700 .85rem var(--mono); color: var(--muted); }
+.db-delta.up { color: var(--text); }
+.db-wkc-s { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem 1.5rem; flex: 1 1 220px; }
+.db-wkc-s div { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.db-wkc-s b { font-size: 1.4rem; font-weight: 900; }
+.db-wkc-s .db-label { font-size: 11px; }
 .db-h2 { margin: 0 0 .75rem; font-weight: 800; text-transform: none; }
 .db-label { font: 700 12px/1.2 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .db .btn.db-flat, .db .db-flat { box-shadow: none; transform: none; border: 2px solid var(--line-control); background: var(--panel); color: var(--text); min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; padding: .4rem 1rem; text-decoration: none; font-weight: 700; }
@@ -429,6 +488,8 @@
   .db-sec { flex-wrap: wrap; }
   .db-sec-b { width: 100%; } .db-sec-b .btn { flex: 1; }
   .db-panels { grid-template-columns: minmax(0, 1fr); }
+  .db-wkc-s { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
+  .db-seal { top: .7rem; right: .8rem; font-size: .8rem; }
 }
 `;
     document.head.appendChild(st);

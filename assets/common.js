@@ -10,8 +10,11 @@
    html[data-device]  "tablet" | "desktop" | "phone"   (apt:layout = auto | desktop | tablet)
    html[data-hand]    "right" | "left"                 (apt:hand: which side the thumb rails sit on)
    html[data-text]    "md" | "lg"                      (apt:text: lg scales the root font to 112.5%)
-   There is no motion setting: the only motion is the "stamp" feedback (press / stamp / thunk / bars in brutal.css) and
-   it is switched off by prefers-reduced-motion. window.stamp(el) restarts the stamp on a toggle that just changed state. */
+   html[data-orient]  "portrait" | "landscape"        (innerHeight > innerWidth)
+   html[data-motion]  "lively" | "minimal"            (apt:motion, default lively; prefers-reduced-motion always behaves as minimal)
+   html[data-fs]      "on" while fullscreen or running as an installed app (kept by the Fullscreen module below)
+   Minimal motion = the "stamp" feedback only (press / stamp / thunk / bars in brutal.css); lively adds the layer at the end of brutal.css.
+   window.stamp(el) restarts the stamp on a toggle that just changed state. */
 (function () {
   var root = document.documentElement;
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -30,9 +33,13 @@
     root.dataset.device = d;
     root.dataset.hand = get("apt:hand") === "left" ? "left" : "right";
     root.dataset.text = get("apt:text") === "lg" ? "lg" : "md";
+    root.dataset.orient = window.innerHeight > window.innerWidth ? "portrait" : "landscape";
+    root.dataset.motion = get("apt:motion") === "minimal" ? "minimal" : "lively";
+    try { if (!prev && window.matchMedia && matchMedia("(display-mode: fullscreen), (display-mode: standalone)").matches) root.dataset.fs = "on"; } catch (e) {}
     if (prev && prev !== d && document.body) document.body.classList.remove("sidebar-open");   // a drawer left open must not follow a layout change
   }
   apply();
+  try { if (window.top !== window) root.setAttribute("data-framed", ""); } catch (e) { root.setAttribute("data-framed", ""); }
   var raf = 0;
   window.addEventListener("resize", function () { if (!raf) raf = requestAnimationFrame(function () { raf = 0; apply(); }); });
   window.addEventListener("orientationchange", apply);
@@ -120,6 +127,8 @@
     sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
     sidebar: '<rect x="3.5" y="4.5" width="17" height="15"/><path d="M9.5 4.5v15"/>',
     restart: '<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 8.9"/><path d="M4.5 4.2v4.7h4.7"/>',
+    expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+    collapse: '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
   };
   const icon = (name, cls = "") => ICONS[name] ? `<svg class="ico${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>` : "";
 
@@ -150,7 +159,26 @@
       this.save();
       return d.items[k];
     },
-    bump() { const d = this.load(), t = today(); d.activity[t] = (d.activity[t] || 0) + 1; },
+    bump() {
+      const d = this.load(), t = today(), before = d.activity[t] || 0, n = before + 1;
+      d.activity[t] = n;
+      // daily goal reached (once per day) and streak milestones (once each): apt:goal / apt:streak + a stamp badge
+      const goal = +d.meta.goal || 25;
+      let late = 0;
+      if (before < goal && n >= goal && d.meta.goalHit !== t) {
+        d.meta.goalHit = t; late = 1700;
+        document.dispatchEvent(new CustomEvent("apt:goal", { detail: { n, goal } }));
+        if (window.Motion) Motion.celebrate("goal", "Daily goal done");
+      }
+      const days = this.streak(), seen = +d.meta.streakSeen || 0;
+      if (days < seen) d.meta.streakSeen = [0, 3, 7, 14, 30, 50, 100].filter((m) => m <= days).pop();
+      if ([3, 7, 14, 30, 50, 100].includes(days) && days > (+d.meta.streakSeen || 0)) {
+        d.meta.streakSeen = days;
+        document.dispatchEvent(new CustomEvent("apt:streak", { detail: { days } }));
+        setTimeout(() => window.Motion && Motion.celebrate("streak", days + "-day streak"), late);
+      }
+      const hot = document.querySelector(".d-streak"); if (hot && n >= goal) hot.classList.add("hot");
+    },
     /* status: "done" | "revise" | null */
     setStatus(k, status) {
       const it = this.item(k), p = { status };
@@ -233,6 +261,150 @@
     void el.offsetWidth;
     el.classList.add("is-stamped");
     el.addEventListener("animationend", () => el.classList.remove("is-stamped"), { once: true });
+  }
+
+  /* ------------------------------------------------------------- Motion (lively layer; CSS in brutal.css)
+     Every helper is a no-op (final state only) in minimal mode or under prefers-reduced-motion. */
+  const reduced = () => !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const Motion = {
+    on: () => document.documentElement.dataset.motion !== "minimal" && !reduced(),
+    countUp(el, to, o = {}) {
+      if (!el) return;
+      const fmtN = o.fmt || ((n) => String(Math.round(n))), from = o.from || 0, ms = o.ms || 600;
+      if (!Motion.on() || from === to) { el.textContent = fmtN(to); return; }
+      const t0 = performance.now();
+      el.textContent = fmtN(from);
+      const step = (t) => {
+        const k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+        el.textContent = fmtN(from + (to - from) * e);
+        if (k < 1 && el.isConnected) requestAnimationFrame(step); else el.textContent = fmtN(to);
+      };
+      requestAnimationFrame(step);
+    },
+    confetti() { /* retired: brutalist motion is snaps and stamps, not falling particles. Kept so callers do not break. */ },
+    nudge(el) { if (!el || !Motion.on()) return; el.classList.remove("is-nudged"); void el.offsetWidth; el.classList.add("is-nudged"); el.addEventListener("animationend", () => el.classList.remove("is-nudged"), { once: true }); },
+    enter(el) { if (!el || !Motion.on()) return; el.classList.remove("is-entering"); void el.offsetWidth; el.classList.add("is-entering"); el.addEventListener("animationend", () => el.classList.remove("is-entering"), { once: true }); },
+    /* a rubber-stamp badge at the top centre: stamps in (stepped), holds 1.6 s, vanishes instantly. kind: goal | streak | best | done. Minimal mode: a plain toast. */
+    celebrate(kind, text) {
+      if (!Motion.on()) { toast(text, 2200, "check"); return; }
+      document.querySelectorAll(".mo-badge").forEach((b) => b.remove());
+      const w = document.createElement("div");
+      w.className = "mo-badge"; w.setAttribute("role", "status");
+      w.innerHTML = `<div class="mo-badge-i k-${esc(kind)}">${icon(kind === "streak" ? "flame" : kind === "best" ? "trophy" : kind === "goal" ? "target" : "check-circle")}<span>${esc(text)}</span></div>`;
+      document.body.appendChild(w);
+      setTimeout(() => w.remove(), 1700);
+    },
+  };
+  window.Motion = Motion;
+
+  /* ------------------------------------------------------------- Fullscreen: the app shell
+     Browsers drop fullscreen on navigation, so turning it on turns the current page into a HOST: an iframe (#appFrame) with this same
+     URL fills the viewport and the host document is what is fullscreen. Every later page change happens inside the frame, so
+     fullscreen never drops. Messages (postMessage only, never the other document's DOM; accepted only with an "apt" field and only
+     from the frame / the parent):
+       frame -> host  { apt:"hello" }  { apt:"fs-toggle", want:"on"|"off" }  { apt:"page", title, href }
+       host -> frame  { apt:"fs-state", on, supported }
+     Before the page is replaced, "apt:suspend" fires on document so practice / mock stop their timers and save their session
+     (the frame continues from sessionStorage). Hidden in an installed app, which is already fullscreen. */
+  const FS = (() => {
+    const de = document.documentElement;
+    let framed = false; try { framed = window.top !== window; } catch (e) { framed = true; }
+    // read once at load: "display-mode: fullscreen" also matches while the Fullscreen API is active, which is not "installed"
+    const isApp = !framed && !!(window.matchMedia && matchMedia("(display-mode: fullscreen), (display-mode: standalone)").matches) && !(document.fullscreenElement || document.webkitFullscreenElement);
+    const installed = () => isApp;
+    let frame = null, fsOn = false, hostOk = framed;                  // frame: the host's iframe; fsOn / hostOk: what a framed page was told
+    const api = () => !!((document.fullscreenEnabled || document.webkitFullscreenEnabled) && (de.requestFullscreen || de.webkitRequestFullscreen));
+    const supported = () => framed ? hostOk : (!installed() && api());
+    const cur = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+    const active = () => framed ? fsOn : (!!cur() || installed());
+    const post = (w, m) => { try { w && w.postMessage(m, "*"); } catch (e) {} };
+    const state = () => { if (frame) post(frame.contentWindow, { apt: "fs-state", on: !!cur(), supported: supported() }); };
+    function makeHost() {
+      if (frame) return;
+      try { document.dispatchEvent(new CustomEvent("apt:suspend")); } catch (e) {}
+      frame = document.createElement("iframe");
+      frame.id = "appFrame"; frame.title = "Aptitude Hub"; frame.setAttribute("allow", "fullscreen");
+      frame.src = location.href;
+      de.classList.add("app-host");
+      document.body.appendChild(frame);
+    }
+    function enter() {
+      if (framed) { post(window.parent, { apt: "fs-toggle", want: "on" }); return Promise.resolve(); }
+      if (!supported() || cur()) return Promise.resolve();
+      makeHost();
+      let p;
+      try { p = de.requestFullscreen ? de.requestFullscreen({ navigationUI: "hide" }) : de.webkitRequestFullscreen(); } catch (e) { return Promise.resolve(); }
+      try { frame.contentWindow.focus(); } catch (e) {}
+      return Promise.resolve(p).catch(() => {});
+    }
+    function exit() {
+      if (framed) { post(window.parent, { apt: "fs-toggle", want: "off" }); return Promise.resolve(); }
+      if (!cur()) return Promise.resolve();
+      try { return Promise.resolve(document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen()).catch(() => {}); } catch (e) { return Promise.resolve(); }
+    }
+    const toggle = () => (active() ? exit() : enter());
+    const html = (kind) => {
+      const on = active(), ic = icon(on ? "collapse" : "expand");
+      return kind === "act" ? ic + `<span>${on ? "Exit fullscreen" : "Fullscreen"}</span>` : ic;
+    };
+    function repaint() {
+      const on = active(), ok = supported();
+      if (on) de.dataset.fs = "on"; else delete de.dataset.fs;
+      document.querySelectorAll("[data-fs-btn]").forEach((b) => {
+        b.hidden = !ok;
+        b.setAttribute("aria-pressed", on);
+        const t = on ? "Exit fullscreen" : "Fullscreen";
+        b.title = t; b.setAttribute("aria-label", t);
+        b.innerHTML = html(b.dataset.fsBtn);
+      });
+    }
+    function changed() {
+      repaint(); state();
+      document.dispatchEvent(new CustomEvent("apt:fs", { detail: { active: active() } }));
+    }
+    document.addEventListener("fullscreenchange", changed);
+    document.addEventListener("webkitfullscreenchange", changed);
+    window.addEventListener("message", (e) => {
+      const d = e.data;
+      if (!d || typeof d !== "object" || typeof d.apt !== "string") return;
+      if (!framed) {                                                   // host: only the frame speaks
+        if (!frame || e.source !== frame.contentWindow) return;
+        if (d.apt === "hello") state();
+        else if (d.apt === "fs-toggle") { (d.want === "on" || (d.want !== "off" && !cur())) ? enter() : exit(); setTimeout(state, 80); }
+        else if (d.apt === "page") {
+          if (typeof d.title === "string" && d.title) document.title = d.title;
+          try { if (typeof d.href === "string") { const u = new URL(d.href); history.replaceState(null, "", u.pathname.split("/").pop() + u.search + u.hash); } } catch (err) {}
+        }
+      } else if (e.source === window.parent && d.apt === "fs-state") {   // frame: only the host speaks
+        fsOn = !!d.on; hostOk = d.supported !== false;
+        changed();
+      }
+    });
+    if (framed) {
+      const page = () => post(window.parent, { apt: "page", title: document.title, href: location.href });
+      post(window.parent, { apt: "hello" }); page();
+      window.addEventListener("hashchange", page);
+      window.addEventListener("load", () => {
+        page();
+        try { const t = document.querySelector("title"); t && new MutationObserver(page).observe(t, { childList: true, characterData: true, subtree: true }); } catch (e) {}
+      });
+    }
+    document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("[data-fs-btn]"); if (b) { e.preventDefault(); toggle(); } });
+    return { supported, active, toggle, enter, exit, repaint, html };
+  })();
+  window.Fullscreen = { supported: FS.supported, active: FS.active, toggle: FS.toggle, enter: FS.enter, exit: FS.exit };
+
+  /* ------------------------------------------------------------- Installable app (http / https only; a manifest link on file:// logs an error) */
+  if (/^https?:$/.test(location.protocol)) {
+    try {
+      const add = (tag, attrs) => { const e = document.createElement(tag); Object.keys(attrs).forEach((k) => e.setAttribute(k, attrs[k])); document.head.appendChild(e); };
+      add("link", { rel: "manifest", href: "manifest.webmanifest" });
+      add("meta", { name: "theme-color", content: "#D6245F" });
+      add("link", { rel: "apple-touch-icon", href: "assets/icons/apple-touch-icon.png" });
+      add("meta", { name: "apple-mobile-web-app-capable", content: "yes" });
+      add("meta", { name: "mobile-web-app-capable", content: "yes" });
+      if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+    } catch (e) {}
   }
 
   /* ------------------------------------------------------------- Fixed-width button labels
@@ -855,11 +1027,12 @@
     ["Layout", "layout", [["auto", "Auto"], ["desktop", "Desktop"], ["tablet", "Tablet"]], "Tablet puts the menu in a thumb rail"],
     ["Rail side", "hand", [["right", "Right"], ["left", "Left"]], "Which side the tablet rails sit on"],
     ["Text size", "text", [["md", "Normal"], ["lg", "Large"]]],
+    ["Animations", "motion", [["lively", "Lively"], ["minimal", "Minimal"]], "Lively adds hover lifts, count-ups and stamps"],
   ];
   const settingVal = (k) => {
     const R = document.documentElement, g = (x) => { try { return localStorage.getItem(x); } catch (e) { return null; } };
     return k === "theme" ? (R.dataset.theme === "dark" ? "dark" : "light") : k === "layout" ? (g("apt:layout") || "auto")
-      : k === "hand" ? R.dataset.hand : R.dataset.text;
+      : k === "hand" ? R.dataset.hand : k === "motion" ? R.dataset.motion : R.dataset.text;
   };
   // light <-> dark is instant: transitions are held off for the frame in which the colours change
   function setTheme(v) {
@@ -871,7 +1044,7 @@
   function setSetting(k, v) {
     const R = document.documentElement;
     if (k === "theme") setTheme(v);
-    else AptPrefs.set(k === "layout" ? "apt:layout" : k === "hand" ? "apt:hand" : "apt:text", v);
+    else AptPrefs.set(k === "layout" ? "apt:layout" : k === "hand" ? "apt:hand" : k === "motion" ? "apt:motion" : "apt:text", v);
   }
   let setMenu = null, setBtn = null;
   function closeSettings() {
@@ -885,13 +1058,23 @@
     const m = document.createElement("div");
     m.className = "set-menu"; m.setAttribute("role", "dialog"); m.setAttribute("aria-label", "Settings");
     const paint = () => SETTINGS.forEach(([, k]) => m.querySelectorAll(`[data-set="${k}"] button`).forEach((b) => { const on = b.dataset.v === settingVal(k); b.setAttribute("aria-pressed", on); b.classList.toggle("on", on); }));
-    m.innerHTML = `<div class="set-h">Settings</div>` + SETTINGS.map(([name, k, opts, note]) =>
+    m.innerHTML = `<div class="set-h">Settings</div>` + `<button type="button" class="set-act" data-fs-btn="act" aria-pressed="false" hidden></button>` + SETTINGS.map(([name, k, opts, note]) =>
       `<div class="set-row"><div class="set-lbl">${name}</div><div class="set-seg" role="group" aria-label="${name}" data-set="${k}">${opts.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="false">${l}</button>`).join("")}</div>${note ? `<div class="set-note">${note}</div>` : ""}</div>`).join("") +
+      `<div class="set-acts"><button type="button" class="set-act only-bar" data-do="find">${icon("search")}<span>Search</span></button><button type="button" class="set-act only-bar" data-do="rough">${icon("pencil")}<span>Rough work</span></button>${document.getElementById("sidebar") ? `<button type="button" class="set-act only-bar" data-do="topics">${icon("menu")}<span>Topics</span></button>` : ""}</div>` +
       (pages && pages.length ? `<div class="set-pages"><div class="set-lbl">More pages</div>${pages.map(([h, l]) => `<a href="${h}">${esc(l)}</a>`).join("")}</div>` : "") +
       `<div class="set-note set-keys">Press <kbd>?</kbd> for keyboard shortcuts</div>`;
     document.body.appendChild(m);
-    setMenu = m; paint();
+    setMenu = m; paint(); FS.repaint();
     m.addEventListener("click", (e) => {
+      const act = e.target.closest("[data-do], [data-fs-btn]");
+      if (act) {
+        closeSettings();
+        const w = act.dataset.do;
+        if (w === "find") window.FindBox && FindBox.open();
+        else if (w === "rough") window.RoughPad && RoughPad.toggle();
+        else if (w === "topics") setTimeout(toggleTopics, 0);                  // after the page's own outside-click handler has run
+        return;
+      }
       const b = e.target.closest(".set-seg button");
       if (!b) return;
       setSetting(b.parentNode.dataset.set, b.dataset.v); paint();
@@ -900,8 +1083,13 @@
       if (a2 && (a2 !== btn || b.parentNode.dataset.set === "hand")) { closeSettings(); openSettings(a2, pages); const nb = document.querySelector(`.set-seg[data-set="${b.parentNode.dataset.set}"] button[data-v="${b.dataset.v}"]`); nb && nb.focus(); }
     });
     // placement: beside the tablet rail (bottom, hand side), otherwise under the header button
-    const r = btn.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight;
-    if (btn.closest(".g-rail")) {
+    const r = btn.getBoundingClientRect(), bar = !!btn.closest(".g-rail") && document.documentElement.dataset.orient === "portrait";
+    if (bar) m.style.maxHeight = Math.max(160, r.top - 16) + "px";                 // the portrait bottom bar: open upward
+    const w = m.offsetWidth, h = m.offsetHeight;
+    if (bar) {
+      m.style.top = Math.max(8, r.top - h - 8) + "px";
+      m.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + "px";
+    } else if (btn.closest(".g-rail")) {
       const left = document.documentElement.dataset.hand === "left";
       m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom - h)) + "px";
       m.style[left ? "left" : "right"] = "calc(var(--rail-w) + 8px)";
@@ -927,11 +1115,12 @@
       <a class="brand" href="${S.home || "index.html"}"><span class="logo-wrap"><span class="logo">${S.logo || "DS"}</span></span><span class="brand-name">${S.brand}</span></a>
       <nav class="nav" aria-label="Main">${S.links.map(([href, label, sub], i) => {
         const on = href === active || (sub && sub.some(([x]) => x === active)), C = NAV_COLORS[i % NAV_COLORS.length];
-        return `<a href="${href}" class="${[on ? "active" : "", sub ? "has-menu" : ""].filter(Boolean).join(" ")}" title="${label}"${on ? ' aria-current="page"' : ""}${sub ? ` aria-haspopup="true" aria-expanded="false" data-menu="${i}"` : ""} style="--c:${C[0]}" data-ink="${C[1]}" data-ink-dark="${C[2]}">${navIcon(label)}<span>${label}</span>${sub ? `<svg class="nav-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>` : ""}${href === "revision.html" ? badgeHTML(due) : ""}</a>`;
+        return `<a href="${href}" class="${[on ? "active" : "", sub ? "has-menu" : ""].filter(Boolean).join(" ")}" title="${label}"${on ? ' aria-current="page"' : ""}${sub ? ` aria-haspopup="true" aria-expanded="false" data-menu="${i}"` : ""} style="--c:${C[0]}" data-ink="${C[1]}" data-ink-dark="${C[2]}">${navIcon(label)}<span class="nav-l" data-short="${label === "Dashboard" ? "Home" : label}">${label}</span>${sub ? `<svg class="nav-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>` : ""}${href === "revision.html" ? badgeHTML(due) : ""}</a>`;
       }).join("")}</nav>
       ${S.links.map(([, , sub], i) => sub ? `<div class="nav-menu" role="menu" data-menu="${i}" style="--c:${NAV_COLORS[i % NAV_COLORS.length][0]}" hidden>${sub.map(([href, label, note]) => `<a role="menuitem" href="${href}" class="${href === active ? "active" : ""}">${navIcon(label)}<span><b>${label}</b>${note ? `<small>${note}</small>` : ""}</span></a>`).join("")}</div>` : "").join("")}
-      ${streak > 0 ? `<span class="d-streak" title="${streak}-day study streak"><span class="f">${icon("flame")}</span><span class="sn">${streak}</span></span>` : ""}
+      ${streak > 0 ? `<span class="d-streak${(Store.load().activity[today()] || 0) >= (+Store.load().meta.goal || 25) ? " hot" : ""}" title="${streak}-day study streak"><span class="f">${icon("flame")}</span><span class="sn">${streak}</span></span>` : ""}
       <span class="tb-slot"><button class="icon-btn" id="setBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="Settings" aria-label="Settings">${icon("sliders")}</button></span>
+      <button class="icon-btn fs-btn" id="fsBtn" type="button" data-fs-btn="icon" aria-pressed="false" hidden></button>
       <button class="icon-btn" id="themeBtn" title="Toggle dark mode" aria-label="Toggle theme">${THEME_SVG}</button>`;
     $("#themeBtn").onclick = () => {
       setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
@@ -948,6 +1137,7 @@
     navMenus(h);
     paintRing();
     buildRail(S, active, due, subPages);
+    FS.repaint();
     // skip link (first thing a keyboard user tabs to)
     if (!document.querySelector(".skip-link")) {
       const sk = document.createElement("a");
@@ -992,7 +1182,7 @@
         return item(href, lab, navIcon(label), `style="--c:${C[0]}"`, on) .replace("</a>", (href === "revision.html" ? badgeHTML(due) : "") + "</a>");
       }).join("")}</div>
       <div class="gr-tools">
-        ${document.getElementById("sidebar") ? `<button type="button" class="gr-item" id="grTopics" aria-label="Topics list" aria-expanded="false">${icon("menu")}<span>Topics</span></button>` : `<span class="gr-item gr-slot" aria-hidden="true"></span>`}
+        ${document.getElementById("sidebar") ? `<button type="button" class="gr-item" id="grTopics" aria-label="Topics list" aria-expanded="false">${icon("menu")}<span>Topics</span></button>` : subPages.length ? `<button type="button" class="gr-item" id="grPages" aria-haspopup="menu" aria-expanded="false" aria-label="Pages">${icon("doc")}<span>Pages</span></button>` : ""}
         <button type="button" class="gr-item" id="grFind" aria-label="Search">${icon("search")}<span>Search</span></button>
         <button type="button" class="gr-item gr-rough" id="grRough" aria-label="Rough work">${icon("pencil")}<span>Rough</span></button>
         <button type="button" class="gr-item" id="grMore" aria-haspopup="dialog" aria-expanded="false" aria-label="Settings and more">${icon("sliders")}<span>More</span></button>
@@ -1003,6 +1193,29 @@
     const tp = rail.querySelector("#grTopics");
     if (tp) tp.onclick = () => toggleTopics();
     rail.querySelector("#grMore").onclick = (e) => { e.stopPropagation(); openSettings(e.currentTarget, subPages); };
+    const pg = rail.querySelector("#grPages");
+    if (pg) pg.onclick = (e) => { e.stopPropagation(); openPages(pg, subPages, active); };
+    // item height: as tall as the screen allows between 48 and 60 px, so nothing is ever squashed (the rail scrolls if even 48 does not fit)
+    const size = () => {
+      const n = rail.querySelectorAll(".gr-item").length || 1, logo = rail.querySelector(".gr-logo");
+      const h = Math.max(48, Math.min(60, Math.floor((innerHeight - (logo ? logo.offsetHeight || 68 : 0) - 4) / n)));
+      document.documentElement.style.setProperty("--gr-item-h", h + "px");
+    };
+    size(); window.addEventListener("resize", size);
+  }
+  /* the "Pages" menu of the tablet rail (pages without a topic list): the sub-pages that have no rail item of their own */
+  function openPages(btn, pages, active) {
+    if (setMenu) { const same = setBtn === btn; closeSettings(); if (same) return; }
+    setBtn = btn; btn.setAttribute("aria-expanded", "true"); btn.classList.add("on");
+    const m = document.createElement("div");
+    m.className = "set-menu pg-menu"; m.setAttribute("role", "menu"); m.setAttribute("aria-label", "Pages");
+    m.innerHTML = pages.map(([h, l]) => `<a role="menuitem" class="pg-item${h === active ? " active" : ""}" href="${h}">${navIcon(l)}<span>${esc(l)}</span></a>`).join("");
+    document.body.appendChild(m);
+    setMenu = m;
+    const r = btn.getBoundingClientRect(), h = m.offsetHeight, left = document.documentElement.dataset.hand === "left";
+    m.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.bottom - h)) + "px";
+    m.style[left ? "left" : "right"] = "calc(var(--rail-w) + 8px)";
+    m.querySelector("a").focus();
   }
 
   /* ------------------------------------------------------------- Status buttons (shared UI) */
@@ -1302,9 +1515,28 @@
       sb.querySelectorAll(".sb-group").forEach((g) => g.classList.toggle("nomatch-g", !!f && !g.querySelector("a.item:not(.nomatch)")));
       const nm = sb.querySelector(".sb-nomatch"); if (nm) nm.hidden = !f || any;
     }
+    // reading progress line (3px, top of the viewport) and the scroll position of each topic (apt:scroll:<kind>:<id>)
+    const rp = document.createElement("div");
+    rp.className = "read-progress"; rp.setAttribute("aria-hidden", "true");
+    document.body.appendChild(rp);
+    let curId = "", restoring = false, scrT = 0, firstShow = true;
+    const scrKey = () => "apt:scroll:" + kind + ":" + curId;
+    function paintProgress() {
+      const max = document.documentElement.scrollHeight - innerHeight;
+      rp.style.transform = "scaleX(" + (max > 0 ? Math.max(0, Math.min(1, scrollY / max)) : 0) + ")";
+    }
+    function saveScroll() {
+      if (restoring || !curId) return;
+      lsSet(scrKey(), scrollY > 60 ? String(Math.round(scrollY)) : null);
+    }
+    window.addEventListener("scroll", () => { paintProgress(); clearTimeout(scrT); scrT = setTimeout(saveScroll, 150); }, { passive: true });
+    window.addEventListener("resize", paintProgress);
+    window.addEventListener("pagehide", saveScroll);
     function show() {
       let id = (location.hash || "").slice(1);
       if (!secs.find((s) => s.id === id)) id = secs[0].id;
+      clearTimeout(scrT); if (curId) saveScroll();
+      curId = id;
       const i = secs.findIndex((s) => s.id === id), s = secs[i];
       const key = kind + ":" + s.id, prev = secs[i - 1], next = secs[i + 1];
       if (s.group && getFolds().includes(s.group)) setFolds(getFolds().filter((x) => x !== s.group));
@@ -1335,6 +1567,18 @@
       sidebar();
       document.body.classList.remove("sidebar-open");
       window.scrollTo(0, 0);
+      // coming back to a topic (page load) puts you where you stopped; picking a topic in the list starts at the top
+      const saved = firstShow ? parseInt(lsGet(scrKey()), 10) : 0;
+      firstShow = false;
+      if (saved > 0) {
+        restoring = true;
+        let tries = 0;
+        const go = () => {
+          window.scrollTo(0, saved);
+          if (Math.abs(scrollY - saved) > 4 && ++tries < 12) setTimeout(go, 60); else { restoring = false; paintProgress(); }
+        };
+        requestAnimationFrame(go);
+      } else paintProgress();
     }
     window.addEventListener("hashchange", show);
     // only rebuild the sidebar when something it shows changed (status / bookmark), not on every note keystroke
@@ -1345,6 +1589,8 @@
   }
 
   if (document.getElementById("topbar")) topbar(location.pathname.split("/").pop() || "index.html");
+  document.addEventListener("apt:prefs", () => FS.repaint());
+  FS.repaint();
 
   Object.assign(window, { stamp, toggleTopics, icon, learnSections, soonPage, codeSource: (i) => CODE[i], startStepper, stopStepper, swapLabel, setSwap, $, $$, esc, fmt, hlPy, R, Store, toast, codeBlock, renderBlocks, D, topbar, actionBar, notesBox, DocPage, today, relDay, DAY });
 })();
