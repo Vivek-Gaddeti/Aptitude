@@ -51,6 +51,8 @@
     pin: '<path d="M12 17v5M5 17h14l-2-5V4H7v8z"/>',
     chevron: '<path d="m6 9 6 6 6-6"/>',
     skip: '<path d="M5 5l9 7-9 7zM18 5v14"/>',
+    expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+    collapse: '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
     book: '<path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0 0 4h13"/>',
   };
   const ic = (name, cls) => {
@@ -58,6 +60,18 @@
     return s || (LOCAL_ICONS[name] ? `<svg class="ico${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true">${LOCAL_ICONS[name]}</svg>` : "");
   };
   const body = (t) => fmt(t).replace(/\n/g, "<br>");
+  /* lively helpers: every call is guarded, the SHELL may not provide them */
+  const M = () => window.Motion;
+  const motionOn = () => { try { return !!(M() && M().on && M().on()); } catch (e) { return false; } };
+  const isTouch = () => { try { return matchMedia("(pointer: coarse)").matches; } catch (e) { return false; } };
+  const buzz = (p) => { try { if (motionOn() && isTouch() && navigator.vibrate) navigator.vibrate(p); } catch (e) {} };
+  const lsRaw = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const autoNextOn = () => lsRaw("apt:autonext") === "1";
+  const AN = { t: 0, pending: false };
+  function cancelAuto() { if (AN.t) { clearTimeout(AN.t); AN.t = 0; } const b = document.querySelector(".pr-an"); if (b) b.remove(); }
+  ["pointerdown", "keydown", "touchstart", "wheel"].forEach((n) => document.addEventListener(n, () => { if (AN.t) cancelAuto(); }, true));
+  const confettiAt = (el) => { try { if (M() && M().confetti && motionOn() && el) { const r = el.getBoundingClientRect(); M().confetti({ x: r.left + r.width / 2, y: Math.max(80, r.top + Math.min(r.height / 2, 120)) }); } } catch (e) {} };
+  const countUp = (el, to, fmtFn) => { try { if (el && M() && M().countUp) return M().countUp(el, to, { ms: 600, fmt: fmtFn }); } catch (e) {} if (el) el.textContent = fmtFn ? fmtFn(to) : String(to); };
 
   /* ---------------------------------------------------------------- catalog helpers */
   const CAT = () => window.CATALOG || [];
@@ -95,6 +109,7 @@
     return q;
   };
   const persist = () => {
+    if (view === "suspended") return;                      // the app shell took over: the frame owns the session now
     if (S) { ss.set(SK, S); if (!S.done) { S.at = Date.now(); ls.set(SLK, S); } else ls.del(SLK); syncDaily(); }
     syncResume();
   };
@@ -121,7 +136,8 @@
     stopSpeed();
     closeModal(true);
     POP = null;
-    document.body.classList.remove("in-session");
+    cancelAuto(); closeZoom();
+    document.body.classList.remove("in-session", "pr-focus");
     const h = (location.hash || "").replace(/^#\/?/, ""), parts = h.split("/");
     main.classList.add("pr");
     document.title = "Practice · " + ((window.SITE && SITE.brand) || "Aptitude Hub");
@@ -185,7 +201,7 @@
   const SRC_L = { bank: "bank", gen: "generated", mix: "bank + generated" }, TIM_L = { none: "untimed", target: "target time per question", total: "total timer" };
   function setupView(pre) {
     view = "setup";
-    document.body.classList.remove("in-session");
+    document.body.classList.remove("in-session", "pr-focus");
     const ix = contentIndex();
     const cfg = sanitize(Object.assign(loadCfg(), pre || {}), ix);
     SETUP = cfg;
@@ -254,6 +270,7 @@
           <div class="pr-field"><div class="pr-lab">Difficulty</div><div class="pr-segc" role="group" aria-label="Difficulty">${DIFFS.map((d) => `<button type="button" class="${cfg.diff.includes(d) ? "on" : ""}" data-act="diff" data-v="${d}" aria-pressed="${cfg.diff.includes(d)}">${d}</button>`).join("")}</div></div>
           <div class="pr-field"><div class="pr-lab">Questions</div>${seg("count", [[10, "10"], [20, "20"], [30, "30"]], cfg.count)}</div>
           <div class="pr-field"><div class="pr-lab">Feedback</div>${seg("feedback", [["instant", "Instant"], ["test", "Test"]], cfg.feedback)}</div>
+          ${cfg.feedback === "instant" ? `<div class="pr-field"><div class="pr-lab">Auto-next on correct</div><div class="pr-segc" role="group" aria-label="Auto-next on correct">${[["0", "Off"], ["1", "On"]].map(([v, l]) => `<button type="button" class="${(autoNextOn() ? "1" : "0") === v ? "on" : ""}" data-act="autonext" data-v="${v}" aria-pressed="${(autoNextOn() ? "1" : "0") === v}">${l}</button>`).join("")}</div></div>` : ""}
           <div class="pr-field"><div class="pr-lab">Timing</div>${seg("timing", [["none", "Untimed"], ["target", "Per question"], ["total", "Total"]], cfg.timing)}</div>
           <div class="pr-field"><div class="pr-lab">Source</div>${seg("source", [["bank", "Bank"], ["gen", "Generated"], ["mix", "Mix"]], cfg.source)}</div>
         </div>
@@ -286,7 +303,8 @@
 
   function setupChange(act, v, el) {
     const c = SETUP;
-    if (act === "sec") { c.sec = v; c.topics = []; c.patterns = []; }
+    if (act === "autonext") { try { localStorage.setItem("apt:autonext", v === "1" ? "1" : "0"); } catch (e) {} }
+    else if (act === "sec") { c.sec = v; c.topics = []; c.patterns = []; }
     else if (act === "topic") {
       c.topics = c.topics.includes(v) ? (c.topics.length > 1 ? c.topics.filter((x) => x !== v) : c.topics) : c.topics.concat(v);
       c.patterns = [];
@@ -546,6 +564,7 @@
   function playerView() {
     view = "run";
     document.body.classList.add("in-session");
+    document.body.classList.toggle("pr-focus", document.documentElement.dataset.device !== "tablet");   // tablets have the session rail instead
     S.idx = clamp(S.idx, 0, total() - 1);
     S.far = Math.max(S.far || 0, S.idx);
     resume();
@@ -563,6 +582,8 @@
       if (window.RoughPad && RoughPad.setContext) RoughPad.setContext(q.id);
       const top = main.getBoundingClientRect().top + window.scrollY - 70;
       if (window.scrollY > top) window.scrollTo(0, Math.max(0, top));
+      const qEl = document.getElementById("prQ");
+      if (qEl && motionOn() && M().enter) M().enter(qEl);
     } else window.scrollTo(0, y);
     tick();
   }
@@ -587,8 +608,6 @@
   function crumbHTML(q) {
     return `<span class="pr-chip sec" style="--sc:var(${SEC_VAR[q.sec] || "--accent"})">${esc(secName(q.sec))}</span><span class="sep">›</span><span class="ct">${esc(topicTitle(q.sec, q.topic))}</span><span class="sep">›</span><span class="cp">${esc(patTitle(q.sec, q.topic, q.pattern))}</span>`;
   }
-  const isTouch = () => { try { return matchMedia("(pointer: coarse)").matches; } catch (e) { return false; } };
-
   function playerHTML(fresh) {
     const q = cur(), i = S.idx, n = total(), a = S.ans[i] || null;
     const test = isTest(), drill = S.mode === "drill", daily = S.mode === "daily";
@@ -629,14 +648,14 @@
     const head = `<div class="pr-top"><button type="button" class="pr-back" data-act="end">${ic("back")} ${daily ? "Save and exit" : "End"}</button>
       <div class="pr-crumb">${crumbHTML(q)} <span class="pr-chip ${DCLS[curD] || "med"}">${esc(curD)}</span></div><span class="grow"></span>
       <span class="pr-qcount">${prog}</span>${clockHTML()}
-      <button type="button" class="pr-back pr-sesbtn" data-act="pop" data-v="session" aria-expanded="false">Session ${ic("chevron")}</button>${sessionPopHTML()}</div>
+      ${fsBtnHTML()}<button type="button" class="pr-back pr-sesbtn" data-act="pop" data-v="session" aria-expanded="false">Session ${ic("chevron")}</button>${sessionPopHTML()}</div>
       <div class="pr-seg${drill ? " drill" : ""}">${segHTML()}</div>`;
 
     let mainCol;
     if (set) {
       const sibs = S.items.map((id, k) => [id, k]).filter(([id]) => getQ(id).set === q.set), pos = sibs.findIndex(([, k]) => k === i);
       const nav = `<div class="pr-setnav">Question ${pos + 1} of ${sibs.length} in this set ${sibs.map(([, k]) => `<i class="${k === i ? "cur" : S.ans[k] && S.ans[k].c != null ? (test ? "c" : S.ans[k].ok ? "c" : "w") : ""}"></i>`).join("")}</div>`;
-      mainCol = `<div class="pr-split"><div class="pr-card pr-stim"><span class="pr-pin">${ic("pin")}stays in view</span>${QB.setHTML(set)}</div><div class="pr-col">${nav}${qcard}${after}${acts}</div></div>`;
+      mainCol = `<div class="pr-split"><div class="pr-card pr-stim" data-act="zoom" role="button" tabindex="0" aria-label="Enlarge the chart or passage"><span class="pr-pin">${ic("pin")}tap to enlarge</span>${QB.setHTML(set)}</div><div class="pr-col">${nav}${qcard}${after}${acts}</div></div>`;
     } else mainCol = `<div class="pr-col">${qcard}${after}${acts}</div>`;
 
     // tablet thumb rail (CSS shows it only when html[data-device="tablet"])
@@ -645,16 +664,23 @@
         <div class="sr-top"><button type="button" class="sr-btn sr-end" data-act="end">${daily ? "Save + exit" : "End"}</button>
           <div class="sr-q">Q <b>${i + 1}</b>${drill ? "" : ` / ${n}`}</div>${clockHTML()}</div>
         <div class="sr-tools">
+          <div class="sr-pair"><button type="button" class="sr-btn sr-prev" data-act="prev"${i === 0 ? " disabled" : ""}><span>Prev</span></button>
+            ${test ? (answered ? `<button type="button" class="sr-btn" data-act="clear"><span>Clear</span></button>` : `<button type="button" class="sr-btn" disabled><span>Skip</span></button>`) : `<button type="button" class="sr-btn sr-skip" data-act="skip"${done ? " disabled" : ""}><span>Skip</span></button>`}</div>
           ${test ? "" : `<button type="button" class="sr-btn" data-act="skey"><span>Solution</span><kbd>S</kbd></button>`}
           <button type="button" class="sr-btn${marked ? " on" : ""}" data-act="mark" aria-pressed="${marked}"><span>Mark</span><kbd>M</kbd></button>
-          <button type="button" class="sr-btn${starred ? " on" : ""}" data-act="star" aria-pressed="${starred}"><span>Bookmark</span><kbd>F</kbd></button>
+          <button type="button" class="sr-btn${starred ? " on" : ""}" data-act="star" aria-pressed="${starred}"><span>Star</span><kbd>F</kbd></button>
           <button type="button" class="sr-btn" data-act="rough"><span>Rough work</span><kbd>W</kbd></button>
-          <button type="button" class="sr-btn" data-act="pop" data-v="session"><span>Session</span>${sc ? `<kbd>${sc.ok}/${sc.n}</kbd>` : ""}</button>
+          <button type="button" class="sr-btn" data-act="pop" data-v="session"><span>Session</span>${sc ? `<small class="sr-sub">${sc.ok}/${sc.n}</small>` : ""}</button>
         </div>
         <button type="button" class="btn primary sr-next" data-act="next"${!test && !done ? " disabled" : ""}>${last ? "Finish" : "Next"}</button>
       </aside>`;
     return `<div class="pr-play${set ? " wide" : ""}">${head}${mainCol}</div>${rail}`;
   }
+
+  const fsOK = () => { try { return !!(window.Fullscreen && Fullscreen.supported && Fullscreen.supported()); } catch (e) { return false; } };
+  const fsOn = () => { try { return !!(window.Fullscreen && Fullscreen.active && Fullscreen.active()); } catch (e) { return false; } };
+  const fsBtnHTML = () => fsOK() ? `<button type="button" class="pr-back pr-fsbtn" data-act="fs" aria-pressed="${fsOn()}" aria-label="${fsOn() ? "Exit fullscreen" : "Fullscreen"}" title="Fullscreen">${ic(fsOn() ? "collapse" : "expand")}<span>Fullscreen</span></button>` : "";
+  document.addEventListener("apt:fs", () => { main.querySelectorAll(".pr-fsbtn").forEach((b) => { const on = fsOn(); b.setAttribute("aria-pressed", String(on)); b.setAttribute("aria-label", on ? "Exit fullscreen" : "Fullscreen"); const sv = b.querySelector("svg"); if (sv) sv.outerHTML = ic(on ? "collapse" : "expand"); }); });
 
   function afterHTML(q, a, answered, it) {
     const secs = a.secs != null ? a.secs : S.tq[S.idx] || 0, tgt = q.time || 60, d = secs - tgt;
@@ -681,7 +707,7 @@
       wrong ? `<button type="button" class="pr-quiet${inBook ? " on" : ""}" data-act="book">${inBook ? "In mistake book" : "Add to mistake book"}</button>` : "",
       S.mode === "drill" ? "" : `<a class="pr-quiet" href="#drill/${pk(q)}" data-act="drill">Drill this pattern</a>`,
     ].join("");
-    return `<div class="pr-card pr-after" role="status">${res}${sol}${tempt}${reasons}<div class="pr-afoot">${foot}</div></div>`;
+    return `<div class="pr-card pr-after" role="status">${AN.pending ? '<div class="pr-an" aria-hidden="true"><i></i></div>' : ""}${res}${sol}${tempt}${reasons}<div class="pr-afoot">${foot}</div></div>`;
   }
 
   function paletteHTML() {
@@ -805,7 +831,14 @@
     S.ans[i] = { c: k, ok: r.ok, secs };
     if (S.mode === "drill") drillAdapt(r.ok);
     persist();
+    cancelAuto();
+    const auto = r.ok && autoNextOn() && (S.mode === "drill" || i < total() - 1);
+    AN.pending = auto;
     paint(false);
+    AN.pending = false;
+    if (r.ok) buzz(10);
+    else { buzz([18, 40, 18]); const bad = main.querySelector(".pr-opt.bad"); if (bad && motionOn() && M().nudge) M().nudge(bad); }
+    if (auto) AN.t = setTimeout(() => { AN.t = 0; const b = document.querySelector(".pr-an"); if (b) b.remove(); if (view === "run" && S && S.idx === i && !modalOpen()) next(); }, 900);
   }
   function reveal() {
     if (isTest()) return;
@@ -1018,9 +1051,9 @@
       <h1 class="pr-h1">${S.mode === "drill" ? "Drill finished" : S.mode === "daily" ? "Daily set done" : "Set finished"}</h1>
       ${S.mode === "daily" ? `<p class="lead pr-dailydone">${dailyChip()} Nice work showing up today. A fresh set is built tomorrow from what you get wrong now.</p>` : ""}
       <div class="pr-card is-hero pr-hero ${hot ? "hot" : ""}">
-        <div class="pr-score"><b>${okN}</b><span>/ ${n}${S.mode === "drill" ? "" : ""}</span><div class="muted small">${answered ? (acc >= 80 ? "Strong set." : acc >= 50 ? "Decent. The slips below are the quick wins." : "Rough one. Work through the solutions below.") : "Nothing answered."}</div></div>
+        <div class="pr-score"><b data-cu="${okN}">${okN}</b><span>/ ${n}${S.mode === "drill" ? "" : ""}</span><div class="muted small">${answered ? (acc >= 80 ? "Strong set." : acc >= 50 ? "Decent. The slips below are the quick wins." : "Rough one. Work through the solutions below.") : "Nothing answered."}</div></div>
         <div class="pr-stats big">
-          <div><b>${acc}%</b><span>accuracy</span></div>
+          <div><b data-cu="${acc}" data-pct="1">${acc}%</b><span>accuracy</span></div>
           <div><b>${mmss(tot)}</b><span>total time</span></div>
           <div><b>${answered ? mmss(avg) : "-"}</b><span>avg / question <small>(target ${mmss(avgTgt)})</small></span></div>
           <div><b>${badN}</b><span>wrong${skipN ? ` · ${skipN} skipped` : ""}</span></div>
@@ -1034,6 +1067,8 @@
         ${S.mode === "daily" ? `<a class="btn" href="#speed">${ic("bolt")} Speed drill</a>` : ""}
         <span class="grow"></span><a class="btn primary" href="#setup" data-act="newset">New set</a></div></div>`;
     window.scrollTo(0, 0);
+    main.querySelectorAll("[data-cu]").forEach((el) => countUp(el, +el.dataset.cu, el.dataset.pct ? (v) => Math.round(v) + "%" : null));
+    if (acc >= 80 && answered >= 5 && !S.confetti) { S.confetti = true; persist(); confettiAt(main.querySelector(".pr-hero")); }
     if (S.mode === "daily" && !S.celebrated) { S.celebrated = true; persist(); toast("Daily set done. See you tomorrow!", 2200, "check"); }
   }
   function retryWrong() {
@@ -1174,7 +1209,7 @@
       <div class="pr-sbar"><button type="button" class="pr-back" data-act="sp-modes">${ic("back")} Modes</button><div class="pr-crumb"><b>Speed drill</b> <span class="sep">›</span> ${esc(speedName(SP.mode))}</div></div>
       <h1 class="pr-h1">${saved ? "Time!" : "Stopped early"}</h1>
       <div class="pr-card is-hero pr-hero${newBest ? " hot" : ""}">
-        <div class="pr-score"><b>${ok}</b><span>correct</span><div class="muted small">${saved ? (newBest ? "New best for this mode." : best ? `Your best here is ${best}.` : "") : "Runs you stop early are not saved."}</div></div>
+        <div class="pr-score"><b data-cu="${ok}">${ok}</b><span>correct</span><div class="muted small">${saved ? (newBest ? "New best for this mode." : best ? `Your best here is ${best}.` : "") : "Runs you stop early are not saved."}</div></div>
         <div class="pr-stats big">
           <div><b>${n ? Math.round((ok / n) * 100) + "%" : "-"}</b><span>accuracy</span></div>
           <div><b>${n}</b><span>answered</span></div>
@@ -1189,6 +1224,8 @@
       </div>
       <div class="pr-actions pr-final"><button class="btn" data-act="sp-modes">Change mode</button><a class="btn" href="#setup">Back to practice</a><span class="grow"></span>
         <button class="btn primary" data-act="sp-start">Go again <kbd>Enter</kbd></button></div></div>`;
+    main.querySelectorAll("[data-cu]").forEach((el) => countUp(el, +el.dataset.cu, el.dataset.pct ? (v) => Math.round(v) + "%" : null));
+    if (newBest) { confettiAt(main.querySelector(".pr-hero")); try { if (M() && M().celebrate && motionOn()) M().celebrate("best", "New best"); } catch (e) {} }
   }
   function speedStart() {
     SP.seed = (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0;
@@ -1308,7 +1345,7 @@
       return;
     }
     if (view === "setup") {
-      if (["sec", "topic", "pat", "pat-all", "diff", "set"].includes(act)) return setupChange(act, el.dataset.v, el);
+      if (["sec", "topic", "pat", "pat-all", "diff", "set", "autonext"].includes(act)) return setupChange(act, el.dataset.v, el);
       if (act === "start") return start();
       if (act === "resume") return go("run");
       if (act === "discard") { dropSession(); return setupView(); }
@@ -1316,6 +1353,8 @@
     }
     if (view === "run") {
       if (act === "pop") return togglePop(el.dataset.v);
+      if (act === "fs") { try { if (window.Fullscreen && Fullscreen.toggle) Fullscreen.toggle(); } catch (err) {} return; }
+      if (act === "zoom") { if (e.target.closest("a,button,summary")) return; return openZoom(el); }
       if (act === "skey") return solKey();
       if (act === "rough") { if (window.RoughPad && RoughPad.toggle) RoughPad.toggle(); return; }
       if (act === "opt") return answer(+el.dataset.i);
@@ -1344,12 +1383,38 @@
       if (act === "newset") { e.preventDefault(); S = S && S.done ? S : S; return go("", true); }
     }
   });
+  /* tap the chart or passage to see it enlarged (Esc or a tap closes) */
+  let zoomEl = null;
+  function openZoom(src) {
+    closeZoom();
+    flush();
+    const z = document.createElement("div");
+    z.className = "pr-zoom";
+    z.setAttribute("role", "dialog"); z.setAttribute("aria-modal", "true"); z.setAttribute("aria-label", "Enlarged view");
+    const clone = src.cloneNode(true);
+    clone.querySelectorAll(".pr-pin").forEach((x) => x.remove());
+    ["data-act", "role", "tabindex", "aria-label"].forEach((a) => clone.removeAttribute(a));
+    clone.querySelectorAll("[id]").forEach((x) => x.removeAttribute("id"));
+    z.innerHTML = `<div class="pr-zoom-box"><button type="button" class="pr-zoom-x" aria-label="Close">${ic("x")}<span>Close</span></button><div class="pr-zoom-body"></div></div>`;
+    z.querySelector(".pr-zoom-body").appendChild(clone);
+    z.addEventListener("click", () => closeZoom());
+    document.body.appendChild(z);
+    zoomEl = z;
+    const b = z.querySelector(".pr-zoom-x"); if (b) b.focus({ preventScroll: true });
+  }
+  function closeZoom() {
+    if (!zoomEl) return;
+    zoomEl.remove(); zoomEl = null;
+    if (view === "run") resume();
+  }
+  main.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".pr-stim")) { e.preventDefault(); e.stopPropagation(); openZoom(e.target); } });
   main.addEventListener("click", (e) => { const r = e.target.closest("[data-reset]"); if (r) { dropSession(); } });
 
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const t = e.target;
     if (t && t.closest && (t.closest("input,textarea,select,[contenteditable='true'],.rw-drawer,.psel-menu") || t.isContentEditable)) return;
+    if (zoomEl) { if (e.key === "Escape" || e.key === "Enter" || e.key === " ") { e.preventDefault(); closeZoom(); } return; }
     if (modalOpen()) {
       if (e.key === "Escape") { e.preventDefault(); closeModal(false); }
       else if (e.key === "Enter") { /* the focused button decides */ }
@@ -1403,6 +1468,14 @@
     }, { passive: true });
   })();
 
-  window.addEventListener("hashchange", safeRoute);
+  /* the app shell (fullscreen) replaces this page with a frame of itself: save, stop every timer, and stay inert (no ticks, no routing, no unload prompt) */
+  document.addEventListener("apt:suspend", () => {
+    try { if (S) { flush(); persist(); } } catch (e) {}
+    clearInterval(T.iv); T.iv = null;
+    try { cancelAuto(); } catch (e) {}
+    try { if (SP && SP.raf) { cancelAnimationFrame(SP.raf); SP.raf = 0; } } catch (e) {}
+    view = "suspended";
+  });
+  window.addEventListener("hashchange", () => { if (view !== "suspended") safeRoute(); });
   safeRoute();
 })();

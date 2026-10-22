@@ -72,7 +72,6 @@
 mark.ch-hl { background: var(--hl); color: #1d1d1f; border-radius: 3px; padding: 0 .06em; }
 @media (max-width: 900px) {
   .ch-body { grid-template-columns: minmax(0, 1fr); }
-  .ch-toc { display: none; }
   .ch-grid { grid-template-columns: minmax(0, 1fr); }
   .ch-row { grid-template-columns: minmax(0, 1fr); row-gap: .15rem; }
   .ch-n, .ch-note { padding-top: 0; }
@@ -117,10 +116,29 @@ mark.ch-hl { background: var(--hl); color: #1d1d1f; border-radius: 3px; padding:
   html[data-device="desktop"] body.toc-closed .ch-cards { grid-column: 1; }
   html[data-device="desktop"] body.toc-closed .ch-toc-open { display: inline-flex; align-items: center; gap: .5rem; }
 }
+/* Contents drawer: below 900px, and on a tablet whose content area is under 1000px (class .ch-dm is set from JS) */
+.ch-contents, .ch-drawer-h, .ch-scrim { display: none; }
+.ch-dm .ch-contents { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; padding: .4rem 1rem; border: 2px solid var(--line-control); background: var(--panel); color: var(--text); font: inherit; font-weight: 800; cursor: pointer; border-radius: 0; box-shadow: none; transform: none; }
+.ch-dm .ch-contents:hover { background: var(--panel-2); }
+.ch-dm .ch-contents .ico { width: 20px; height: 20px; }
+.ch-dm .ch-body { grid-template-columns: minmax(0, 1fr); }
+.ch-dm .ch-toc-rz, .ch-dm .ch-toc-close, .ch-dm .ch-toc-open { display: none !important; }
+.ch-dm .ch-cards { grid-column: 1; grid-row: 1; }
+.ch-dm .ch-toc { position: fixed; top: 0; bottom: 0; left: 0; right: auto; z-index: 320; width: min(86vw, 320px); max-height: none; box-sizing: border-box; padding: .75rem .75rem 2rem; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--panel); color: var(--text); border-right: 2px solid var(--line); transform: translateX(-105%); visibility: hidden; grid-column: auto; grid-row: auto; }
+.ch-dm .ch-toc.open { transform: none; visibility: visible; }
+html[data-device="tablet"][data-hand="left"] .ch-dm .ch-toc { left: auto; right: 0; border-right: 0; border-left: 2px solid var(--line); transform: translateX(105%); }
+html[data-device="tablet"][data-hand="left"] .ch-dm .ch-toc.open { transform: none; }
+.ch-dm .ch-drawer-h { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; font: 800 1.05rem var(--sans); }
+.ch-dm .ch-drawer-h button { display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; background: var(--panel); border: 2px solid var(--line-control); color: var(--text); cursor: pointer; }
+.ch-dm .ch-drawer-h .ico { width: 20px; height: 20px; }
+.ch-dm .ch-scrim { display: block; position: fixed; inset: 0; z-index: 319; background: rgba(0,0,0,.4); }
+.ch-dm .ch-scrim[hidden] { display: none; }
 @media print {
+  .ch-scrim, .ch-contents { display: none !important; }
   @page { margin: 12mm; }
   html, body { background: #fff !important; color: #000 !important; }
-  #topbar, .ch-toc, .ch-toc-rz, .ch-bar, .ch-pr, .ch-empty, .ch-empty-all, .ch-print, #roughBtn, #roughPad, .rough-btn, .rough-pad, [id^="fx"], .fx-layer, canvas { display: none !important; }
+  #topbar, .ch-toc, .ch-scrim, .ch-toc-rz, .ch-bar, .ch-pr, .ch-empty, .ch-empty-all, .ch-print, #roughBtn, #roughPad, .rough-btn, .rough-pad, [id^="fx"], .fx-layer, canvas { display: none !important; }
   #content.ch-page { max-width: none; padding: 0; margin: 0; }
   .ch-head { margin-bottom: 6mm; }
   .ch-head h1 { font-size: 18pt; }
@@ -212,14 +230,16 @@ mark.ch-hl { background: var(--hl); color: #1d1d1f; border-radius: 3px; padding:
       <div class="ch-head"><div><h1>Cheat sheet</h1>
         <p class="ch-lead">Every formula, shortcut and memory table in one place. Search to filter, pick a section, or print the lot (or just the section you filtered to) for the night before the test.</p></div></div>
       <div class="ch-bar">
+        <button type="button" class="ch-contents" id="chContents" aria-haspopup="dialog" aria-expanded="false" aria-controls="chToc">${icon("sidebar")} Contents</button>
         <label class="ch-search">${icon("search")}<input id="chQ" type="search" placeholder="Search formulas, rules, topics" autocomplete="off" spellcheck="false" aria-label="Search the cheat sheet"><kbd>/</kbd></label>
         <div class="ch-chips" role="group" aria-label="Section">${chipDefs.map(([k, l]) => `<button type="button" class="ch-chip" data-k="${k}" aria-pressed="${k === "all"}">${l}<i>${counts[k]}</i></button>`).join("")}</div>
         <button type="button" class="btn ch-toc-open" aria-label="Show topics" title="Show topics  ( [ )">${icon("sidebar")} Topics</button>
         <button type="button" class="ch-print" id="chPrint">${PRINT_ICO}<span>Print</span></button>
       </div>
-      <div class="ch-body"><nav class="ch-toc" aria-label="Topics"><button type="button" class="ch-toc-close" aria-label="Hide topics" title="Hide topics  ( [ )">${icon("sidebar")}</button>${toc}</nav>
+      <div class="ch-body"><nav class="ch-toc" id="chToc" aria-label="Topics"><div class="ch-drawer-h"><span>Contents</span><button type="button" class="ch-drawer-x" aria-label="Close contents">${icon("x")}</button></div><button type="button" class="ch-toc-close" aria-label="Hide topics" title="Hide topics  ( [ )">${icon("sidebar")}</button>${toc}</nav>
         <div class="ch-cards" id="chCards">${cards}<div class="ch-empty" hidden>Nothing matches that search. Try a shorter word, like "ratio" or "tense".</div>
-        ${counts.all ? "" : '<div class="ch-empty-all">No cheat sheet data loaded.</div>'}</div></div>`;
+        ${counts.all ? "" : '<div class="ch-empty-all">No cheat sheet data loaded.</div>'}</div></div>
+      <div class="ch-scrim" hidden></div>`;
 
     const q = document.getElementById("chQ"), cardsEl = document.getElementById("chCards"), tocEl = root.querySelector(".ch-toc");
     const cardEls = Array.from(cardsEl.querySelectorAll(".ch-card"));
@@ -279,8 +299,52 @@ mark.ch-hl { background: var(--hl); color: #1d1d1f; border-radius: 3px; padding:
     });
     tocEl.addEventListener("click", (e) => {
       const a = e.target.closest("a"); if (!a) return; e.preventDefault();
+      if (drawerOpen) closeDrawer(true);
       document.getElementById(a.dataset.card).scrollIntoView({ behavior: "auto", block: "start" });
     });
+    /* Contents drawer for tablet + phone */
+    const dBtn = document.getElementById("chContents"), scrim = root.querySelector(".ch-scrim"), dX = root.querySelector(".ch-drawer-x");
+    let drawerOpen = false;
+    function wantDrawer() {
+      if (window.innerWidth <= 900) return true;
+      const dev = document.documentElement.getAttribute("data-device");
+      return dev === "tablet" && root.getBoundingClientRect().width < 1000;
+    }
+    function openDrawer() {
+      if (drawerOpen) return; drawerOpen = true;
+      tocEl.classList.add("open"); scrim.hidden = false; dBtn.setAttribute("aria-expanded", "true");
+      tocEl.setAttribute("role", "dialog"); tocEl.setAttribute("aria-modal", "true");
+      const first = tocEl.querySelector("a:not([hidden])") || dX; (first || dX).focus({ preventScroll: true });
+      tocEl.scrollTop = 0;
+      const on = tocEl.querySelector("a.on:not([hidden])"); if (on) on.scrollIntoView({ block: "center" });
+    }
+    function closeDrawer(refocus) {
+      if (!drawerOpen) return; drawerOpen = false;
+      tocEl.classList.remove("open"); scrim.hidden = true; dBtn.setAttribute("aria-expanded", "false");
+      tocEl.removeAttribute("role"); tocEl.removeAttribute("aria-modal");
+      if (refocus) dBtn.focus({ preventScroll: true });
+    }
+    function layout() {
+      const on = wantDrawer();
+      if (on !== root.classList.contains("ch-dm")) { if (!on) closeDrawer(false); root.classList.toggle("ch-dm", on); }
+    }
+    layout();
+    window.addEventListener("resize", layout);
+    window.addEventListener("orientationchange", () => setTimeout(layout, 200));
+    window.addEventListener("load", layout);
+    dBtn.addEventListener("click", () => (drawerOpen ? closeDrawer(true) : openDrawer()));
+    dX.addEventListener("click", () => closeDrawer(true));
+    scrim.addEventListener("click", () => closeDrawer(true));
+    document.addEventListener("keydown", (e) => {
+      if (!drawerOpen) return;
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeDrawer(true); return; }
+      if (e.key === "Tab") {
+        const f = Array.from(tocEl.querySelectorAll("a:not([hidden]), button")); if (!f.length) return;
+        const a = f[0], z = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); }
+        else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
+      }
+    }, true);
     /* highlight the TOC entry of the card nearest the top */
     if ("IntersectionObserver" in window) {
       const io = new IntersectionObserver((es) => {

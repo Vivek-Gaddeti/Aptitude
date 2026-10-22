@@ -164,7 +164,7 @@
   const ivl = (lvl) => { const d = INTERVALS[lvl]; return d < 30 ? d + "d" : Math.round(d / 30) + "mo"; };
 
   /* ---------------------------------------------------------------- state */
-  let main, view = "due", group = "pattern", secF = ss.get("apt:rev:sec") || "", deck = "formulas";
+  let cuView = null, main, view = "due", group = "pattern", secF = ss.get("apt:rev:sec") || "", deck = "formulas";
   let cf = ss.get("apt:rev:cf") || { sec: "", topic: "" };
   let sess = null;
   const openRows = new Set();
@@ -259,7 +259,7 @@
     if (!nQ && !nL) return `<div class="rv-grid"><div>${empty("party", "All caught up", "Nothing is due right now. Wrong answers and lessons you mark as learned come back here on a 1, 3, 7, 14, 30, 60-day schedule.",
       `<div class="btn-row rv-ec"><a class="btn primary" href="practice.html#daily">${ic("play")} Today's daily set</a>${M.mist.length ? `<a class="btn" href="#mistakes">${ic("mistake")} Mistake book (${M.mist.length})</a>` : ""}${M.cardsDue ? `<a class="btn" href="#cards/${deck}">${ic("cards")} ${M.cardsDue} flashcards due</a>` : ""}</div>`)}</div>${rail(M)}</div>`;
     const groups = byTopic(M.due, (a, b) => (a.it.next || 0) - (b.it.next || 0));
-    const hero = `<div class="pr-card is-hero rv-hero"><div class="rv-big"><b>${nQ + nL}</b><span>due</span></div>
+    const hero = `<div class="pr-card is-hero rv-hero"><div class="rv-big"><b data-cu="${nQ + nL}">${nQ + nL}</b><span>due</span></div>
       <div class="rv-hero-t"><b>${nQ ? plural(nQ, "question") : ""}${nQ && nL ? " and " : ""}${nL ? plural(nL, "lesson") : ""}</b> ready for review.
       <div class="muted small">Re-solve each one from memory before you peek at the solution.</div></div><span class="grow"></span>
       ${nQ ? `<a class="btn primary" href="${qsHref(M.due.map((r) => r.k))}">${ic("play")} Practise all due</a>` : ""}</div>`;
@@ -341,7 +341,7 @@
     if (!q.length && !l.length) return `<div class="rv-grid"><div>${empty("star", "No bookmarks yet", "Star a question in practice (the star next to the question) or a lesson (the star in its action bar) and it shows up here for a quick look before an exam.",
       `<div class="btn-row rv-ec"><a class="btn primary" href="practice.html">${ic("play")} Go to practice</a></div>`)}</div>${starRail(M)}</div>`;
     const groups = byTopic(q, (a, b) => (b.it.updated || 0) - (a.it.updated || 0));
-    const hero = q.length ? `<div class="pr-card is-hero rv-hero"><div class="rv-big"><b>${q.length}</b><span>starred</span></div><div class="rv-hero-t"><b>${plural(q.length, "question")}</b> you wanted to keep.<div class="muted small">Open one for its solution, or run them all as a set.</div></div><span class="grow"></span>
+    const hero = q.length ? `<div class="pr-card is-hero rv-hero"><div class="rv-big"><b data-cu="${q.length}">${q.length}</b><span>starred</span></div><div class="rv-hero-t"><b>${plural(q.length, "question")}</b> you wanted to keep.<div class="muted small">Open one for its solution, or run them all as a set.</div></div><span class="grow"></span>
       <a class="btn primary" href="${qsHref(q.map((r) => r.k))}">${ic("play")} Practise all</a></div>` : "";
     return `<div class="rv-grid"><div class="rv-main">${hero}${groups.map((g) => groupCard(topicHead(g.sec, g.topic, g.rows.length), g.rows, "star", g.rows.length > 1 ? g.rows.map((r) => r.k) : [])).join("")}
       ${!q.length ? empty("star", "No starred questions", "Starred lessons are on the right. Star questions in practice to collect them here.") : ""}</div>${starRail(M)}</div>`;
@@ -442,7 +442,12 @@
     const c = curCard(), card = document.getElementById("rvCard");
     if (!c || !card) return;
     sess.flipped = !sess.flipped;
-    card.classList.toggle("on", sess.flipped);
+    const swap = () => card.classList.toggle("on", sess.flipped);
+    const snap = document.documentElement.getAttribute("data-motion") !== "minimal" && !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) && card.animate;
+    if (snap) {   // brutalist snap swap: squash to nothing, swap faces, snap back
+      const a = card.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }], { duration: 60, easing: "steps(2)", fill: "forwards" });
+      a.onfinish = () => { swap(); a.cancel(); card.animate([{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }], { duration: 60, easing: "steps(2)" }); };
+    } else swap();
     card.querySelector(".rv-front").setAttribute("aria-hidden", sess.flipped);
     card.querySelector(".rv-back").setAttribute("aria-hidden", !sess.flipped);
     const fb = main.querySelector(".rv-flipbar"), rb = main.querySelector(".rv-rate");
@@ -480,6 +485,10 @@
       <p class="lead">Your due reviews, the mistake book, bookmarks and flashcards, all on one schedule: 1, 3, 7, 14, 30, then 60 days.</p></div></div>
       ${tabsHTML(M)}<div class="rv-view" data-view="${view}">${v}</div>`;
     if (keepScroll) window.scrollTo(0, y);
+    if (cuView !== view) {      // count up the hero number once per view, not on every re-render
+      cuView = view;
+      if (window.Motion && Motion.on && Motion.on() && Motion.countUp) main.querySelectorAll("[data-cu]").forEach((b) => Motion.countUp(b, +b.dataset.cu, { ms: 500 }));
+    }
     document.title = { due: "Due reviews", mistakes: "Mistake book", bookmarks: "Bookmarks", cards: "Flashcards" }[view] + " · Revision · Aptitude Hub";
   }
   function after(el, fn) { fn(); }

@@ -589,7 +589,7 @@ html[data-device="tablet"][data-hand="left"] .g-rail { right: auto; left: 0; bor
 .gr-nav > :first-child { margin-top: auto; }
 .gr-nav::-webkit-scrollbar { display: none; }
 .gr-tools { flex: none; display: flex; flex-direction: column; border-top: var(--bw) solid var(--line); }
-.gr-item { position: relative; flex: none; width: 100%; min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 4px 2px;
+.gr-item { position: relative; flex: none; width: 100%; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 4px 2px;
   font: 800 .78rem/1.1 var(--display); text-transform: none; letter-spacing: 0; color: var(--text); background: transparent; border: 0; border-bottom: var(--bw-s) solid var(--line); text-decoration: none; cursor: pointer; }
 .gr-item:hover { background: var(--panel-2); color: var(--text); text-decoration: none; }
 .gr-item .ni, .gr-item .ico { display: block; width: 24px; height: 24px; flex: none; }
@@ -679,7 +679,7 @@ html.no-tr *, html.no-tr *::before, html.no-tr *::after { transition: none !impo
    TABLET (stable rail, same content layout on every page, topics drawer) and DESKTOP (resizable / closable sidebar)
    ===================================================================== */
 /* the rail: every slot has a fixed size and position on every page; Topics only fills its slot on lesson pages */
-.gr-item { height: 60px; min-height: 60px; }
+.gr-item { height: var(--gr-item-h, 60px); min-height: 0; }
 .gr-logo { height: 68px; }
 .gr-slot { pointer-events: none; }
 .gr-item[disabled] { opacity: .35; cursor: default; }
@@ -764,3 +764,135 @@ html .rw-drawer { border-left-color: var(--line); }
 [data-theme="dark"] .pr-result.ok { background: var(--f-green); color: var(--on-fill); }
 [data-theme="dark"] .pr-opt.sel .k, [data-theme="dark"] main.pr .pr-opt.sel .k { background: var(--ink); color: var(--bg); }
 [data-theme="dark"] .fd-kind.k-practice { color: var(--f-orange); } [data-theme="dark"] .fd-kind.k-cheat { color: var(--f-lilac); } [data-theme="dark"] .fd-kind.k-mock { color: var(--f-blue); }
+
+/* =====================================================================
+   LIVELY LAYER, FULLSCREEN, TOUCH, PORTRAIT BOTTOM BAR (docs/SPEC-lively.md)
+   Lively = html[data-motion="lively"] (the default) and no prefers-reduced-motion. Minimal / reduced motion = the stamp contract above.
+   ===================================================================== */
+:root { --bar-h: 72px; }
+
+/* ---- fullscreen controls: hidden where the API is missing or the app is installed ---- */
+[data-fs-btn][hidden] { display: none !important; }
+/* the host page of the app shell: a full-viewport iframe (#appFrame) is all that shows; fullscreen stays on while the frame navigates */
+html.app-host, html.app-host body { overflow: hidden !important; height: 100%; }
+html.app-host body > :not(#appFrame) { display: none !important; }
+#appFrame { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; z-index: 2147483000; background: var(--bg); display: block; }
+
+/* ---- reading progress (lessons): a 3px line at the top of the viewport ---- */
+.read-progress { position: fixed; top: 0; left: 0; right: 0; height: 3px; background: var(--accent); transform: scaleX(0); transform-origin: 0 50%; z-index: 300; pointer-events: none; }
+@media print { .read-progress, .mo-badge { display: none !important; } #appFrame { display: none; } }
+
+/* ---- touch: keyboard hints are noise without a keyboard (they stay in prose and in the "?" sheet) ---- */
+html[data-device="tablet"] :is(button, .btn, a, .sr-btn, .pr-quiet, .g-rail) kbd,
+html[data-device="phone"] :is(button, .btn, a, .sr-btn, .pr-quiet, .g-rail) kbd,
+html[data-device="tablet"] .set-keys, html[data-device="phone"] .set-keys { display: none !important; }
+@media (pointer: coarse) {
+  :is(button, .btn, a, .sr-btn, .pr-quiet, .g-rail) kbd, .set-keys { display: none !important; }
+}
+
+/* ---- Settings popover: action buttons (Search / Rough work / Topics only in the portrait bottom bar; Fullscreen everywhere) ---- */
+.set-acts { display: contents; }
+.set-act { display: flex; align-items: center; gap: .7rem; width: 100%; min-height: 52px; margin: 0 0 .5rem; padding: 0 .9rem; font: 800 1rem var(--display); color: var(--text);
+  background: var(--panel); border: var(--bw) solid var(--line-control); cursor: pointer; text-align: left; }
+.set-act:hover { background: var(--panel-2); }
+.set-act .ico { width: 24px; height: 24px; flex: none; }
+.set-act.only-bar { display: none; }
+html[data-device="tablet"][data-orient="portrait"] .set-act.only-bar { display: flex; }
+.set-act[data-fs-btn][hidden] { display: none; }
+
+/* ---- phone header: small labels under the icons (one row; scrolls if a label does not fit) ---- */
+@media (max-width: 640px) {
+  .topbar .nav { overflow-x: auto; }
+  .topbar .nav a { flex-direction: column; justify-content: center; gap: 1px; padding: .2rem .1rem; min-width: 0; min-height: 48px; flex: 1 1 0; font-size: 11px; line-height: 1.1; letter-spacing: 0; text-transform: none; }
+  .topbar .nav a > span:not(.nav-badge) { display: block; }
+  .topbar .nav a .nav-chev { display: none; }
+  .topbar .nav a .ni { width: 20px; height: 20px; }
+  .topbar #fsBtn { display: none !important; }                  /* no room in the phone header: Fullscreen stays in Settings */
+  .topbar .nav a { position: relative; }
+  .topbar .nav a .nav-l { font-size: 0; }
+  .topbar .nav a .nav-l::after { content: attr(data-short); font-size: 11px; }
+  .topbar .nav a .nav-badge { position: absolute; top: 2px; right: 2px; margin: 0; }
+}
+
+/* ---- portrait tablet: the global rail becomes a bottom bar (7 sections + More) ---- */
+html[data-device="tablet"][data-orient="portrait"][data-hand] { --bar-h: 72px; }
+html[data-device="tablet"][data-orient="portrait"][data-hand] body:not(.in-session) { padding-left: 0; padding-right: 0; padding-bottom: var(--bar-h); }
+html[data-device="tablet"][data-orient="portrait"][data-hand] .g-rail {
+  top: auto; bottom: 0; left: 0; right: 0; width: auto; height: var(--bar-h); flex-direction: row; border-left: 0; border-right: 0; border-top: var(--bw) solid var(--line);
+}
+html[data-device="tablet"][data-orient="portrait"][data-hand] body.in-session .g-rail { display: none; }
+html[data-device="tablet"][data-orient="portrait"][data-hand] .gr-logo { display: none; }
+html[data-device="tablet"][data-orient="portrait"][data-hand] .gr-nav { flex-direction: row; flex: 1 1 auto; overflow: hidden; }
+html[data-device="tablet"][data-orient="portrait"][data-hand] .gr-nav > :first-child { margin-top: 0; }
+html[data-device="tablet"][data-orient="portrait"][data-hand] .gr-item { height: var(--bar-h); min-height: var(--bar-h); flex: 1 1 0; width: auto; min-width: 0; border-bottom: 0; border-right: var(--bw-s) solid var(--line); }
+html[data-device="tablet"][data-orient="portrait"][data-hand] .gr-tools { flex: none; flex-direction: row; width: calc(var(--bar-h) * 1.25); border-top: 0; border-left: var(--bw) solid var(--line); }
+html[data-device="tablet"][data-orient="portrait"][data-hand] .gr-tools .gr-item:not(#grMore) { display: none; }
+html[data-device="tablet"][data-orient="portrait"][data-hand] .gr-tools #grMore { border-right: 0; }
+html[data-device="tablet"][data-orient="portrait"][data-hand] .toast { left: 50%; bottom: calc(var(--bar-h) + 12px); }
+html[data-device="tablet"][data-orient="portrait"][data-hand] body.in-session .toast { bottom: calc(var(--sbar-h, 88px) + 12px); }
+html[data-device="tablet"][data-orient="portrait"][data-hand] .to-top, html[data-device="tablet"][data-orient="portrait"][data-hand] .sticky-practise { left: auto; right: 20px; bottom: calc(var(--bar-h) + 20px); }
+html[data-device="tablet"][data-orient="portrait"][data-hand] body.has-sticky .to-top { bottom: calc(var(--bar-h) + 92px); }
+/* topics drawer and rough-work pad open above the bar */
+html[data-device="tablet"][data-orient="portrait"][data-hand] .sidebar { left: auto; right: 0; bottom: var(--bar-h); width: min(360px, calc(100vw - 24px)); border-right: 0; border-left: var(--bw) solid var(--line); }
+html[data-device="tablet"][data-orient="portrait"][data-hand] body.sidebar-open::after { bottom: var(--bar-h); }
+html[data-device="tablet"][data-orient="portrait"][data-hand] .rw-drawer { left: auto; right: 0; bottom: var(--bar-h); width: min(420px, 100vw); transform: translateX(105%); border-left: var(--bw) solid var(--line); border-right: 0; }
+html[data-device="tablet"][data-orient="portrait"][data-hand] .rw-drawer.show { transform: none; }
+html[data-device="tablet"][data-orient="portrait"][data-hand] body.in-session .rw-drawer { right: 0; left: auto; bottom: var(--sbar-h, 88px); }
+
+/* ---- lively: hard-edged snaps only (translate by whole pixels, the ink shadow appearing, stepped timing, the rubber stamp).
+   No fades, no blur, no floating easing, no particles. Every rule is a no-op in minimal mode / reduced motion. ---- */
+@keyframes mo-enter { from { transform: translate(3px, 3px); } to { transform: none; } }
+@keyframes mo-nudge { 0%, 100% { transform: none; } 25% { transform: translateX(-3px); } 50% { transform: translateX(3px); } 75% { transform: translateX(-3px); } }
+@keyframes mo-flame { 0%, 100% { transform: none; } 50% { transform: scale(1.2); } }
+@keyframes mo-stamp { from { transform: scale(.94) rotate(-3deg); } to { transform: scale(1) rotate(-3deg); } }
+.mo-badge { position: fixed; top: 16%; left: 0; right: 0; display: flex; justify-content: center; pointer-events: none; z-index: 390; }
+.mo-badge-i { display: inline-flex; align-items: center; gap: .6rem; padding: .7rem 1.3rem; border: 3px solid var(--ink); background: var(--f-yellow); color: var(--on-fill);
+  font: 900 1.25rem var(--display); text-transform: uppercase; letter-spacing: .03em; transform: rotate(-3deg); box-shadow: 4px 4px 0 var(--ink); animation: mo-stamp 100ms steps(2) both; }
+.mo-badge-i .ico { width: 1.4em; height: 1.4em; }
+.mo-badge-i.k-goal { background: var(--f-green); }
+.mo-badge-i.k-streak { background: var(--f-orange); }
+.mo-badge-i.k-best { background: var(--f-yellow); }
+.mo-badge-i.k-done { background: var(--f-blue); }
+@media (prefers-reduced-motion: no-preference) {
+  html[data-motion="lively"] .is-entering { animation: mo-enter 90ms steps(2); }
+  html[data-motion="lively"] .is-nudged { animation: mo-nudge 160ms steps(4); }
+  html[data-motion="lively"] .is-thunk { transition: box-shadow 80ms linear, transform 80ms linear; }
+  html[data-motion="lively"] .d-streak.hot .f { animation: mo-flame 240ms steps(2) 2 both; }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  html[data-motion="lively"] :is(.db-tile, .pr-quick, .mk-row, .db-sec .btn:not(.primary), .pr-pick, .pr-opt:not(:disabled):not(.ok):not(.bad):not(.sel):not(.dim):not(.answered .pr-opt), #content .gr-item, .nav a:not(.active)) {
+    transition: transform 80ms linear, box-shadow 80ms linear, background-color 80ms linear;
+  }
+  html[data-motion="lively"][data-device] :is(.db-tile, .pr-quick, .mk-row, .db-sec .btn:not(.primary), .pr-pick, .pr-opt:not(:disabled):not(.ok):not(.bad):not(.sel):not(.dim):not(.answered .pr-opt), #content .gr-item, .nav a:not(.active)):hover:not(:active) {
+    transform: translate(-2px, -2px); box-shadow: 3px 3px 0 var(--ink) !important;
+  }
+}
+
+/* ---- header menu button: only in drawer mode (the desktop sidebar column has its own collapse button) ---- */
+@media (min-width: 901px) { html[data-device="desktop"] .menu-btn { display: none !important; } }
+@media (max-width: 900px) { html[data-device="desktop"] .menu-btn { display: inline-grid; } }
+
+/* ---- tablet rail: items never squash; --gr-item-h (48-60px, set by common.js) and the rail scrolls if even 48px does not fit ---- */
+html[data-device="tablet"][data-orient="landscape"] .g-rail, html[data-device="tablet"]:not([data-orient]) .g-rail { overflow-y: auto; scrollbar-width: none; }
+html[data-device="tablet"] .g-rail::-webkit-scrollbar { display: none; }
+html[data-device="tablet"][data-orient="landscape"] .gr-nav { flex: 1 0 auto; overflow: visible; }
+.pg-menu { padding: .5rem; width: min(280px, calc(100vw - 16px)); }
+.pg-item { display: flex; align-items: center; gap: .8rem; min-height: 52px; padding: 0 .9rem; font: 800 1rem var(--display); color: var(--text); text-decoration: none; border-bottom: var(--bw-s) solid var(--line); }
+.pg-item:last-child { border-bottom: 0; }
+.pg-item:hover { background: var(--panel-2); text-decoration: none; }
+.pg-item.active { background: var(--ink); color: var(--bg); }
+.pg-item .ni { width: 24px; height: 24px; flex: none; }
+
+/* ---- lesson action row: three flat bordered toggle buttons with meaning colours (learned green, revision red, bookmark yellow) ---- */
+.doc-actions { gap: .6rem; }
+.da-learn, .da-quiet { font-family: var(--display); font-weight: 800; font-size: .95rem; color: var(--text); text-decoration: none; background: var(--panel); border: var(--bw) solid var(--line-control);
+  min-height: 44px; padding: 0 .9rem; gap: .55rem; cursor: pointer; display: inline-flex; align-items: center; text-underline-offset: 0; }
+.da-learn:hover, .da-quiet:hover { background: var(--panel-2); color: var(--text); text-decoration: none; }
+.da-learn .da-box { width: 20px; height: 20px; border: 2px solid currentColor; background: transparent; }
+.da-learn .da-box .ico { width: 14px; height: 14px; }
+.da-quiet .ico { width: 18px; height: 18px; }
+.da-learn.on, .da-learn.on:hover { background: var(--f-green); color: var(--on-fill); }
+.da-learn.on .da-box { background: transparent; border-color: currentColor; }
+.da-learn.on .da-box .ico { color: var(--on-fill); }
+.da-quiet.on-red.on, .da-quiet.on-red.on:hover { background: var(--red-soft); color: var(--text); }
+.da-quiet.on-amber.on, .da-quiet.on-amber.on:hover { background: var(--f-yellow); color: var(--on-fill); }
