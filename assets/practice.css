@@ -729,3 +729,12 @@ html[data-device="tablet"] body.pr-ws-on .pr-work .rw-pane { flex: 1; }
   html[data-device="tablet"] body.pr-ws-on main.pr .pr-stim { max-height: 28dvh; }
   html[data-device="tablet"] body.pr-ws-on .pr-work { flex: 1 1 0; }
 }
+
+/* ---- tablet: session controls at the top (user request) ----
+   landscape rail: tools stack right under the timer, Next follows them; portrait: the session bar sits at the top of the screen */
+html[data-device="tablet"] .session-rail .sr-tools { margin-top: 0; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail { top: 0; bottom: auto; border-top: 0; border-bottom: 2px solid var(--line); padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session main.pr { padding-top: calc(var(--sbar-h, 88px) + 16px) !important; padding-bottom: 20px !important; }
+@media (orientation: portrait) {
+  html[data-device="tablet"] body.pr-ws-on main.pr { padding-top: calc(var(--sbar-h, 88px) + 12px) !important; padding-bottom: 12px !important; }
+}

@@ -1234,6 +1234,18 @@ html[data-device="tablet"] body.mk-ws-on .mk-work .rw-pane { flex: 1; }
   html[data-device="tablet"] body.mk-ws-on .mk-exam .pr-stim { max-height: 28dvh; }
   html[data-device="tablet"] body.mk-ws-on .mk-work { flex: 1 1 0; }
 }
+
+/* tablet: exam controls at the top (user request): landscape rail tools under the timer, portrait bar at the top of the screen */
+html[data-device="tablet"] body.in-session .session-rail .sr-mid { margin-top: 0; align-content: start; overflow: visible; flex: none; }
+html[data-device="tablet"] body.in-session .session-rail .sr-sec { flex: none; }
+html[data-device="tablet"] body.in-session .mk-bar .mk-fs { display: none; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail { top: 0; bottom: auto; border-top: 0; border-bottom: 3px solid var(--line); }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .page.mk,
+html[data-device="tablet"][data-orient="portrait"][data-hand="left"] body.in-session .page.mk { padding-top: calc(var(--sbar-h) + 16px) !important; padding-bottom: 16px !important; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .mk-palpop.open { top: calc(var(--sbar-h) + .6rem); bottom: auto; }
+@media (orientation: portrait) {
+  html[data-device="tablet"] body.mk-ws-on .page.mk, html[data-device="tablet"][data-hand="left"] body.mk-ws-on .page.mk { padding: calc(var(--sbar-h) + 12px) 16px 12px !important; }
+}
 `;
     document.head.appendChild(st);
   }

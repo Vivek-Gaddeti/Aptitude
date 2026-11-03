@@ -1499,7 +1499,7 @@
     let x0 = 0, y0 = 0, t0 = 0, ok = false;
     main.addEventListener("touchstart", (e) => {
       const t = e.touches[0];
-      ok = view === "run" && e.touches.length === 1 && !e.target.closest("input,textarea,table,svg,.pr-pop,.pr-stim,.table-wrap,[data-scroll]");
+      ok = view === "run" && e.touches.length === 1 && !document.body.classList.contains("pr-ws-on") && !e.target.closest("input,textarea,table,svg,canvas,.pr-pop,.pr-stim,.table-wrap,[data-scroll],#prWork,.rw-drawer,.pr-work");   // never while the rough-work pad is on screen: stylus strokes must not turn the page
       x0 = t.clientX; y0 = t.clientY; t0 = Date.now();
     }, { passive: true });
     main.addEventListener("touchend", (e) => {
