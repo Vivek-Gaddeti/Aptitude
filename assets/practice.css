@@ -705,3 +705,27 @@ body.pr-focus .pr-top .pr-crumb .cp { flex: 0 1 auto; min-width: 0; }
 html[data-device="tablet"][data-orient="portrait"] body.in-session .sr-sub { display: none; }
 .pr-fsbtn span { display: none; }
 .pr-fsbtn { min-width: 44px; justify-content: center; }
+
+/* =====================================================================
+   Tablet workspace: the question on one side, the rough-work pad docked on the other (body.pr-ws-on)
+   ===================================================================== */
+.pr-work[hidden] { display: none; }
+html[data-device="tablet"] body.pr-ws-on main.pr { padding-top: 12px !important; padding-bottom: 12px !important; }
+html[data-device="tablet"] body.pr-ws-on .pr-ws .pr-play, html[data-device="tablet"] body.pr-ws-on .pr-ws .pr-play.wide { max-width: none; width: 100%; margin: 0; min-width: 0; }
+html[data-device="tablet"] body.pr-ws-on .pr-ws .pr-qbody2 { display: block; }
+html[data-device="tablet"] body.pr-ws-on .pr-ws .pr-qtext { margin-bottom: 1rem; }
+html[data-device="tablet"] body.pr-ws-on .pr-ws main.pr .pr-split, html[data-device="tablet"] body.pr-ws-on main.pr .pr-split { grid-template-columns: minmax(0, 1fr); gap: .9rem; }
+html[data-device="tablet"] body.pr-ws-on main.pr .pr-stim { position: static; max-height: 38dvh; max-height: 38vh; max-height: 38dvh; }
+html[data-device="tablet"] body.pr-ws-on .pr-work { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+html[data-device="tablet"] body.pr-ws-on .pr-work .rw-pane { flex: 1; }
+@media (orientation: landscape) {
+  html[data-device="tablet"] body.pr-ws-on .pr-ws { display: grid; grid-template-columns: minmax(0, 1fr) 46%; gap: 16px; align-items: start; min-height: calc(100vh - 24px); min-height: calc(100dvh - 24px); }
+  html[data-device="tablet"] body.pr-ws-on .pr-work { position: sticky; top: 12px; height: calc(100vh - 24px); height: calc(100dvh - 24px); }
+}
+@media (orientation: portrait) {
+  html[data-device="tablet"] body.pr-ws-on main.pr { padding-bottom: calc(var(--sbar-h, 88px) + 12px) !important; }
+  html[data-device="tablet"] body.pr-ws-on .pr-ws { display: flex; flex-direction: column; gap: 12px; height: calc(100vh - var(--sbar-h, 88px) - 32px); height: calc(100dvh - var(--sbar-h, 88px) - 32px); }
+  html[data-device="tablet"] body.pr-ws-on .pr-ws .pr-play, html[data-device="tablet"] body.pr-ws-on .pr-ws .pr-play.wide { flex: 0 1 auto; max-height: 46vh; max-height: 46dvh; overflow-y: auto; overscroll-behavior: contain; }
+  html[data-device="tablet"] body.pr-ws-on main.pr .pr-stim { max-height: 28dvh; }
+  html[data-device="tablet"] body.pr-ws-on .pr-work { flex: 1 1 0; }
+}

@@ -134,10 +134,11 @@
   function route() {
     stopTick();
     stopSpeed();
+    try { if (window.RoughPad && RoughPad.undock) RoughPad.undock(); } catch (e) {}
     closeModal(true);
     POP = null;
     cancelAuto(); closeZoom();
-    document.body.classList.remove("in-session", "pr-focus");
+    document.body.classList.remove("in-session", "pr-focus", "pr-ws-on");
     const h = (location.hash || "").replace(/^#\/?/, ""), parts = h.split("/");
     main.classList.add("pr");
     document.title = "Practice · " + ((window.SITE && SITE.brand) || "Aptitude Hub");
@@ -201,7 +202,7 @@
   const SRC_L = { bank: "bank", gen: "generated", mix: "bank + generated" }, TIM_L = { none: "untimed", target: "target time per question", total: "total timer" };
   function setupView(pre) {
     view = "setup";
-    document.body.classList.remove("in-session", "pr-focus");
+    document.body.classList.remove("in-session", "pr-focus", "pr-ws-on");
     const ix = contentIndex();
     const cfg = sanitize(Object.assign(loadCfg(), pre || {}), ix);
     SETUP = cfg;
@@ -575,7 +576,12 @@
   function paint(fresh) {
     if (!S || view !== "run") return;
     const y = window.scrollY;
+    const oldPlay = main.querySelector(".pr-play"), hadAfter = !!(oldPlay && oldPlay.querySelector(".pr-after")), playTop = oldPlay ? oldPlay.scrollTop : 0;
+    // the tablet workspace column keeps its DOM (pad, focus, calculator) across re-renders: lift it out, then put it back
+    const keepWork = document.getElementById("prWork"), af = document.activeElement, hadFocus = !!(keepWork && af && keepWork.contains(af));
+    if (keepWork) keepWork.remove();
     main.innerHTML = playerHTML(fresh);
+    syncWork(keepWork, hadFocus ? af : null);
     applyPop();
     if (fresh) {
       const q = cur();
@@ -584,9 +590,41 @@
       if (window.scrollY > top) window.scrollTo(0, Math.max(0, top));
       const qEl = document.getElementById("prQ");
       if (qEl && motionOn() && M().enter) M().enter(qEl);
-    } else window.scrollTo(0, y);
+    } else {
+      window.scrollTo(0, y);
+      const play = main.querySelector(".pr-play");
+      if (play && wsOn()) {
+        play.scrollTop = playTop;
+        const aft = play.querySelector(".pr-after");
+        if (aft && !hadAfter && window.matchMedia("(orientation: portrait)").matches) aft.scrollIntoView({ block: "nearest" });     // the answer just landed: bring the result into view
+      }
+    }
     tick();
   }
+
+  /* ---- tablet workspace: the question on one side, the rough-work pad docked on the other (apt:ws = off collapses it) ---- */
+  let WSL = false;
+  const wsDevice = () => document.documentElement.dataset.device === "tablet";
+  const wsOn = () => { if (!wsDevice()) return false; try { return localStorage.getItem("apt:ws") !== "off"; } catch (e) { return true; } };
+  function syncWork(keep, refocus) {
+    const slot = document.getElementById("prWork");
+    const R = window.RoughPad;
+    document.body.classList.toggle("pr-ws-on", wsOn());
+    if (!slot || !R || !R.dock || !wsDevice()) { try { R && R.undock && R.undock(); } catch (e) {} return; }
+    let host = slot;
+    if (keep) { slot.replaceWith(keep); host = keep; }
+    host.hidden = !wsOn();
+    R.dock(host);                                            // idempotent; the pad stays docked (collapsed) while the column is hidden
+    if (refocus && document.contains(refocus)) { try { refocus.focus({ preventScroll: true }); } catch (e) {} }
+  }
+  function toggleWs() {
+    try { localStorage.setItem("apt:ws", wsOn() ? "off" : "on"); } catch (e) {}
+    paint(false);
+  }
+  document.addEventListener("apt:rwtoggle", (e) => { if (view === "run" && wsDevice()) { e.preventDefault(); toggleWs(); } });
+  const wsCheck = () => { if (view === "run" && S && wsDevice() !== WSL) paint(false); };
+  document.addEventListener("apt:prefs", wsCheck);
+  window.addEventListener("resize", wsCheck);
   const modeName = () => (S.cfg.label || (S.mode === "drill" ? "Pattern drill" : "Topic practice"));
 
   const clockHTML = () => `<span class="pr-clock" data-clock title="Your time / target"><b class="t">0:00</b><span class="tg"></span></span>`;
@@ -660,6 +698,8 @@
 
     // tablet thumb rail (CSS shows it only when html[data-device="tablet"])
     const sc = isTest() ? null : scoreOf();
+    const padBtn = wsDevice() ? `<button type="button" class="sr-btn${wsOn() ? " on" : ""}" data-act="rough" aria-pressed="${wsOn()}"><span>${wsOn() ? "Hide pad" : "Show pad"}</span><kbd>W</kbd></button>`
+      : `<button type="button" class="sr-btn" data-act="rough"><span>Rough work</span><kbd>W</kbd></button>`;
     const rail = `<aside class="session-rail" aria-label="Session controls">
         <div class="sr-top"><button type="button" class="sr-btn sr-end" data-act="end">${daily ? "Save + exit" : "End"}</button>
           <div class="sr-q">Q <b>${i + 1}</b>${drill ? "" : ` / ${n}`}</div>${clockHTML()}</div>
@@ -669,12 +709,15 @@
           ${test ? "" : `<button type="button" class="sr-btn" data-act="skey"><span>Solution</span><kbd>S</kbd></button>`}
           <button type="button" class="sr-btn${marked ? " on" : ""}" data-act="mark" aria-pressed="${marked}"><span>Mark</span><kbd>M</kbd></button>
           <button type="button" class="sr-btn${starred ? " on" : ""}" data-act="star" aria-pressed="${starred}"><span>Star</span><kbd>F</kbd></button>
-          <button type="button" class="sr-btn" data-act="rough"><span>Rough work</span><kbd>W</kbd></button>
+          ${padBtn}
           <button type="button" class="sr-btn" data-act="pop" data-v="session"><span>Session</span>${sc ? `<small class="sr-sub">${sc.ok}/${sc.n}</small>` : ""}</button>
         </div>
         <button type="button" class="btn primary sr-next" data-act="next"${!test && !done ? " disabled" : ""}>${last ? "Finish" : "Next"}</button>
       </aside>`;
-    return `<div class="pr-play${set ? " wide" : ""}">${head}${mainCol}</div>${rail}`;
+    WSL = wsDevice();
+    const play = `<div class="pr-play${set ? " wide" : ""}">${head}${mainCol}</div>`;
+    if (!WSL) return `${play}${rail}`;
+    return `<div class="pr-ws">${play}<div class="pr-work" id="prWork"${wsOn() ? "" : " hidden"}></div></div>${rail}`;
   }
 
   const fsOK = () => { try { return !!(window.Fullscreen && Fullscreen.supported && Fullscreen.supported()); } catch (e) { return false; } };
@@ -1356,7 +1399,7 @@
       if (act === "fs") { try { if (window.Fullscreen && Fullscreen.toggle) Fullscreen.toggle(); } catch (err) {} return; }
       if (act === "zoom") { if (e.target.closest("a,button,summary")) return; return openZoom(el); }
       if (act === "skey") return solKey();
-      if (act === "rough") { if (window.RoughPad && RoughPad.toggle) RoughPad.toggle(); return; }
+      if (act === "rough") { if (wsDevice()) return toggleWs(); if (window.RoughPad && RoughPad.toggle) RoughPad.toggle(); return; }
       if (act === "opt") return answer(+el.dataset.i);
       if (act === "next") return next();
       if (act === "prev") return prev();

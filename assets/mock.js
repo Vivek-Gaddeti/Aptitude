@@ -401,7 +401,8 @@
     function exitFocus() {
       if (!document.body.classList.contains("mk-focus")) return;
       document.body.classList.remove("mk-focus");
-      document.body.classList.remove("in-session");
+      document.body.classList.remove("in-session", "mk-ws-on");
+      try { if (root.RoughPad && RoughPad.undock) RoughPad.undock(); } catch (e) {}
       palOpen = false;
     }
     const running = () => view === "run" && R && !R.done && document.visibilityState === "visible" && !modalOpen();
@@ -440,7 +441,13 @@
     function paint(fresh, enter) {
       if (!R || view !== "run") return;
       const y = window.scrollY;
+      // the tablet workspace column keeps its DOM (pad, focus, calculator) across re-renders: lift it out, then put it back
+      const keepWork = document.getElementById("mkWork"), af = document.activeElement, hadFocus = !!(keepWork && af && keepWork.contains(af));
+      const oldLeft = main.querySelector(".mk-left"), leftTop = oldLeft ? oldLeft.scrollTop : 0;
+      if (keepWork) keepWork.remove();
       main.innerHTML = examHTML();
+      syncWork(keepWork, hadFocus ? af : null);
+      const newLeft = main.querySelector(".mk-left"); if (newLeft && !fresh) newLeft.scrollTop = leftTop;
       if (fresh) {
         const q = getQ(R.items[R.idx].id);
         if (root.RoughPad && RoughPad.setContext) RoughPad.setContext("mock:" + q.id);
@@ -449,6 +456,28 @@
       } else window.scrollTo(0, y);
       tick();
     }
+    /* ---- tablet workspace: the question on one side, the rough-work pad docked on the other (apt:ws = off collapses it) ---- */
+    let WSL = false;
+    const wsDevice = () => document.documentElement.dataset.device === "tablet";
+    const wsOn = () => { if (!wsDevice()) return false; try { return localStorage.getItem("apt:ws") !== "off"; } catch (e) { return true; } };
+    function syncWork(keep, refocus) {
+      const slot = document.getElementById("mkWork"), RP = root.RoughPad;
+      document.body.classList.toggle("mk-ws-on", wsOn());
+      if (!slot || !RP || !RP.dock || !wsDevice()) { try { RP && RP.undock && RP.undock(); } catch (e) {} return; }
+      let host = slot;
+      if (keep) { slot.replaceWith(keep); host = keep; }
+      host.hidden = !wsOn();
+      RP.dock(host);                                           // idempotent; the pad stays docked (collapsed) while the column is hidden
+      if (refocus && document.contains(refocus)) { try { refocus.focus({ preventScroll: true }); } catch (e) {} }
+    }
+    function toggleWs() {
+      try { localStorage.setItem("apt:ws", wsOn() ? "off" : "on"); } catch (e) {}
+      paint(false);
+    }
+    document.addEventListener("apt:rwtoggle", (e) => { if (view === "run" && wsDevice()) { e.preventDefault(); toggleWs(); } });
+    const wsCheck = () => { if (view === "run" && R && wsDevice() !== WSL) paint(false); };
+    document.addEventListener("apt:prefs", wsCheck);
+    window.addEventListener("resize", wsCheck);
     // fullscreen toggle: common.js handles every [data-fs-btn] click and repaints it when the state changes
     function fsBtn(cls) {
       const F = root.Fullscreen;
@@ -535,7 +564,7 @@
         }).join("") : ""}</div>
         <div class="sr-mid">
           <button type="button" data-act="pal" aria-expanded="${palOpen}" class="${palOpen ? "on" : ""}">${ic("list")} Palette</button>
-          <button type="button" data-act="rough" title="Rough-work pad (W)">${ic("pencil")} Rough</button>
+          <button type="button" data-act="rough" title="Rough-work pad (W)" class="${wsOn() ? "on" : ""}"${wsDevice() ? ` aria-pressed="${wsOn()}"` : ""}>${ic("pencil")} ${wsDevice() ? (wsOn() ? "Hide pad" : "Show pad") : "Rough"}</button>
           ${fsBtn("")}
           <button type="button" data-act="clear"${a == null ? " disabled" : ""}>Clear</button>
           <button type="button" data-act="mark" class="${marked ? "on" : ""}" aria-pressed="${marked}">${ic("flag")} ${marked ? "Unmark" : "Mark"}</button>
@@ -552,7 +581,9 @@
         ${fsBtn("btn sm mk-fs")}
         <button type="button" class="btn sm mk-quit" data-act="quit" title="Quit without saving">Quit</button>
       </div>`;
-      return `<div class="mk-exam">${bar}<div class="mk-grid"><div class="mk-main">${mainCol}</div>${rail}</div>${sessRail}</div>`;
+      WSL = wsDevice();
+      if (!WSL) return `<div class="mk-exam">${bar}<div class="mk-grid"><div class="mk-main">${mainCol}</div>${rail}</div>${sessRail}</div>`;
+      return `<div class="mk-exam"><div class="mk-ws"><div class="mk-left">${bar}<div class="mk-grid"><div class="mk-main">${mainCol}</div>${rail}</div></div><div class="mk-work" id="mkWork"${wsOn() ? "" : " hidden"}></div></div>${sessRail}</div>`;
     }
 
     function tick() {
@@ -875,7 +906,7 @@
         if (act === "submit") return submitFlow();
         if (act === "quit") return quitFlow();
         if (act === "pal") { palOpen = !palOpen; return paint(false); }
-        if (act === "rough") { if (root.RoughPad && RoughPad.toggle) RoughPad.toggle(); return; }
+        if (act === "rough") { if (wsDevice()) return toggleWs(); if (root.RoughPad && RoughPad.toggle) RoughPad.toggle(); return; }
       }
       if (view === "result") {
         if (act === "filter") return applyFilter(el.dataset.f, el);
@@ -1179,6 +1210,29 @@ html[data-device="tablet"][data-orient="portrait"][data-hand="left"] body.in-ses
   .mk-sink { grid-template-columns: auto auto minmax(0, 1fr) auto; }
   .mk-sink .bar { display: none; }
   .mk-hist th:nth-child(4), .mk-hist td:nth-child(4), .mk-hist th:nth-child(6), .mk-hist td:nth-child(6) { display: none; }
+}
+
+/* tablet workspace: the question on one side, the rough-work pad docked on the other (body.mk-ws-on) */
+.mk-work[hidden] { display: none; }
+html[data-device="tablet"] body.mk-ws-on .page.mk { padding: 12px calc(var(--rail-w-session, 132px) + 16px) 12px 16px !important; }
+html[data-device="tablet"][data-hand="left"] body.mk-ws-on .page.mk { padding: 12px 16px 12px calc(var(--rail-w-session, 132px) + 16px) !important; }
+html[data-device="tablet"] body.mk-ws-on .mk-left { min-width: 0; }
+html[data-device="tablet"] body.mk-ws-on .mk-qcard { display: block; }
+html[data-device="tablet"] body.mk-ws-on .mk-exam .pr-split { grid-template-columns: minmax(0, 1fr); gap: .9rem; }
+html[data-device="tablet"] body.mk-ws-on .mk-exam .pr-stim { position: static; max-height: 38dvh; }
+html[data-device="tablet"] body.mk-ws-on .mk-bar { padding-top: 0; }
+html[data-device="tablet"] body.mk-ws-on .mk-work { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+html[data-device="tablet"] body.mk-ws-on .mk-work .rw-pane { flex: 1; }
+@media (orientation: landscape) {
+  html[data-device="tablet"] body.mk-ws-on .mk-ws { display: grid; grid-template-columns: minmax(0, 1fr) 46%; gap: 16px; align-items: start; min-height: calc(100vh - 24px); min-height: calc(100dvh - 24px); }
+  html[data-device="tablet"] body.mk-ws-on .mk-work { position: sticky; top: 12px; height: calc(100vh - 24px); height: calc(100dvh - 24px); }
+}
+@media (orientation: portrait) {
+  html[data-device="tablet"] body.mk-ws-on .page.mk, html[data-device="tablet"][data-hand="left"] body.mk-ws-on .page.mk { padding: 12px 16px calc(var(--sbar-h) + 12px) !important; }
+  html[data-device="tablet"] body.mk-ws-on .mk-ws { display: flex; flex-direction: column; gap: 12px; height: calc(100vh - var(--sbar-h) - 32px); height: calc(100dvh - var(--sbar-h) - 32px); }
+  html[data-device="tablet"] body.mk-ws-on .mk-left { flex: 0 1 auto; max-height: 46vh; max-height: 46dvh; overflow-y: auto; overscroll-behavior: contain; }
+  html[data-device="tablet"] body.mk-ws-on .mk-exam .pr-stim { max-height: 28dvh; }
+  html[data-device="tablet"] body.mk-ws-on .mk-work { flex: 1 1 0; }
 }
 `;
     document.head.appendChild(st);
