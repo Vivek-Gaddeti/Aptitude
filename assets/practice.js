@@ -49,6 +49,7 @@
     back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
     solution: '<path d="M9 11.5l3 3 8-8"/><path d="M20 12.5v6.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10"/>',
     pin: '<path d="M12 17v5M5 17h14l-2-5V4H7v8z"/>',
+    pencil: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
     chevron: '<path d="m6 9 6 6 6-6"/>',
     skip: '<path d="M5 5l9 7-9 7zM18 5v14"/>',
     expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
@@ -135,6 +136,7 @@
     stopTick();
     stopSpeed();
     try { if (window.RoughPad && RoughPad.undock) RoughPad.undock(); } catch (e) {}
+    MK.on = false; dropLayers();
     closeModal(true);
     POP = null;
     cancelAuto(); closeZoom();
@@ -580,9 +582,11 @@
     // the tablet workspace column keeps its DOM (pad, focus, calculator) across re-renders: lift it out, then put it back
     const keepWork = document.getElementById("prWork"), af = document.activeElement, hadFocus = !!(keepWork && af && keepWork.contains(af));
     if (keepWork) keepWork.remove();
+    dropLayers();
     main.innerHTML = playerHTML(fresh);
     syncWork(keepWork, hadFocus ? af : null);
     applyPop();
+    mountLayers();
     if (fresh) {
       const q = cur();
       if (window.RoughPad && RoughPad.setContext) RoughPad.setContext(q.id);
@@ -627,6 +631,55 @@
   window.addEventListener("resize", wsCheck);
   const modeName = () => (S.cfg.label || (S.mode === "drill" ? "Pattern drill" : "Topic practice"));
 
+  /* ---- mark up: ink over the question text and the shared stimulus, never the options (RoughPad.layer, guarded: it may not exist) ---- */
+  const MK = { on: false, layers: [] };
+  const penSeen = () => { try { return sessionStorage.getItem("apt:pen") === "1"; } catch (e) { return false; } };
+  if (penSeen()) document.documentElement.classList.add("apt-pen");
+  document.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "pen" || penSeen()) return;
+    try { sessionStorage.setItem("apt:pen", "1"); } catch (err) {}
+    document.documentElement.classList.add("apt-pen");          // CSS reveals the Mark up buttons; nothing re-renders under the pen
+  }, true);
+  const markCapable = () => wsDevice() || penSeen();
+  const layerApi = () => (window.RoughPad && typeof RoughPad.layer === "function" ? RoughPad : null);
+  function dropLayers() { MK.layers.forEach((L) => { try { L.destroy(); } catch (e) {} }); MK.layers = []; }
+  function mountLayers() {
+    const R = layerApi();
+    if (!R || !markCapable() || view !== "run" || !S) return;
+    const q = cur();
+    main.querySelectorAll("[data-mk]").forEach((host) => {
+      try {
+        const L = R.layer(host, host.dataset.mk === "stim" ? q.id + "#stim" : q.id);
+        if (!L) return;
+        if (L.readonly) L.readonly(!MK.on);
+        MK.layers.push(L);
+      } catch (e) {}
+    });
+  }
+  /* rough.js loads after this file: once everything is in, dock the pad and mount the mark-up layers of a question that was painted before it existed */
+  window.addEventListener("load", () => { if (view === "run" && S && layerApi() && !MK.layers.length) paint(false); });
+  function toggleMarkup() {
+    if (!markCapable() || view !== "run") return;
+    MK.on = !MK.on;
+    closeZoom();
+    paint(false);
+  }
+  function clearMarks() { MK.layers.forEach((L) => { try { L.clear(); } catch (e) {} }); toast("Marks cleared", 1200, "check"); }
+  /* review rows: show the marks the student made on a question (a read-only layer, mounted when the row opens) */
+  function reviewMarks(d, key) {
+    const R = layerApi();
+    if (!R || !d.open || d.dataset.mkd) return;
+    const host = d.querySelector("[data-rv]");
+    if (!host) return;
+    d.dataset.mkd = "1";
+    try {
+      const L = R.layer(host, key);
+      if (!L) return;
+      if (L.readonly) L.readonly(true);
+      if (L.hasMarks && !L.hasMarks()) L.destroy(); else MK.layers.push(L);
+    } catch (e) {}
+  }
+
   const clockHTML = () => `<span class="pr-clock" data-clock title="Your time / target"><b class="t">0:00</b><span class="tg"></span></span>`;
   function segHTML() {
     const n = total();
@@ -670,15 +723,17 @@
     const nextBtn = `<button class="btn primary pr-next" data-act="next"${!test && !done ? " disabled" : ""}>${last ? "Finish" : "Next"} <kbd>Enter</kbd></button>`;
     const tools = `<button type="button" class="pr-icon${starred ? " on" : ""}" data-act="star" title="Bookmark (F)" aria-label="Bookmark" aria-pressed="${starred}">${ic(starred ? "star-fill" : "star")}</button>
       <button type="button" class="pr-icon${marked ? " mk" : ""}" data-act="mark" title="Mark for review (M)" aria-label="Mark for review" aria-pressed="${marked}">${ic("flag")}</button>
-      <button type="button" class="pr-icon" data-act="pop" data-v="keys" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" aria-expanded="false"><b>?</b></button>`;
+      <button type="button" class="pr-icon pr-mkbtn${MK.on ? " on" : ""}" data-act="markup" title="Mark up the question (U)" aria-label="Mark up" aria-pressed="${MK.on}">${ic("pencil")}</button>
+      <button type="button" class="pr-icon pr-keysbtn" data-act="pop" data-v="keys" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" aria-expanded="false"><b>?</b></button>`;
     let quiet = "";
     if (test) quiet = `<button class="pr-quiet" data-act="prev"${i === 0 ? " disabled" : ""}>${ic("back")} Previous</button>${answered ? `<button class="pr-quiet" data-act="clear">Clear answer</button>` : ""}`;
     else if (!done) quiet = `<button class="pr-quiet" data-act="reveal">Show solution <kbd>S</kbd></button><button class="pr-quiet" data-act="skip">Skip</button>`;
     const acts = `<div class="pr-actions"><div class="pr-tools">${tools}${quiet}</div><span class="grow"></span>${nextBtn}${keysPopHTML()}</div>`;
 
-    const qcard = `<div class="pr-card pr-qcard${fb ? " answered" : ""}${test ? " test" : ""}" id="prQ">
+    const mkChip = MK.on && markCapable() ? `<div class="pr-mkchip" role="status"><b>Marking up</b><span class="grow"></span><button type="button" class="pr-quiet" data-act="mkclear">Clear marks</button><button type="button" class="btn sm" data-act="mkdone">Done</button></div>` : "";
+    const qcard = `<div class="pr-card pr-qcard${fb ? " answered" : ""}${test ? " test" : ""}" id="prQ">${mkChip}
         <div class="pr-patline">${esc(topicTitle(q.sec, q.topic))} › ${esc(patTitle(q.sec, q.topic, q.pattern))}</div>
-        <div class="pr-qbody2"><div class="pr-qtext">${body(q.q)}</div><div class="pr-opts" role="group" aria-label="Options">${opts}</div></div></div>`;
+        <div class="pr-qbody2"><div class="pr-mkhost" data-mk="q"><div class="pr-qtext">${body(q.q)}</div></div><div class="pr-opts" role="group" aria-label="Options">${opts}</div></div></div>`;
 
     // thin header
     const prog = drill ? `Q <b>${i + 1}</b>` : `Q <b>${i + 1}</b> / ${n}`;
@@ -693,7 +748,7 @@
     if (set) {
       const sibs = S.items.map((id, k) => [id, k]).filter(([id]) => getQ(id).set === q.set), pos = sibs.findIndex(([, k]) => k === i);
       const nav = `<div class="pr-setnav">Question ${pos + 1} of ${sibs.length} in this set ${sibs.map(([, k]) => `<i class="${k === i ? "cur" : S.ans[k] && S.ans[k].c != null ? (test ? "c" : S.ans[k].ok ? "c" : "w") : ""}"></i>`).join("")}</div>`;
-      mainCol = `<div class="pr-split"><div class="pr-card pr-stim" data-act="zoom" role="button" tabindex="0" aria-label="Enlarge the chart or passage"><span class="pr-pin">${ic("pin")}tap to enlarge</span>${QB.setHTML(set)}</div><div class="pr-col">${nav}${qcard}${after}${acts}</div></div>`;
+      mainCol = `<div class="pr-split"><div class="pr-card pr-stim" data-act="zoom" role="button" tabindex="0" aria-label="Enlarge the chart or passage"><span class="pr-pin">${ic("pin")}${MK.on ? "marking up" : "tap to enlarge"}</span><div class="pr-mkhost" data-mk="stim">${QB.setHTML(set)}</div></div><div class="pr-col">${nav}${qcard}${after}${acts}</div></div>`;
     } else mainCol = `<div class="pr-col">${qcard}${after}${acts}</div>`;
 
     // tablet thumb rail (CSS shows it only when html[data-device="tablet"])
@@ -707,15 +762,16 @@
           <div class="sr-pair"><button type="button" class="sr-btn sr-prev" data-act="prev"${i === 0 ? " disabled" : ""}><span>Prev</span></button>
             ${test ? (answered ? `<button type="button" class="sr-btn" data-act="clear"><span>Clear</span></button>` : `<button type="button" class="sr-btn" disabled><span>Skip</span></button>`) : `<button type="button" class="sr-btn sr-skip" data-act="skip"${done ? " disabled" : ""}><span>Skip</span></button>`}</div>
           ${test ? "" : `<button type="button" class="sr-btn" data-act="skey"><span>Solution</span><kbd>S</kbd></button>`}
-          <button type="button" class="sr-btn${marked ? " on" : ""}" data-act="mark" aria-pressed="${marked}"><span>Mark</span><kbd>M</kbd></button>
-          <button type="button" class="sr-btn${starred ? " on" : ""}" data-act="star" aria-pressed="${starred}"><span>Star</span><kbd>F</kbd></button>
+          <button type="button" class="sr-btn${marked ? " on" : ""}" data-act="mark" title="Mark for review (M)" aria-pressed="${marked}"><span>Flag</span><kbd>M</kbd></button>
+          <button type="button" class="sr-btn${starred ? " on" : ""}" data-act="star" title="Bookmark (F)" aria-pressed="${starred}"><span>Bookmark</span><kbd>F</kbd></button>
+          <button type="button" class="sr-btn${MK.on ? " on" : ""}" data-act="markup" title="Mark up the question (U)" aria-pressed="${MK.on}"><span>Mark up</span><kbd>U</kbd></button>
           ${padBtn}
           <button type="button" class="sr-btn" data-act="pop" data-v="session"><span>Session</span>${sc ? `<small class="sr-sub">${sc.ok}/${sc.n}</small>` : ""}</button>
         </div>
         <button type="button" class="btn primary sr-next" data-act="next"${!test && !done ? " disabled" : ""}>${last ? "Finish" : "Next"}</button>
       </aside>`;
     WSL = wsDevice();
-    const play = `<div class="pr-play${set ? " wide" : ""}">${head}${mainCol}</div>`;
+    const play = `<div class="pr-play${set ? " wide" : ""}${MK.on ? " mking" : ""}">${head}${mainCol}</div>`;
     if (!WSL) return `${play}${rail}`;
     return `<div class="pr-ws">${play}<div class="pr-work" id="prWork"${wsOn() ? "" : " hidden"}></div></div>${rail}`;
   }
@@ -804,6 +860,7 @@
         ${test ? "" : "<kbd>S</kbd><span>show or hide the solution</span>"}
         <kbd>M</kbd><span>mark for review</span>
         <kbd>F</kbd><span>bookmark</span>
+        ${markCapable() ? "<kbd>U</kbd><span>mark up the question</span>" : ""}
         <span><kbd>←</kbd> <kbd>→</kbd></span><span>previous / next</span>
         <kbd>W</kbd><span>rough-work pad</span>
         <kbd>?</kbd><span>this list</span></div></div>`;
@@ -1084,10 +1141,11 @@
       const opts = q.opts.map((o, j) => `<div class="pr-ro${j === q.ans ? " ok" : a && a.c === j ? " bad" : ""}"><span class="k">${LET[j]}</span><span>${fmt(o)}</span>${j === q.ans ? '<em>correct</em>' : a && a.c === j ? "<em>your answer</em>" : ""}${q.why && q.why[j] && (!a || a.c === j || r.st !== "ok") ? `<small>${fmt(q.why[j])}</small>` : ""}</div>`).join("");
       const sol = (q.sol && q.sol.length ? `<ol>${q.sol.map((s) => `<li>${fmt(s)}</li>`).join("")}</ol>` : "") +
         (q.short ? `<div class="pr-box tip"><div class="lb">${ic("bolt")} Shortcut</div>${fmt(q.short)}</div>` : "") + (q.trap ? `<div class="pr-box trap"><div class="lb">${ic("warn")} Trap</div>${fmt(q.trap)}</div>` : "");
-      return `<details class="pr-qrow" id="prRow${k}"><summary>${icn}<span class="n">Q${r.i + 1}</span><span class="t">${fmt(q.q.replace(/\n/g, " "))}</span><span class="pr-chip ${DCLS[q.d] || "med"}">${esc(q.d)}</span><span class="tm">${r.st === "none" ? "-" : mmss(r.secs)}</span>${ic("chevron", "chev")}</summary>
-        <div class="pr-qbody"><div class="muted small">${esc(patTitle(q.sec, q.topic, q.pattern))}</div><div class="pr-qtext sm">${body(q.q)}</div><div class="pr-ro-list">${opts}</div><div class="pr-sol">${sol || '<span class="muted">No written solution for this one.</span>'}</div></div></details>`;
+      return `<details class="pr-qrow" id="prRow${k}"><summary>${icn}<span class="n">Q${r.i + 1}</span><span class="t">${fmt(q.q.replace(/\n/g, " "))}</span><span class="meta"><span class="pr-chip ${DCLS[q.d] || "med"}">${esc(q.d)}</span><span class="tm">${r.st === "none" ? "-" : mmss(r.secs)}</span></span>${ic("chevron", "chev")}</summary>
+        <div class="pr-qbody"><div class="muted small">${esc(patTitle(q.sec, q.topic, q.pattern))}</div><div class="pr-mkhost" data-rv="1" data-key="${esc(q.id)}"><div class="pr-qtext sm">${body(q.q)}</div></div><div class="pr-ro-list">${opts}</div><div class="pr-sol">${sol || '<span class="muted">No written solution for this one.</span>'}</div></div></details>`;
     }).join("");
 
+    const missing = Store ? rows.filter((r) => (r.st === "bad" || r.st === "skip") && (Store.item(itemKey(r.q)).status !== "revise")).length : 0;
     const hot = acc >= 80 && answered >= 3;
     main.innerHTML = `<div>
       <div class="pr-sbar"><a class="pr-back" href="#setup" data-act="newset">${ic("back")} Practice</a><div class="pr-crumb"><b>${esc(sessionLabel())}</b></div><span class="grow"></span><span class="pr-chip mode">${isTest() ? "Test" : "Instant"}</span></div>
@@ -1104,16 +1162,26 @@
       <div class="pr-card"><h5>Time per question <small>bar = your time, line = target. Green right, red wrong.</small></h5><div class="pr-strip-t">${strip}</div></div>
       ${ptable ? `<div class="pr-card"><h5>By pattern <small>weakest first</small></h5><div class="pr-tbl-wrap"><table class="pr-table"><thead><tr><th>Pattern</th><th>Asked</th><th>Right</th><th>Accuracy</th><th>Avg time / target</th><th></th></tr></thead><tbody>${ptable}</tbody></table></div></div>` : ""}
       <div class="pr-card"><h5>Questions <small>tap one for the solution</small></h5><div class="pr-qlist">${list}</div></div>
-      <div class="pr-actions pr-final">
-        ${badN + skipN ? `<button class="btn" data-act="retry">${ic("restart")} Retry wrong ones</button><button class="btn" data-act="mistakes">Add wrong to mistake book</button>` : ""}
-        ${weakest ? `<a class="btn" href="#drill/${weakest.k}">Drill weakest pattern</a>` : ""}
-        ${S.mode === "daily" ? `<a class="btn" href="#speed">${ic("bolt")} Speed drill</a>` : ""}
-        <span class="grow"></span><a class="btn primary" href="#setup" data-act="newset">New set</a></div></div>`;
+      ${missing === 0 && badN + skipN ? `<p class="pr-bookline">Wrong answers are already in your <a href="revision.html">mistake book</a>.</p>` : ""}
+      ${finalBar([
+        badN + skipN ? `<button class="btn" data-act="retry">${ic("restart")} Retry wrong ones</button>` : "",
+        missing > 0 ? `<button class="btn" data-act="mistakes">Add ${missing} skipped to mistake book</button>` : "",
+        weakest ? `<a class="btn" href="#drill/${weakest.k}">Drill weakest pattern</a>` : "",
+        S.mode === "daily" ? `<a class="btn" href="#speed">${ic("bolt")} Speed drill</a>` : "",
+      ], `<a class="btn primary" href="#setup" data-act="newset">New set</a>`)}</div>`;
     window.scrollTo(0, 0);
+    main.querySelectorAll(".pr-qrow").forEach((d) => d.addEventListener("toggle", () => { const h = d.querySelector("[data-rv]"); if (h) reviewMarks(d, h.dataset.key); }));
     main.querySelectorAll("[data-cu]").forEach((el) => countUp(el, +el.dataset.cu, el.dataset.pct ? (v) => Math.round(v) + "%" : null));
     if (acc >= 80 && answered >= 5 && !S.confetti) { S.confetti = true; persist(); confettiAt(main.querySelector(".pr-hero")); }
     if (S.mode === "daily" && !S.celebrated) { S.celebrated = true; persist(); toast("Daily set done. See you tomorrow!", 2200, "check"); }
   }
+  /* end-of-screen action bar: all buttons in a row on wide screens; on a phone one row = "More" (the secondary actions) + the primary, and it scrolls with the page */
+  function finalBar(secs, primary) {
+    secs = secs.filter(Boolean);
+    const more = secs.length ? `<details class="pr-more"><summary class="btn">More</summary><div class="pr-more-list">${secs.join("")}</div></details>` : "";
+    return `<div class="pr-actions pr-final"><div class="pr-final-sec">${secs.join("")}</div>${more}<span class="grow"></span>${primary}</div>`;
+  }
+  document.addEventListener("click", (e) => { document.querySelectorAll(".pr-more[open]").forEach((d) => { if (!d.contains(e.target)) d.open = false; }); });
   function retryWrong() {
     const rows = reviewRows().filter((r) => r.st === "bad" || r.st === "skip");
     if (!rows.length) return;
@@ -1124,9 +1192,9 @@
   function addMistakes(btn) {
     if (!Store) return;
     const now = Date.now();
-    const rows = reviewRows().filter((r) => r.st === "bad" || r.st === "skip");
+    const rows = reviewRows().filter((r) => (r.st === "bad" || r.st === "skip") && Store.item(itemKey(r.q)).status !== "revise");
     rows.forEach((r) => { const k = itemKey(r.q), it = Store.item(k); Store.patch(k, { status: "revise", next: now, level: 0, doneAt: it.doneAt || now }); });
-    if (window.setSwap && btn) setSwap(btn, 1);
+    if (btn) document.querySelectorAll('.pr-final [data-act="mistakes"]').forEach((x) => x.remove());
     toast(`${rows.length} question${rows.length === 1 ? "" : "s"} in your mistake book`, 1600, "check");
   }
 
@@ -1209,6 +1277,18 @@
     return `<div class="sp-runs">${sp.runs.slice(0, n || 5).map((r) => `<div class="sp-run-row"><span class="m">${esc(speedName(r.mode))}</span><span class="w muted small">${esc(typeof window.relDay === "function" ? relDay(r.at) : new Date(r.at).toLocaleDateString())}</span>
       <span class="s"><b>${r.score}</b><small> / ${r.n}</small></span><span class="a muted small">${r.n ? Math.round((r.score / r.n) * 100) : 0}%</span></div>`).join("")}</div>`;
   }
+  /* on a touch device the drill uses its own keypad, so the OS keyboard never covers the question */
+  const keypadOn = () => isTouch() || document.documentElement.dataset.device !== "desktop";
+  const KEYS = [["7", "7"], ["8", "8"], ["9", "9"], ["4", "4"], ["5", "5"], ["6", "6"], ["1", "1"], ["2", "2"], ["3", "3"], [".", "."], ["0", "0"], ["-", "−"]];
+  const keypadHTML = () => `<div class="sp-pad" role="group" aria-label="Number pad">${KEYS.map(([v, l]) => `<button type="button" class="sp-key" data-act="sp-key" data-v="${v}" aria-label="${v === "-" ? "minus" : v === "." ? "point" : v}">${l}</button>`).join("")}
+      <button type="button" class="sp-key sp-del" data-act="sp-key" data-v="back" aria-label="Delete">${ic("back")}</button><button type="button" class="sp-key sp-enter" data-act="sp-key" data-v="enter">Enter</button></div>`;
+  function speedKeypad(v) {
+    const inp = document.getElementById("spIn");
+    if (!inp || SP.phase !== "run") return;
+    if (v === "enter") return speedSubmit();
+    if (v === "back") inp.value = inp.value.slice(0, -1); else inp.value += v;
+    buzz(6);
+  }
   function paintSpeed() {
     const sp = speedMeta();
     window.scrollTo(0, 0);
@@ -1226,6 +1306,7 @@
       return;
     }
     if (SP.phase === "run") {
+      const kp = keypadOn();
       main.innerHTML = `<div>
         <div class="pr-sbar"><button type="button" class="pr-back" data-act="sp-stop">${ic("back")} Stop <kbd>Esc</kbd></button><div class="pr-crumb"><b>Speed drill</b> <span class="sep">›</span> ${esc(speedName(SP.mode))}</div>
           <span class="grow"></span>${sp.best[SP.mode] ? `<span class="pr-chip mode">Best ${sp.best[SP.mode]}</span>` : ""}</div>
@@ -1233,9 +1314,10 @@
           <div class="sp-bar" aria-hidden="true"><i id="spBar"></i></div>
           <div class="sp-top"><span class="sp-clock"><b id="spClock">${SPEED_SECS}</b> s left</span><span class="sp-score">Score <b id="spScore">0</b></span></div>
           <div class="sp-q" id="spQ" aria-live="polite"></div>
-          <form class="sp-form" id="spForm" autocomplete="off"><input id="spIn" class="sp-in" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Your answer" placeholder="?">
-            <button class="btn primary" type="submit">${ic("enter") || "Go"}<span class="sr">Submit</span></button></form>
-          <div class="sp-fb" id="spFb">Type the answer and press Enter.</div>
+          <form class="sp-form" id="spForm" autocomplete="off"><input id="spIn" class="sp-in" type="text" inputmode="${kp ? "none" : "decimal"}" autocomplete="off" spellcheck="false" aria-label="Your answer" placeholder="?">
+            ${kp ? "" : `<button class="btn primary" type="submit">${ic("enter") || "Go"}<span class="sr">Submit</span></button>`}</form>
+          <div class="sp-fb" id="spFb">${kp ? "Tap the answer, then Enter." : "Type the answer and press Enter."}</div>
+          ${kp ? keypadHTML() : ""}
         </div></div>`;
       const inp = document.getElementById("spIn");
       document.getElementById("spForm").addEventListener("submit", (e) => { e.preventDefault(); speedSubmit(); });
@@ -1265,8 +1347,7 @@
             : `<p class="muted">${n ? "No misses. Clean run." : "Nothing answered this time."}</p>`}</div>
         <div class="pr-card"><h5>Last 5 runs</h5>${speedRuns(5)}</div>
       </div>
-      <div class="pr-actions pr-final"><button class="btn" data-act="sp-modes">Change mode</button><a class="btn" href="#setup">Back to practice</a><span class="grow"></span>
-        <button class="btn primary" data-act="sp-start">Go again <kbd>Enter</kbd></button></div></div>`;
+      ${finalBar([`<button class="btn" data-act="sp-modes">Change mode</button>`, `<a class="btn" href="#setup">Back to practice</a>`], `<button class="btn primary" data-act="sp-start">Go again <kbd>Enter</kbd></button>`)}</div>`;
     main.querySelectorAll("[data-cu]").forEach((el) => countUp(el, +el.dataset.cu, el.dataset.pct ? (v) => Math.round(v) + "%" : null));
     if (newBest) { confettiAt(main.querySelector(".pr-hero")); try { if (M() && M().celebrate && motionOn()) M().celebrate("best", "New best"); } catch (e) {} }
   }
@@ -1384,6 +1465,7 @@
       if (act === "sp-mode") { SP.mode = el.dataset.v; ls.set(SPK, SP.mode); return paintSpeed(); }
       if (act === "sp-start") return speedStart();
       if (act === "sp-stop") return speedStop();
+      if (act === "sp-key") return speedKeypad(el.dataset.v);
       if (act === "sp-modes") { SP.phase = "pick"; return paintSpeed(); }
       return;
     }
@@ -1397,7 +1479,10 @@
     if (view === "run") {
       if (act === "pop") return togglePop(el.dataset.v);
       if (act === "fs") { try { if (window.Fullscreen && Fullscreen.toggle) Fullscreen.toggle(); } catch (err) {} return; }
-      if (act === "zoom") { if (e.target.closest("a,button,summary")) return; return openZoom(el); }
+      if (act === "zoom") { if (MK.on || e.target.closest("a,button,summary")) return; return openZoom(el); }
+      if (act === "markup") return toggleMarkup();
+      if (act === "mkdone") return toggleMarkup();
+      if (act === "mkclear") return clearMarks();
       if (act === "skey") return solKey();
       if (act === "rough") { if (wsDevice()) return toggleWs(); if (window.RoughPad && RoughPad.toggle) RoughPad.toggle(); return; }
       if (act === "opt") return answer(+el.dataset.i);
@@ -1435,7 +1520,8 @@
     z.className = "pr-zoom";
     z.setAttribute("role", "dialog"); z.setAttribute("aria-modal", "true"); z.setAttribute("aria-label", "Enlarged view");
     const clone = src.cloneNode(true);
-    clone.querySelectorAll(".pr-pin").forEach((x) => x.remove());
+    clone.querySelectorAll(".pr-pin,canvas").forEach((x) => x.remove());
+    clone.querySelectorAll("[data-mk]").forEach((x) => x.removeAttribute("data-mk"));
     ["data-act", "role", "tabindex", "aria-label"].forEach((a) => clone.removeAttribute(a));
     clone.querySelectorAll("[id]").forEach((x) => x.removeAttribute("id"));
     z.innerHTML = `<div class="pr-zoom-box"><button type="button" class="pr-zoom-x" aria-label="Close">${ic("x")}<span>Close</span></button><div class="pr-zoom-body"></div></div>`;
@@ -1452,6 +1538,7 @@
   }
   main.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".pr-stim")) { e.preventDefault(); e.stopPropagation(); openZoom(e.target); } });
   main.addEventListener("click", (e) => { const r = e.target.closest("[data-reset]"); if (r) { dropSession(); } });
+  main.addEventListener("pointerdown", (e) => { if (e.target.closest(".sp-pad")) e.preventDefault(); });      // the keypad never takes focus from the answer box
 
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -1470,6 +1557,7 @@
     }
     if (view !== "run" || !S) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (k === "u" && markCapable()) { e.preventDefault(); return toggleMarkup(); }      // pen / tablet: U = mark up (A–D always answer)
     if ("1234".includes(k) && k.length === 1) { e.preventDefault(); return answer(+k - 1); }
     if ("abcd".includes(k) && k.length === 1) { e.preventDefault(); return answer("abcd".indexOf(k)); }
     if (k === "Enter") { e.preventDefault(); return next(); }
@@ -1499,7 +1587,7 @@
     let x0 = 0, y0 = 0, t0 = 0, ok = false;
     main.addEventListener("touchstart", (e) => {
       const t = e.touches[0];
-      ok = view === "run" && e.touches.length === 1 && !document.body.classList.contains("pr-ws-on") && !e.target.closest("input,textarea,table,svg,canvas,.pr-pop,.pr-stim,.table-wrap,[data-scroll],#prWork,.rw-drawer,.pr-work");   // never while the rough-work pad is on screen: stylus strokes must not turn the page
+      ok = view === "run" && document.documentElement.dataset.device === "phone" && !MK.on && e.touches.length === 1 && !document.body.classList.contains("pr-ws-on") && !e.target.closest("input,textarea,table,svg,canvas,.pr-pop,.pr-stim,.table-wrap,[data-scroll],#prWork,.rw-drawer,.pr-work");   // never while the rough-work pad is on screen: stylus strokes must not turn the page
       x0 = t.clientX; y0 = t.clientY; t0 = Date.now();
     }, { passive: true });
     main.addEventListener("touchend", (e) => {

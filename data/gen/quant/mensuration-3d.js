@@ -17,9 +17,16 @@
   const A2 = (u) => (x) => N(x) + " " + u + "²";
   const WHO = ["Ravi", "Meena", "Arjun", "Kavya", "Imran", "Sneha", "Gopal", "Divya", "Harish", "Lakshmi", "Farhan", "Nisha"];
 
+  // singular after "1": "1 hours" -> "1 hour", "1 men are" -> "1 man is"
+  const plz = (() => {
+    const S = { men: "man", women: "woman", boys: "boy", girls: "girl", people: "person" };
+    const re1 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (men|women|boys|girls) are\b/g, re2 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (hours|minutes|seconds|days|weeks|months|years|marks|litres|units|students|people|men|women|boys|girls)\b/g;
+    const one = (s) => (typeof s === "string" ? s.replace(re1, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + S[w] + " is").replace(re2, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + (S[w] || w.slice(0, -1))) : s);
+    return (r) => { if (r) { r.q = one(r.q); for (const k of ["sol", "opts", "why"]) if (Array.isArray(r[k])) r[k] = r[k].map(one); r.short = one(r.short); r.trap = one(r.trap); } return r; };
+  })();
   function wrap(fn) {
     return function (rng, d) {
-      for (let i = 0; i < 1500; i++) { const r = fn(rng, d); if (r) return r; }
+      for (let i = 0; i < 1500; i++) { const r = fn(rng, d); if (r) return plz(r); }
       throw new Error("mensuration-3d: no clean question found");
     };
   }
@@ -47,8 +54,8 @@
   }
   const fin = (d, q, sol, short, trap, calc) => ({ d, q, sol, short, trap, calc });
 
-  const BOX = ["wooden box", "water tank", "packing carton", "storage crate", "iron block", "fish tank", "brick", "cardboard box", "toolbox", "godown"];
-  const CYL = ["cylindrical tank", "cylindrical drum", "metal pipe", "water bottle", "oil can", "cylindrical pillar", "steel rod", "cylindrical container"];
+  const BOX = ["wooden box", "water tank", "packing carton", "storage crate", "steel block", "fish tank", "brick", "cardboard box", "toolbox", "godown"];
+  const CYL = ["cylindrical tank", "cylindrical drum", "metal pipe", "water bottle", "paint can", "cylindrical pillar", "steel rod", "cylindrical container"];
 
   /* ---------------------------------------------------------------- 1. cube & cuboid */
   const DIAG = [[1, 2, 2], [2, 3, 6], [4, 4, 7], [2, 10, 11], [6, 6, 7], [2, 6, 9], [1, 4, 8], [4, 8, 8]];
@@ -231,7 +238,7 @@
         [PI * h * R1 * R1, "Ignored the hollow"],
         [PI * h * (R1 * R1 + r1 * r1), "Added instead of subtracted"],
         [2 * PI * h * (R1 - r1), "Used circumference-style terms"],
-      ], fin(d, `A hollow ${T(rng, ["metal pipe", "iron tube", "cylindrical pillar", "concrete pipe"])} is **${h} cm** long with outer radius **${R1} cm** and inner radius **${r1} cm**. Find the volume of the material (π = 22/7).`,
+      ], fin(d, `A hollow ${T(rng, ["metal pipe", "steel tube", "cylindrical pillar", "concrete pipe"])} is **${h} cm** long with outer radius **${R1} cm** and inner radius **${r1} cm**. Find the volume of the material (π = 22/7).`,
         [`V = πh(R² − r²) = 22/7 × ${h} × (${R1 * R1} − ${r1 * r1})`, `= **${N(R(V))} cm³**`], `π h (R − r)(R + r).`, `(R − r)² is not R² − r².`, `22/7*${h}*(${R1}*${R1}-${r1}*${r1})`));
     }
     if (t === 1) {
@@ -257,7 +264,7 @@
   /* ---------------------------------------------------------------- 3. cone */
   const T3 = [[7, 24, 25], [21, 20, 29], [21, 28, 35], [14, 48, 50], [35, 12, 37], [28, 45, 53], [63, 16, 65], [42, 56, 70]];
   QB.gen("quant/mensuration-3d/cone", { title: "Cone (and frustum basics)", gen: wrap((rng, d) => {
-    const ob = T(rng, ["conical tent", "ice-cream cone", "conical heap of sand", "conical vessel", "party hat", "conical funnel", "conical tower roof"]), w = T(rng, WHO);
+    const ob = T(rng, ["conical tent", "waffle cone", "conical heap of sand", "conical vessel", "party hat", "conical funnel", "conical tower roof"]), w = T(rng, WHO);
     const sc = rng.int(1, 3), tr = T(rng, T3).map((v) => v * sc);
     if (d === "Easy") {
       const [r, h, l] = tr, t = rng.int(0, 2), u = T(rng, ["cm", "m"]);
@@ -424,7 +431,7 @@
         [4 / 3 * PI * Ro ** 3, "Ignored the hollow"],
         [4 * PI * (Ro * Ro - ri * ri), "Used the surface-area difference"],
         [4 / 3 * PI * (Ro ** 3 + ri ** 3), "Added the cubes"],
-      ], fin(d, `A hollow ${T(rng, ['spherical shell', 'metal ball', 'iron sphere', 'spherical tank'])} has outer radius **${Ro} cm** and inner radius **${ri} cm**. Find the volume of the metal (π = 22/7).`,
+      ], fin(d, `A hollow ${T(rng, ['spherical shell', 'metal ball', 'steel sphere', 'spherical tank'])} has outer radius **${Ro} cm** and inner radius **${ri} cm**. Find the volume of the metal (π = 22/7).`,
         [`V = 4/3 π (R³ − r³) = 4/3 × 22/7 × (${Ro ** 3} − ${ri ** 3})`, `= **${N(R(V))} cm³**`], `Subtract the cubes, then apply 4/3 π.`, `(R − r)³ is not R³ − r³.`, `4/3*22/7*(${Ro}**3-${ri}**3)`));
     }
     if (t === 1) {
@@ -448,7 +455,7 @@
 
   /* ---------------------------------------------------------------- 5. melting & recasting */
   QB.gen("quant/mensuration-3d/melting-and-recasting", { title: "Melting & recasting", gen: wrap((rng, d) => {
-    const w = T(rng, WHO), met = T(rng, ["copper", "iron", "lead", "silver", "brass", "steel", "gold", "aluminium"]);
+    const w = T(rng, WHO), met = T(rng, ["copper", "tin", "lead", "silver", "brass", "steel", "gold", "zinc"]);
     if (d === "Easy") {
       const t = rng.int(0, 2);
       if (t === 0) {
@@ -591,6 +598,7 @@
       const t = rng.int(0, 2);
       if (t === 0) {
         const k = rng.int(1, 6), rc = 7 * k, rho = rng.int(1, 12), rise = 4 * rho ** 3 / (3 * rc * rc);
+        if (rc < 2 * rho) return null;
         return mk(rng, U("cm"), rise, [
           [rho ** 3 / (rc * rc), "Dropped the 4/3"],
           [4 * rho * rho / (3 * rc * rc), "Used ρ² for the sphere"],
@@ -601,6 +609,7 @@
       }
       if (t === 1) {
         const rho = 3, n = rng.int(1, 6) * 3, rc = rng.int(1, 4) * 3, rise = 4 * n * rho ** 3 / (3 * rc * rc);
+        if (rc < 2 * rho) return null;
         if (!C(rise)) return null;
         return mk(rng, U("cm"), rise, [
           [n * rho ** 3 / (rc * rc), "Dropped the 4/3"],
@@ -637,7 +646,7 @@
     if (t === 1) {
       const k = rng.int(1, 5), rc = 7 * k, h = rng.int(2, 20), n = 3 * rng.int(1, 5), rise = 3 * h / (rc * rc) * 0 + 0;
       const cr = 7 * rng.int(1, 3), ch = rng.int(1, 6) * 3, vol = PI * cr * cr * ch / 3, rs = vol / (PI * rc * rc);
-      if (!C(rs) || rs < 0.05) return null;
+      if (!C(rs) || rs < 0.05 || rc < 2 * cr) return null;
       return mk(rng, U("cm"), rs, [
         [vol / (PI * rc * rc) * 3, "Forgot the 1/3 of the cone"],
         [cr * cr * ch / (rc * rc), "Forgot the 1/3 of the cone"],
@@ -659,7 +668,7 @@
 
   /* ---------------------------------------------------------------- 7. cost of painting / tiling */
   QB.gen("quant/mensuration-3d/cost-of-painting-tiling", { title: "Cost of painting / tiling", gen: wrap((rng, d) => {
-    const w = T(rng, WHO), room = T(rng, ["hall", "classroom", "bedroom", "shop", "auditorium", "office room", "kitchen", "godown"]);
+    const w = T(rng, WHO), room = T(rng, ["hall", "classroom", "bedroom", "shop", "seminar hall", "staff room", "kitchen", "godown"]);
     if (d === "Easy") {
       const t = rng.int(0, 2);
       if (t === 0) {

@@ -40,7 +40,7 @@
   const ALL = (col) => [col, col, col, col, col, col];
   const COLS = ["red", "green", "blue", "yellow", "black", "white", "orange"];
   const BLOCK = ["wooden block", "cuboid of cheese", "block of clay", "brick-shaped block", "cuboid of soap"];
-  const THING = ["wooden cube", "solid cube", "cube of cheese", "cube of soap", "block of clay", "ice cube"];
+  const THING = ["wooden cube", "solid cube", "cube of cheese", "cube of soap", "block of clay", "cube of ice"];
   const SIZES = [2, 3, 4, 5];
 
   /* ------------------------------------------------------------ 1. painted cube counting */

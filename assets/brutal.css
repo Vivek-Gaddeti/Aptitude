@@ -896,3 +896,64 @@ html[data-device="tablet"][data-orient="landscape"] .gr-nav { flex: 1 0 auto; ov
 .da-learn.on .da-box .ico { color: var(--on-fill); }
 .da-quiet.on-red.on, .da-quiet.on-red.on:hover { background: var(--red-soft); color: var(--text); }
 .da-quiet.on-amber.on, .da-quiet.on-amber.on:hover { background: var(--f-yellow); color: var(--on-fill); }
+/* =====================================================================
+   AUDIT FIXES (shell): plain scrims, touch targets, sticky hover, toasts, floaters, wide-table hint, phone tab badge
+   ===================================================================== */
+/* no blurred backdrops: every scrim is plain black at 45% */
+.fd-bg, .pr-modal, .d-sheet-bg, [data-theme="dark"] .d-sheet-bg { background: rgba(0,0,0,.45); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.topbar { backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* phone: the settings popover lists the sub-pages too (tablet already did) */
+html[data-device="phone"] .set-pages { display: block; }
+/* touch: every tappable chip / filter / pick is at least 44px high (the reason chips are the player's) */
+html[data-device="tablet"] main .pr-pick, html[data-device="phone"] main .pr-pick,
+html[data-device="tablet"] .ch-chip, html[data-device="phone"] .ch-chip,
+html[data-device="tablet"] .pr-segc button, html[data-device="phone"] .pr-segc button,
+html[data-device="tablet"] .mk-filters button, html[data-device="phone"] .mk-filters button,
+html[data-device="tablet"] .filter-bar .btn, html[data-device="phone"] .filter-bar .btn { min-height: 44px; }
+@media (pointer: coarse) { main .pr-pick, .ch-chip, .pr-segc button { min-height: 44px; } }
+html[data-device="tablet"] main.pr .pr-segc button, html[data-device="phone"] main.pr .pr-segc button,
+html[data-device="tablet"] .pr-build .pr-opts .pr-segc button, html[data-device="phone"] .pr-build .pr-opts .pr-segc button { min-height: 44px; }
+/* toasts: bottom-left on desktop (never over the centre of the reading column); lifted above the sticky practise bar on phone (tablet keeps its own centred spot above the bottom bar) */
+html[data-device="desktop"] .toast { left: 1.25rem; bottom: 1.25rem; transform: none; }
+html[data-device="phone"] .toast { bottom: 1rem; max-width: calc(100vw - 2rem); }
+html[data-device="phone"] body.has-sticky .toast, html[data-device="phone"] body.in-session .toast { bottom: 5.25rem; }
+/* lesson floaters never meet each other or the end of the text */
+body.has-sticky .content, body.has-sticky main.page { padding-bottom: 8.5rem; }
+html[data-device="tablet"] body.has-sticky:not(.in-session) .layout > main.content { padding-bottom: 11rem !important; }
+html[data-device="tablet"] body.has-sticky .to-top { bottom: 96px; }
+html[data-device="tablet"][data-orient="portrait"][data-hand] body.has-sticky .to-top { bottom: calc(var(--bar-h) + 96px); }
+html[data-device="phone"] body.has-sticky .to-top { bottom: 84px; }
+html[data-device="phone"] body.has-sticky .content { padding-bottom: 9.5rem; }
+/* same page width and top spacing on dashboard, practice setup, mock gallery, revision and cheat sheet (desktop) */
+html[data-device="desktop"] body:not(.in-session):not(.pr-focus):not(.mk-focus) main.page { max-width: 1200px; padding-top: 2rem; }
+/* wide tables: a right-edge fade and a small "scroll" hint while there is more to the right (phone and tablet) */
+.tw { position: relative; }
+.tw-hint, .tw::after { display: none; }
+html[data-device="phone"] .tw.more::after, html[data-device="tablet"] .tw.more::after {
+  content: ""; display: block; position: absolute; right: 0; top: 0; bottom: 0; width: 44px; pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--panel) 85%);
+}
+html[data-device="phone"] .tw.more .tw-hint, html[data-device="tablet"] .tw.more .tw-hint {
+  display: block; position: absolute; right: 0; top: -1.15rem; font: 700 11px/1 var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); pointer-events: none;
+}
+/* phone tab strip: the tabs size to their labels, and the revision count sits beside its label instead of covering the icon */
+@media (max-width: 640px) {
+  .topbar .nav a { flex: 1 1 auto; padding-left: 3px; padding-right: 3px; }
+  .topbar .nav a:has(> .nav-badge) { display: grid; grid-template-columns: auto auto; justify-content: center; align-content: center; column-gap: 3px; row-gap: 1px; }
+  .topbar .nav a:has(> .nav-badge) > .ni { grid-column: 1 / 3; justify-self: center; }
+  .topbar .nav a:has(> .nav-badge) > .nav-l { grid-column: 1; grid-row: 2; }
+  .topbar .nav a:has(> .nav-badge) > .nav-badge { position: static; grid-column: 2; grid-row: 2; align-self: center; min-width: 15px; height: 15px; padding: 0 4px; font-size: 10px; line-height: 11px; }
+}
+/* sticky hover on touch: hover backgrounds are cancelled where there is no hover (taps leave :hover behind) */
+@media (hover: none) {
+  html .btn:hover:not(.primary):not(:disabled), html .icon-btn:hover, html .pr-back:hover, html .set-seg button:not(.on):hover, html .to-top:hover,
+  html .da-learn:not(.on):hover, html .da-quiet:not(.on):hover, html .pr-reasons button:hover, html .pr-pal button:hover, html .sp-mode:not(.on):hover,
+  html .pr-pick:hover:not(:disabled):not(.on), html .rv-tabs a:not(.on):hover, html a.card:hover, html .pr-tile:hover, html .cat-tile:hover, html .hm-tile:not(.main):hover,
+  html .qz-opt:hover:not(:disabled):not(.ok):not(.bad) { background: var(--panel); color: var(--text); }
+  html .qz-opt:hover:not(:disabled) { box-shadow: none; }
+  html .nav a:not(.active):hover, html .sidebar a.item:not(.active):hover, html .nav-menu a:hover, html .set-pages a:hover, html .set-act:hover, html .gr-item:not(.active):not(.on):hover,
+  html .pg-item:not(.active):hover, html .table-wrap tbody tr:hover { background: transparent; color: var(--text); }
+  html .sidebar a.item:not(.active):hover { border-color: transparent; }
+  html a:not([class]):hover { background: transparent; color: var(--accent); }
+}
+html[data-device="desktop"] main.pr .pr-setupwrap { max-width: none; margin-inline: 0; }

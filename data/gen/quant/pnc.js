@@ -47,15 +47,23 @@
 
   // a short lead-in (who is asking, and from where) so that the same counting idea reads differently each time
   const CITIES = ["Pune", "Nagpur", "Madurai", "Jaipur", "Lucknow", "Kochi", "Indore", "Surat", "Patna", "Mysuru", "Bhopal", "Ranchi", "Guwahati", "Vizag", "Raipur", "Dehradun", "Agra", "Nashik", "Udaipur", "Coimbatore", "Kanpur", "Vadodara", "Cuttack", "Thrissur", "Jodhpur", "Amritsar", "Hubballi", "Shillong", "Belagavi", "Salem"];
-  const JOBS = ["teacher", "trainee", "librarian", "shopkeeper", "coach", "student", "clerk", "event planner", "engineer", "quiz host"];
+  const JOBS = ["teacher", "trainee", "librarian", "shopkeeper", "coach", "student", "clerk", "caterer", "architect", "quiz host"];
   const VENUES = ["coaching class", "college fest", "club meeting", "office training", "school assembly", "workshop"];
+  const an = (w) => (/^[aeiou]/i.test(w) ? "an " : "a ") + w;
   const lead = (rng) => {
     const c = T(rng, CITIES), k = rng.int(0, 2);
-    return k === 0 ? `A ${T(rng, JOBS)} in ${c} asks: ` : k === 1 ? `${cap(T(rng, JOBS))} from ${c}: ` : `At a ${T(rng, VENUES)} in ${c}: `;
+    return k === 0 ? `${cap(an(T(rng, JOBS)))} in ${c} asks: ` : k === 1 ? "" : `At ${an(T(rng, VENUES))} in ${c}: `;
   };
+  // singular after "1": "1 hours" -> "1 hour", "1 men are" -> "1 man is"
+  const plz = (() => {
+    const S = { men: "man", women: "woman", boys: "boy", girls: "girl", people: "person" };
+    const re1 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (men|women|boys|girls) are\b/g, re2 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (hours|minutes|seconds|days|weeks|months|years|marks|litres|units|students|people|men|women|boys|girls)\b/g;
+    const one = (s) => (typeof s === "string" ? s.replace(re1, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + S[w] + " is").replace(re2, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + (S[w] || w.slice(0, -1))) : s);
+    return (r) => { if (r) { r.q = one(r.q); for (const k of ["sol", "opts", "why"]) if (Array.isArray(r[k])) r[k] = r[k].map(one); r.short = one(r.short); r.trap = one(r.trap); } return r; };
+  })();
   function wrap(fn) {
     return function (rng, d) {
-      for (let i = 0; i < 800; i++) { const r = fn(rng, d); if (r) { r.q = lead(rng) + r.q; return r; } }
+      for (let i = 0; i < 800; i++) { const r = fn(rng, d); if (r) { r.q = lead(rng) + r.q; return plz(r); } }
       throw new Error("pnc: no clean question found");
     };
   }
@@ -390,9 +398,9 @@
         finish(d, `A committee of **${kk}** is chosen from **${n}** members. ${pa} **must** be on it and ${pb} **must not** be. How many committees are possible?`,
           [`${pa} is in, ${pb} is out: ${n - 2} members remain`, `Choose the other ${kk - 1}: ${n - 2}C${kk - 1} = **${ans}**`], `Remove both people, reduce k by one.`, `Both special people are settled, so n drops by 2 but k drops by only 1.`));
     }
-    const m = rng.int(5, 8), w = rng.int(4, 7), ans = (nCr(m + w - 2, 3) ) + 0;
-    const both = nCr(m + w, 4) - nCr(m + w - 2, 2);
-    return mk(rng, both, [[nCr(m + w - 2, 2), "Counted the committees with neither of them"], [nCr(m + w, 4), "Ignored the condition"], [nCr(m + w - 1, 3), "Counted those with a particular person"], [ans]],
+    const m = rng.int(5, 8), w = rng.int(4, 7);
+    const both = nCr(m + w, 4) - nCr(m + w - 2, 4);
+    return mk(rng, both, [[nCr(m + w - 2, 4), "Counted the committees with neither of them"], [nCr(m + w, 4), "Ignored the condition"], [nCr(m + w - 1, 3), "Counted those with a particular person"], [2 * nCr(m + w - 2, 3), "Counted only the committees with exactly one of them"]],
       finish(d, `A committee of **4** is chosen from **${m + w}** members (including ${pa} and ${pb}). It must include **at least one of ${pa} and ${pb}**. How many committees are possible?`,
         [`All committees: ${m + w}C4 = ${nCr(m + w, 4)}`, `With neither: ${m + w - 2}C4 = ${nCr(m + w - 2, 4)}`, `${nCr(m + w, 4)} − ${nCr(m + w - 2, 4)} = **${nCr(m + w, 4) - nCr(m + w - 2, 4)}**`], `Total − (neither).`, `Do not add "with ${pa}" and "with ${pb}": committees with both get counted twice.`));
   }) });
@@ -416,7 +424,7 @@
       if (k === 0) {
         const n = rng.int(6, 15), nm = { 6: "hexagon", 7: "heptagon", 8: "octagon", 9: "nonagon", 10: "decagon" };
         return mk(rng, X.diag(n), [[nCr(n, 2), "Counted the sides as diagonals too"], [n * (n - 3), "Counted each diagonal twice"], [nCr(n, 2) - n - 1], [n * (n - 1) / 2 - 2 * n]],
-          finish(d, `How many diagonals does a convex polygon with **${n} sides**${nm[n] ? ` (a ${nm[n]})` : ""} have?`,
+          finish(d, `How many diagonals does a convex polygon with **${n} sides**${nm[n] ? ` (${an(nm[n])})` : ""} have?`,
             [`Pairs of vertices: ${n}C2 = ${nCr(n, 2)}`, `Subtract the ${n} sides: ${nCr(n, 2)} − ${n} = **${X.diag(n)}**`], `n(n − 3)/2.`, `Joining adjacent vertices gives the sides, not diagonals.`));
       }
       if (k === 1) {

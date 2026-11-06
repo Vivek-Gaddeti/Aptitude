@@ -14,9 +14,16 @@
   const L = (x) => N(x) + " litres";
   const KG = (x) => N(x) + " kg";
 
+  // singular after "1": "1 hours" -> "1 hour", "1 men are" -> "1 man is"
+  const plz = (() => {
+    const S = { men: "man", women: "woman", boys: "boy", girls: "girl", people: "person" };
+    const re1 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (men|women|boys|girls) are\b/g, re2 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (hours|minutes|seconds|days|weeks|months|years|marks|litres|units|students|people|men|women|boys|girls)\b/g;
+    const one = (s) => (typeof s === "string" ? s.replace(re1, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + S[w] + " is").replace(re2, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + (S[w] || w.slice(0, -1))) : s);
+    return (r) => { if (r) { r.q = one(r.q); for (const k of ["sol", "opts", "why"]) if (Array.isArray(r[k])) r[k] = r[k].map(one); r.short = one(r.short); r.trap = one(r.trap); } return r; };
+  })();
   function wrap(fn) {
     return function (rng, d) {
-      for (let i = 0; i < 800; i++) { const r = fn(rng, d); if (r) return r; }
+      for (let i = 0; i < 800; i++) { const r = fn(rng, d); if (r) return plz(r); }
       throw new Error("mixtures: no clean question found");
     };
   }
@@ -322,7 +329,7 @@
 
   /* ------------------------------------------------------------------ 4. removing and adding water */
   QB.gen("quant/mixtures/removing-and-adding-water", { title: "Removing & adding water", gen: wrap((rng, d) => {
-    const [liq] = T(rng, [["milk"], ["fruit juice"], ["lemonade concentrate"], ["sugar syrup"], ["acid"]]), vess = T(rng, ["A mixture", "A drum", "A can", "A tank", "A bottle"]);
+    const [liq] = T(rng, [["milk"], ["fruit juice"], ["lemonade concentrate"], ["sugar syrup"], ["vinegar"]]), vess = T(rng, ["A mixture", "A drum", "A can", "A tank", "A bottle"]);
     if (d === "Easy") {
       const a = rng.int(1, 9), b = rng.int(1, 9), k = rng.int(2, 15) * 2, w = rng.int(1, 12) * 2;
       if (a === b || QB.gcd(a, b) !== 1) return null;

@@ -10,13 +10,27 @@
   const T = (rng, arr) => rng.pick(arr);
   const TIME = { Easy: 35, Medium: 60, Hard: 95 };
   const WHO = ["Ravi", "Meena", "Farhan", "Lakshmi", "Suresh", "Anita", "Kiran", "Deepa", "Imran", "Pooja", "Harish", "Nisha", "Vikram", "Sana"];
-  const WHERE = ["a bank", "a cooperative society", "a post-office scheme", "a finance company", "a credit union", "a local lender"];
+  const WHERE = ["a bank", "a cooperative society", "a post-office scheme", "a finance company", "a credit union", "a small-finance bank"];
   const yrs = (t) => t + (t === 1 ? " year" : " years");
   const pw = (x, n) => Math.pow(x, n);
 
+  // singular after "1": "1 hours" -> "1 hour", "1 men are" -> "1 man is"
+  const plz = (() => {
+    const S = { men: "man", women: "woman", boys: "boy", girls: "girl", people: "person" };
+    const re1 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (men|women|boys|girls) are\b/g, re2 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (hours|minutes|seconds|days|weeks|months|years|marks|litres|units|students|people|men|women|boys|girls)\b/g;
+    const one = (s) => (typeof s === "string" ? s.replace(re1, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + S[w] + " is").replace(re2, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + (S[w] || w.slice(0, -1))) : s);
+    return (r) => { if (r) { r.q = one(r.q); for (const k of ["sol", "opts", "why"]) if (Array.isArray(r[k])) r[k] = r[k].map(one); r.short = one(r.short); r.trap = one(r.trap); } return r; };
+  })();
+  // sensible figures only: every amount in the question at least ₹1,000 and every rate at most 20% a year
+  const plausible = (r) => {
+    const q = String(r.q);
+    for (const m of q.matchAll(/₹([\d,]+(?:\.\d+)?)/g)) if (parseFloat(m[1].replace(/,/g, "")) < 1000) return false;
+    for (const m of q.matchAll(/(\d+(?:\.\d+)?)%/g)) if (parseFloat(m[1]) > 20) return false;
+    return true;
+  };
   function wrap(fn) {
     return function (rng, d) {
-      for (let i = 0; i < 2000; i++) { const r = fn(rng, d); if (r) return r; }
+      for (let i = 0; i < 2000; i++) { const r = fn(rng, d); if (r && plausible(r)) return plz(r); }
       throw new Error("interest: no clean question found");
     };
   }
@@ -53,7 +67,7 @@
   function lead(fn) {
     return function (rng, d) {
       const r = fn(rng, d);
-      const w = T(rng, WHO), b = T(rng, WHERE);
+      const named = new RegExp("(?:^|[^A-Za-z])(" + WHO.join("|") + ")(?![A-Za-z])").exec(r.q), w = named ? named[1] : T(rng, WHO), b = WHERE.find((x) => r.q.includes(x)) || T(rng, WHERE);
       r.q = T(rng, LEADS)(w, b) + " " + r.q;
       return r;
     };
@@ -357,7 +371,7 @@
   /* ------------------------------------------------------------ 4. CI - SI for 2 and 3 years */
   QB.gen("quant/interest/ci-si-for-2-and", { title: "CI − SI for 2 and 3 years", gen: wrap((rng, d) => {
     const w = T(rng, WHO);
-    const Rs = [5, 8, 10, 12, 15, 20, 25, 4, 6, 40];
+    const Rs = [5, 8, 10, 12, 15, 20, 4, 6, 2, 16];
     if (d === "Easy") {
       const r = T(rng, Rs), p = rng.int(1, 40) * 500 * T(rng, [1, 2, 4]);
       const diff = p * r * r / 10000;
@@ -375,7 +389,7 @@
     if (d === "Medium") {
       const k = rng.int(0, 1);
       if (k === 0) {
-        const r = T(rng, [5, 10, 20, 25, 4, 8, 12, 15, 40]), p = rng.int(1, 40) * 1000 * T(rng, [1, 2, 5]);
+        const r = T(rng, [5, 10, 20, 4, 8, 12, 15, 6, 16]), p = rng.int(1, 40) * 1000 * T(rng, [1, 2, 5]);
         const diff = p * r * r * (300 + r) / 1e6;
         if (!C(diff)) return null;
         return mk(rng, M, diff, [
@@ -404,7 +418,7 @@
     }
     const k = rng.int(0, 2);
     if (k === 0) {
-      const r = T(rng, [5, 10, 20, 25, 4, 8, 12, 15, 40]), p = rng.int(1, 40) * 1000 * T(rng, [1, 2, 5]);
+      const r = T(rng, [5, 10, 20, 4, 8, 12, 15, 6, 16]), p = rng.int(1, 40) * 1000 * T(rng, [1, 2, 5]);
       const diff = p * r * r / 10000;
       if (!C(diff) || diff < 1) return null;
       return mk(rng, M, p, [
@@ -418,7 +432,7 @@
         `The square of the rate is essential: (${r}/100)² = ${R(r * r / 10000)}, not ${r}/100.`));
     }
     if (k === 1) {
-      const r = T(rng, [5, 10, 20, 25, 4, 8, 12, 15, 40]), p = rng.int(1, 30) * 1000 * T(rng, [1, 2, 5]);
+      const r = T(rng, [5, 10, 20, 4, 8, 12, 15, 6, 16]), p = rng.int(1, 30) * 1000 * T(rng, [1, 2, 5]);
       const diff = p * r * r * (300 + r) / 1e6;
       if (!C(diff) || diff < 1) return null;
       return mk(rng, M, p, [
@@ -431,7 +445,7 @@
         `Factor: ${R(r * r * (300 + r) / 1e6)} × P = ${N(diff)}.`,
         `For 3 years the difference is larger than for 2 years; use the (300 + R) factor.`));
     }
-    const r = T(rng, [5, 10, 20, 25, 4, 8, 12, 15, 40]), p = rng.int(1, 30) * 1000 * T(rng, [1, 2, 5]);
+    const r = T(rng, [5, 10, 20, 4, 8, 12, 15, 6, 16]), p = rng.int(1, 30) * 1000 * T(rng, [1, 2, 5]);
     const diff2 = p * r * r / 10000, diff3 = p * r * r * (300 + r) / 1e6;
     if (!C(diff2) || !C(diff3)) return null;
     const ratio = diff3 - diff2;

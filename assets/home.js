@@ -423,7 +423,7 @@
 .db-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.25rem; margin-top: .25rem; }
 .db-cta { min-height: 48px; display: inline-flex; align-items: center; gap: .5rem; font-size: 1rem; }
 .db-streak { border-left: 2px solid var(--line); padding-left: 2rem; display: flex; flex-direction: column; gap: .8rem; justify-content: center; }
-.db-streak-n b { display: block; font: 900 3.6rem/0.9 var(--mono); }
+.db-streak-n b { display: block; font: 900 3.6rem/1 var(--display); font-variant-numeric: tabular-nums lining-nums; letter-spacing: -.02em; }
 .db-streak-n span { font: 700 12px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .db-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .db-week span { display: flex; flex-direction: column; align-items: center; gap: 3px; font: 700 .72rem var(--mono); color: var(--muted); }

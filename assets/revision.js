@@ -108,7 +108,8 @@
     M.mist = qs.filter(isMistake);
     M.starQ = qs.filter((r) => r.it.star);
     M.starL = learn.filter((r) => r.it.star);
-    M.cardsDue = cardCounts(deckCards("formulas")).due + cardCounts(deckCards("vocab")).due;
+    const cf_ = cardCounts(deckCards("formulas")), cv_ = cardCounts(deckCards("vocab"));
+    M.cardsDue = cf_.due + cv_.due; M.cardsNew = cf_.nw + cv_.nw;
     return M;
   }
 
@@ -178,10 +179,11 @@
 
   /* ---------------------------------------------------------------- shared pieces */
   function tabsHTML(M) {
-    const n = { due: M.due.length + M.dueL.length, mistakes: M.mist.length, bookmarks: M.starQ.length + M.starL.length, cards: M.cardsDue };
+    const n = { due: M.due.length + M.dueL.length, mistakes: M.mist.length, bookmarks: M.starQ.length + M.starL.length, cards: M.cardsDue || M.cardsNew };
+    const lab = (id) => id === "cards" && !M.cardsDue && M.cardsNew ? Math.min(NEW_PER, M.cardsNew) + " new" : n[id];
     const T = [["due", "Due", "calendar"], ["mistakes", "Mistakes", "mistake"], ["bookmarks", "Bookmarks", "star"], ["cards", "Flashcards", "cards"]];
     return `<nav class="rv-tabs" role="tablist" aria-label="Revision sections">${T.map(([id, l, i]) =>
-      `<a href="#${id}${id === "mistakes" && group === "reason" ? "/reason" : id === "cards" ? "/" + deck : ""}" role="tab" aria-selected="${view === id}" class="${view === id ? "on" : ""}" data-tab="${id}">${ic(i)}<span>${l}</span><b class="n${n[id] ? "" : " z"}">${n[id]}</b></a>`).join("")}</nav>`;
+      `<a href="#${id}${id === "mistakes" && group === "reason" ? "/reason" : id === "cards" ? "/" + deck : ""}" role="tab" aria-selected="${view === id}" class="${view === id ? "on" : ""}" data-tab="${id}">${ic(i)}<span>${l}</span><b class="n${n[id] ? "" : " z"}">${lab(id)}</b></a>`).join("")}</nav>`;
   }
   function empty(ico, title, text, extra) {
     return `<div class="pr-card rv-empty"><div class="rv-empty-i">${ic(ico)}</div><h3>${title}</h3><p class="muted">${text}</p>${extra || ""}</div>`;
@@ -388,7 +390,7 @@
     const top = `<div class="rv-ctop"><div class="pr-segc" role="group" aria-label="Deck">
         <button type="button" class="${deck === "formulas" ? "on" : ""}" data-act="deck" data-v="formulas" aria-pressed="${deck === "formulas"}">Formulas <small>${fcN.due ? fcN.due + " due" : fAll.length}</small></button>
         <button type="button" class="${deck === "vocab" ? "on" : ""}" data-act="deck" data-v="vocab" aria-pressed="${deck === "vocab"}">Vocabulary <small>${vAll.length ? (vcN.due ? vcN.due + " due" : vAll.length) : "soon"}</small></button></div>${filters}</div>`;
-    const stats = `<div class="rv-cstats"><div class="d"><b>${C.due}</b><span>due today</span></div><div class="n"><b>${C.nw}</b><span>new</span></div><div class="l"><b>${C.learned}</b><span>learned</span></div></div>`;
+    const stats = `<div class="rv-cstats"><div class="d"><b>${C.due}</b><span>due today</span></div><div class="n"><b>${C.nw}</b><span>new to learn</span></div><div class="l"><b>${C.learned}</b><span>learned</span></div></div>`;
     let stage;
     if (!list.length) {
       stage = deck === "vocab" && !vAll.length
@@ -431,7 +433,9 @@
       const lv = gradeLevel(c, g, lapsed);
       return `<button type="button" class="${GRADES[g][1]}" data-act="rate" data-g="${g}"><b>${GRADES[g][0]}</b><small>${g === 1 ? "again soon" : ivl(lv)}</small><kbd>${g}</kbd></button>`;
     }).join("");
-    return `<div class="rv-prog"><span>Card <b>${sess.i + 1}</b> of ${n}</span><span class="rv-pbar"><i style="width:${pct}%"></i></span>${tag}</div>
+    const ready = !sess.started && !sess.i && !sess.flipped && !sess.done && !sess.ahead && !C.due && C.nw;
+    const startBar = ready ? `<div class="rv-start"><span><b>${Math.min(NEW_PER, C.nw)} new</b> · 0 due. Nothing is overdue, so this round is all new cards.</span><button type="button" class="btn primary" data-act="start">${ic("play")} Start ${n} cards</button></div>` : "";
+    return `${startBar}<div class="rv-prog"><span>Card <b>${sess.i + 1}</b> of ${n}</span><span class="rv-pbar"><i style="width:${pct}%"></i></span>${tag}</div>
       <div class="rv-scene"><div class="rv-flip${sess.flipped ? " on" : ""}" id="rvCard" role="button" tabindex="0" aria-label="Flashcard, press Space to flip" data-act="flip">
         <div class="rv-face rv-front" aria-hidden="${sess.flipped}">${front}<div class="rv-tap">${ic("flip")} Click or press Space</div></div>
         <div class="rv-face rv-back" aria-hidden="${!sess.flipped}">${back}</div></div></div>
@@ -498,6 +502,7 @@
     const act = b.dataset.act, k = b.dataset.k;
     if (act === "flip") { e.preventDefault(); return flip(); }
     if (act === "rate") return rate(+b.dataset.g);
+    if (act === "start") { sess.started = true; render(true); const cd = document.getElementById("rvCard"); if (cd) cd.focus({ preventScroll: true }); return; }
     if (act === "round") { newSession(false); return render(true); }
     if (act === "ahead") { newSession(true); return render(true); }
     if (act === "deck") { location.hash = "#cards/" + b.dataset.v; return; }
@@ -673,6 +678,8 @@
 .rv-cstats b { font: 800 var(--fs-xl) var(--display); font-variant-numeric: tabular-nums; }
 .rv-cstats span { font-size: var(--fs-xs); color: var(--muted); }
 .rv-cstats .d b { color: var(--accent); } .rv-cstats .n b { color: var(--purple); } .rv-cstats .l b { color: var(--green); }
+.rv-start { display: flex; align-items: center; justify-content: space-between; gap: .8rem; flex-wrap: wrap; padding: .7rem .9rem; margin-bottom: .8rem; border: 2px solid var(--line); background: var(--panel-2); font-size: var(--fs-sm); }
+.rv-start b { font-weight: 800; }
 .rv-prog { display: flex; align-items: center; gap: .7rem; font-size: var(--fs-xs); color: var(--muted); margin-bottom: .7rem; }
 .rv-prog b { color: var(--text); }
 .rv-pbar { flex: 1; height: 6px; border-radius: var(--r-pill); background: var(--panel-2); overflow: hidden; }

@@ -13,9 +13,16 @@
   const LS = [60, 72, 90, 120, 144, 180, 240, 360];
   const divs = (L) => { const r = []; for (let i = 1; i <= L; i++) if (L % i === 0) r.push(i); return r; };
 
+  // singular after "1": "1 hours" -> "1 hour", "1 men are" -> "1 man is"
+  const plz = (() => {
+    const S = { men: "man", women: "woman", boys: "boy", girls: "girl", people: "person" };
+    const re1 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (men|women|boys|girls) are\b/g, re2 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (hours|minutes|seconds|days|weeks|months|years|marks|litres|units|students|people|men|women|boys|girls)\b/g;
+    const one = (s) => (typeof s === "string" ? s.replace(re1, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + S[w] + " is").replace(re2, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + (S[w] || w.slice(0, -1))) : s);
+    return (r) => { if (r) { r.q = one(r.q); for (const k of ["sol", "opts", "why"]) if (Array.isArray(r[k])) r[k] = r[k].map(one); r.short = one(r.short); r.trap = one(r.trap); } return r; };
+  })();
   function wrap(fn) {
     return function (rng, d) {
-      for (let i = 0; i < 1500; i++) { const r = fn(rng, d); if (r) return r; }
+      for (let i = 0; i < 1500; i++) { const r = fn(rng, d); if (r) return plz(r); }
       throw new Error("time-work: no clean question found");
     };
   }
@@ -58,8 +65,7 @@
     }
     if (d === "Medium") {
       const r = pq(rng, false); if (!r) return null;
-      const askB = rng.chance(0.6);
-      return mk(rng, N, askB ? r.y : r.x, [[askB ? r.x : r.y, "Gave the other worker's time"], [r.x - r.t, "Subtracted the times directly"], [r.x + r.t, "Added the times"], [r.t * 2, "Doubled the joint time"]],
+      return mk(rng, N, r.y, [[r.x, "Gave the other worker's time"], [r.x - r.t, "Subtracted the times directly"], [r.x + r.t, "Added the times"], [r.t * 2, "Doubled the joint time"]],
         fin(d, `${A} and ${B} together can ${job} in **${r.t}** days. ${A} alone can do it in **${r.x}** days. In how many days can ${B} alone do it?`,
           [`Together rate = 1/${r.t}, ${A}'s rate = 1/${r.x}`, `${B}'s rate = 1/${r.t} − 1/${r.x} = ${r.x - r.t}/${r.t * r.x}`, `${B} alone = ${r.t * r.x}/${r.x - r.t} = **${r.y}**`],
           "Take LCM as total work, subtract efficiencies: (total ÷ (joint rate − A's rate)).", "Subtract the rates, never the days."));

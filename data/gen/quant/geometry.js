@@ -41,6 +41,7 @@
   const fin = (d, q, sol, short, trap, calc) => ({ d, q, sol, short, trap, calc });
 
   const NAME = { 3: "triangle", 4: "quadrilateral", 5: "pentagon", 6: "hexagon", 7: "heptagon", 8: "octagon", 9: "nonagon", 10: "decagon", 12: "dodecagon" };
+  const an = (w) => (/^[aeiou]/i.test(w) ? "an " : "a ") + w;
   const poly = (n) => NAME[n] ? NAME[n] : `polygon with ${n} sides`;
   const DIV = [3, 4, 5, 6, 8, 9, 10, 12, 15, 18, 20, 24, 30, 36, 40, 45, 60, 72, 90, 120, 180];
   const diag = (n) => n * (n - 3) / 2;
@@ -64,7 +65,7 @@
           [(n - 1) * 180, "Used (n − 1) × 180"],
           [(n - 2) * 360, "Used 360 in place of 180"],
           [(n - 3) * 180, "Used (n − 3) × 180"],
-        ], fin(d, T(rng, [`Find the sum of the interior angles of a ${poly(n)}.`, `What is the total of all interior angles of a convex polygon with **${n}** sides?`, `${w} draws a convex polygon with **${n}** sides. Find the sum of its interior angles.`]),
+        ], fin(d, T(rng, [`Find the sum of the interior angles of ${an(poly(n))}.`, `What is the total of all interior angles of a convex polygon with **${n}** sides?`, `${w} draws a convex polygon with **${n}** sides. Find the sum of its interior angles.`]),
           [`Sum = (n − 2) × 180°`, `= (${n} − 2) × 180° = **${S}°**`], `Split from one vertex into n − 2 triangles of 180° each.`, `Use n − 2, not n: the triangles number two fewer than the sides.`, `(${n}-2)*180`));
       }
       if (t === 1) {
@@ -84,7 +85,7 @@
         [n * (n - 3), "Forgot to halve (each diagonal counted twice)"],
         [n * (n - 2) / 2, "Used n(n − 2)/2"],
         [n * (n - 3) / 2 + n, "Added the sides"],
-      ], fin(d, T(rng, [`How many diagonals does a ${poly(n)} have?`, `Find the number of diagonals in a convex polygon of **${n}** sides.`]),
+      ], fin(d, T(rng, [`How many diagonals does ${an(poly(n))} have?`, `Find the number of diagonals in a convex polygon of **${n}** sides.`]),
         [`Diagonals = n(n − 3)/2`, `= ${n} × ${n - 3} ÷ 2 = **${diag(n)}**`], `From each vertex, n − 3 diagonals; halve the total.`, `Each diagonal joins two vertices, so n(n − 3) counts it twice.`, `${n}*(${n}-3)/2`));
     }
     if (d === "Medium") {

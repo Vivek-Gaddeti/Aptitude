@@ -133,23 +133,66 @@
   const icon = (name, cls = "") => ICONS[name] ? `<svg class="ico${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>` : "";
 
   /* ------------------------------------------------------------- Store */
+  const isObj = (o) => !!o && typeof o === "object" && !Array.isArray(o);
+  /* a stored or imported copy can be anything (hand-edited, truncated, from an old version): keep only the shapes the pages rely on */
+  function sanitizeStore(d) {
+    if (!isObj(d)) d = {};
+    const items = {}, activity = {}, meta = isObj(d.meta) ? d.meta : {};
+    if (isObj(d.items)) Object.keys(d.items).forEach((k) => { if (isObj(d.items[k])) items[k] = d.items[k]; });
+    if (isObj(d.activity)) Object.keys(d.activity).forEach((k) => { const n = +d.activity[k]; if (isFinite(n) && n > 0) activity[k] = n; });
+    const mocks = Array.isArray(d.mocks) ? d.mocks.filter((m) => isObj(m) && m.id != null) : [];
+    return Object.assign({}, d, { items, activity, meta, mocks });
+  }
+  let saveWarned = false;
   const Store = {
     key: (window.SITE && SITE.storeKey) || "apt:v1",
     d: null,
+    baseRaw: null,                                   // the stored text this tab last read or wrote: the common ancestor when two tabs both save
     load() {
       if (this.d) return this.d;
       let raw = null;
       try { raw = localStorage.getItem(this.key); } catch (e) {}
-      try { this.d = raw ? JSON.parse(raw) : null; } catch (e) { this.d = null; }
-      if (!this.d || typeof this.d !== "object") this.d = {};
-      this.d.items = this.d.items || {};
-      this.d.activity = this.d.activity || {};
-      this.d.mocks = Array.isArray(this.d.mocks) ? this.d.mocks : [];   // finished mock tests, newest last (assets/mock.js)
-      this.d.meta = this.d.meta || {};                                    // small site-wide settings: goal, daily set, speed-drill bests…
+      let p = null;
+      try { p = raw ? JSON.parse(raw) : null; } catch (e) { p = null; }
+      this.baseRaw = raw;
+      this.d = sanitizeStore(p);
       return this.d;
     },
-    save() {
-      try { localStorage.setItem(this.key, JSON.stringify(this.d)); } catch (e) {}
+    /* Another tab may have saved since this tab loaded. Before writing, fold in what it changed: for every item / meta key this tab did not
+       touch take the stored value (when both touched a key the newer "updated" wins), add the day counts it added, and keep both tabs' mocks. */
+    merge(d) {
+      let raw = null;
+      try { raw = localStorage.getItem(this.key); } catch (e) { return; }
+      if (raw === this.baseRaw || !raw) return;
+      let S, B;
+      try { S = sanitizeStore(JSON.parse(raw)); } catch (e) { return; }
+      try { B = sanitizeStore(this.baseRaw ? JSON.parse(this.baseRaw) : null); } catch (e) { B = sanitizeStore(null); }
+      const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+      Object.keys(S.items).forEach((k) => {
+        const mine = d.items[k], theirs = S.items[k];
+        if (mine === undefined && B.items[k] !== undefined) return;                       // this tab deleted it
+        if (mine === undefined || same(mine, B.items[k])) d.items[k] = theirs;            // untouched here
+        else if (!same(mine, theirs) && (+theirs.updated || 0) > (+mine.updated || 0)) d.items[k] = theirs;
+      });
+      Object.keys(S.activity).forEach((day) => {
+        const was = B.activity[day] || 0, add = (d.activity[day] || 0) - was, theirs = S.activity[day];
+        if (theirs !== was) d.activity[day] = Math.max(0, theirs + add);
+      });
+      Object.keys(S.meta).forEach((k) => { if (!(k in d.meta) ? !(k in B.meta) : same(d.meta[k], B.meta[k])) d.meta[k] = S.meta[k]; });
+      const have = new Set(d.mocks.map((m) => m.id));
+      const add = S.mocks.filter((m) => !have.has(m.id));
+      if (add.length) { d.mocks.push.apply(d.mocks, add); d.mocks.sort((a, b) => (a.at || 0) - (b.at || 0)); }
+    },
+    save(force) {
+      const d = this.load();
+      if (!force) { try { this.merge(d); } catch (e) {} }
+      try {
+        const raw = JSON.stringify(d);
+        localStorage.setItem(this.key, raw);
+        this.baseRaw = raw;
+      } catch (e) {
+        if (!saveWarned) { saveWarned = true; try { toast("Progress could not be saved in this browser. Use Export on the dashboard.", 5200, "alert"); } catch (x) {} }
+      }
       document.dispatchEvent(new CustomEvent("store:change"));
     },
     item(k) { return this.load().items[k] || {}; },
@@ -231,19 +274,24 @@
       const r = new FileReader();
       r.onload = () => {
         try {
-          const d = JSON.parse(r.result);
-          if (!d.items) throw new Error("bad file");
+          const raw = JSON.parse(r.result);
+          if (!isObj(raw)) throw new Error("bad file");
+          const d = sanitizeStore(raw);
+          if (!Object.keys(d.items).length && !Object.keys(d.activity).length && !d.mocks.length) throw new Error("no progress in that file");
           const cur = this.load(), seen = new Set(cur.mocks.map((m) => m.id));
-          this.d = { items: Object.assign({}, cur.items, d.items), activity: Object.assign({}, cur.activity, d.activity || {}),
-            mocks: cur.mocks.concat((d.mocks || []).filter((m) => m && !seen.has(m.id))).sort((a, b) => (a.at || 0) - (b.at || 0)),
-            meta: Object.assign({}, cur.meta, d.meta || {}) };
+          cur.items = Object.assign({}, cur.items, d.items); cur.activity = Object.assign({}, cur.activity, d.activity);
+          cur.mocks = cur.mocks.concat(d.mocks.filter((m) => !seen.has(m.id))).sort((a, b) => (a.at || 0) - (b.at || 0));
+          cur.meta = Object.assign({}, cur.meta, d.meta);
           this.save(); toast("Progress imported", 1800, "check"); cb && cb();
         } catch (e) { toast("Could not import that file"); }
       };
       r.readAsText(file);
     },
-    reset() { this.d = { items: {}, activity: {}, mocks: [], meta: {} }; this.save(); },
+    reset() { this.d = { items: {}, activity: {}, mocks: [], meta: {} }; this.save(true); },
   };
+
+  // another tab saved: drop this tab's copy so the next read sees it (and so a later save here starts from it)
+  window.addEventListener("storage", (e) => { if (e.key === null || e.key === Store.key) { Store.d = null; document.dispatchEvent(new CustomEvent("store:change")); } });
 
   /* ------------------------------------------------------------- Toast */
   let toastEl, toastT;
@@ -945,6 +993,26 @@
   new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => n.nodeType === 1 && prettyIn(n)))).observe(document.documentElement, { childList: true, subtree: true });
   document.addEventListener("DOMContentLoaded", () => prettyIn(document.body));
 
+  /* wide tables: every .table-wrap sits in a .tw frame; while it overflows (and is not scrolled to the end) the frame gets .more,
+     which brutal.css turns into a right-edge fade and a small "scroll" hint on phone and tablet */
+  const twMeasure = (tw) => { const w = tw.querySelector(".table-wrap"); if (w) tw.classList.toggle("more", w.scrollWidth > w.clientWidth + 2 && w.scrollLeft + w.clientWidth < w.scrollWidth - 2); };
+  const twAll = () => document.querySelectorAll(".tw").forEach(twMeasure);
+  function twScan(node) {
+    const list = node.matches && node.matches(".table-wrap") ? [node] : node.querySelectorAll ? [...node.querySelectorAll(".table-wrap")] : [];
+    list.forEach((w) => {
+      if (w.parentNode && w.parentNode.classList && w.parentNode.classList.contains("tw")) return;
+      const tw = document.createElement("div"); tw.className = "tw";
+      w.parentNode.insertBefore(tw, w); tw.appendChild(w);
+      tw.insertAdjacentHTML("beforeend", '<span class="tw-hint" aria-hidden="true">scroll →</span>');
+      twMeasure(tw);
+    });
+  }
+  new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => n.nodeType === 1 && twScan(n)))).observe(document.documentElement, { childList: true, subtree: true });
+  document.addEventListener("DOMContentLoaded", () => { twScan(document.body); twAll(); });
+  document.addEventListener("scroll", (e) => { const t = e.target; if (t && t.classList && t.classList.contains("table-wrap") && t.parentNode.classList.contains("tw")) twMeasure(t.parentNode); }, true);
+  window.addEventListener("resize", twAll);
+  window.addEventListener("load", () => setTimeout(twAll, 200));
+
   /* ------------------------------------------------------------- Top bar
      Built in one go (icons, colours, due badge, streak, a reserved spot for the ✨ menu), and as early as
      possible, so nothing pops in or shifts after the page appears. Each link has its own soft colour (--c). */
@@ -986,7 +1054,7 @@
   function paintRing() {
     const R = window.SITE && SITE.ring, br = document.querySelector(".topbar .brand");
     if (!R || !br) return;
-    const done = Object.entries(Store.load().items).filter(([k, v]) => v.status && R.prefixes.some((p) => k.startsWith(p))).length;
+    const done = Object.entries(Store.load().items).filter(([k, v]) => v && v.status && R.prefixes.some((p) => k.startsWith(p))).length;
     br.title = `${done} / ${R.total} ${R.label} · ${dueCount()} due for review`;
   }
   // a header link with a small menu (Python ▾): opens on hover or focus, or on tap where there is no hover
@@ -1127,7 +1195,7 @@
     };
     const subPages = [];
     S.links.forEach(([href, , sub]) => sub && sub.forEach(([x, l]) => { if (!S.links.some(([y]) => y === x)) subPages.push([x, l]); }));
-    $("#setBtn").onclick = (e) => { e.stopPropagation(); openSettings(e.currentTarget); };
+    $("#setBtn").onclick = (e) => { e.stopPropagation(); openSettings(e.currentTarget, subPages); };
     const mb = $("#menuBtn");
     if (!document.getElementById("sidebar")) mb.style.display = "none";
     mb.onclick = () => document.body.classList.toggle("sidebar-open");
@@ -1237,8 +1305,8 @@
     const b = e.target.closest(".doc-actions [data-act]");
     if (!b) return;
     const bar = b.closest(".doc-actions"), key = bar.dataset.key, it = Store.item(key), act = b.dataset.act;
-    if (act === "done") { Store.setStatus(key, it.status === "done" ? null : "done"); toast(it.status === "done" ? "Unmarked" : "Nice! Added to your revision schedule"); }
-    if (act === "revise") { Store.setStatus(key, it.status === "revise" ? (it.doneAt ? "done" : null) : "revise"); }
+    if (act === "done") { Store.setStatus(key, it.status === "done" ? null : "done"); toast(it.status === "done" ? "Unmarked" : it.status === "revise" ? "Moved from Needs revision to Learned" : "Nice! Added to your revision schedule"); }
+    if (act === "revise") { Store.setStatus(key, it.status === "revise" ? (it.doneAt ? "done" : null) : "revise"); if (it.status === "done") toast("Moved from Learned to Needs revision"); }
     if (act === "star") { Store.toggleStar(key); }
     // update the buttons in place (no re-render), so they keep their size and position
     const fresh = document.createElement("div");
@@ -1260,7 +1328,7 @@
   }
   function notesBox(key) {
     const it = Store.item(key);
-    return `<details class="box" ${it.note ? "open" : ""}><summary>${icon("note")} My notes</summary><div class="body"><textarea data-note="${key}" placeholder="Write your own summary, mistakes you made, key insight...">${esc(it.note || "")}</textarea><div class="small muted">Saved automatically in this browser.</div></div></details>`;
+    return `<details class="box" ${it.note ? "open" : ""}><summary>${icon("note")} My notes</summary><div class="body"><textarea data-note="${key}" aria-label="My notes" placeholder="Write your own summary, mistakes you made, key insight...">${esc(it.note || "")}</textarea><div class="small muted">Saved automatically in this browser.</div></div></details>`;
   }
   let noteT;
   document.addEventListener("input", (e) => {
@@ -1475,7 +1543,7 @@
     function sidebar() {
       const total = secs.length, done = secs.filter((s) => Store.item(kind + ":" + s.id).status).length;
       const hashId = (location.hash || "").slice(1), curId = byId[hashId] ? hashId : secs[0].id, ci = secs.findIndex((s) => s.id === curId);
-      let h = `<div class="sb-top"><input type="search" class="search" id="docSearch" placeholder="Search ${cfg.noun || "topics"}…" value="${esc(filter)}"><button type="button" class="sb-close" aria-label="Hide topics" title="Hide topics  ( [ )">${icon("sidebar")}</button></div>
+      let h = `<div class="sb-top"><input type="search" class="search" id="docSearch" aria-label="Search ${cfg.noun || "topics"}" placeholder="Search ${cfg.noun || "topics"}…" value="${esc(filter)}"><button type="button" class="sb-close" aria-label="Hide topics" title="Hide topics  ( [ )">${icon("sidebar")}</button></div>
         <div class="sb-progress"><div class="small muted row-between"><span>Progress</span><span>${done}/${total}</span></div><div class="bar"><span style="width:${(done / total) * 100}%"></span></div></div>
         <p class="small muted sb-nomatch empty-state" hidden>No matches.</p>`;
       // the current item and its neighbours read a little stronger; learned items soften and get a small ✓
@@ -1534,6 +1602,7 @@
     window.addEventListener("pagehide", saveScroll);
     function show() {
       let id = (location.hash || "").slice(1);
+      const unknown = !!id && !secs.find((s) => s.id === id);
       if (!secs.find((s) => s.id === id)) id = secs[0].id;
       clearTimeout(scrT); if (curId) saveScroll();
       curId = id;
@@ -1579,6 +1648,7 @@
         };
         requestAnimationFrame(go);
       } else paintProgress();
+      if (unknown) toast("That topic wasn't found", 2600);
     }
     window.addEventListener("hashchange", show);
     // only rebuild the sidebar when something it shows changed (status / bookmark), not on every note keystroke

@@ -20,11 +20,12 @@
   };
 
   const CITIES = ["Pune", "Nagpur", "Madurai", "Jaipur", "Lucknow", "Kochi", "Indore", "Surat", "Patna", "Mysuru", "Bhopal", "Ranchi", "Guwahati", "Vizag", "Raipur", "Dehradun", "Agra", "Nashik", "Udaipur", "Coimbatore", "Kanpur", "Vadodara", "Cuttack", "Thrissur", "Jodhpur", "Amritsar", "Hubballi", "Shillong", "Belagavi", "Salem"];
-  const JOBS = ["teacher", "trainee", "librarian", "shopkeeper", "coach", "student", "clerk", "game-stall owner", "engineer", "quiz host"];
+  const JOBS = ["teacher", "trainee", "librarian", "shopkeeper", "coach", "student", "clerk", "game-stall owner", "architect", "quiz host"];
   const VENUES = ["coaching class", "college fest", "club meeting", "office training", "school fair", "workshop"];
+  const an = (w) => (/^[aeiou]/i.test(w) ? "an " : "a ") + w;
   const lead = (rng) => {
     const c = T(rng, CITIES), k = rng.int(0, 2);
-    return k === 0 ? `A ${T(rng, JOBS)} in ${c} asks: ` : k === 1 ? `${cap(T(rng, JOBS))} from ${c}: ` : `At a ${T(rng, VENUES)} in ${c}: `;
+    return k === 0 ? `${cap(an(T(rng, JOBS)))} in ${c} asks: ` : k === 1 ? "" : `At ${an(T(rng, VENUES))} in ${c}: `;
   };
   function wrap(fn) {
     return function (rng, d) {

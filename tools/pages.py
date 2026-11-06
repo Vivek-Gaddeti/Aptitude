@@ -27,8 +27,10 @@ HEAD = '''<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{title}</title>
+<link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap"></noscript>
 <link rel="stylesheet" href="assets/style.css">
 <link rel="stylesheet" href="assets/practice.css">
 <link rel="stylesheet" href="assets/brutal.css">
@@ -72,7 +74,8 @@ charts = opt("assets/charts.js")                    # DI charts drawn from a dat
 
 
 def lesson(sec, name, title):
-    data = ["assets/glossary.js", "assets/qbank.js"] + charts + ["data/briefs.js"] + learn_files(sec) + qfiles(sec) + glob("sets")
+    # only the questions the lesson's quiz blocks use (data/quiz/<sec>.js, written by tools/lite.js), not the whole bank
+    data = ["assets/glossary.js", "assets/qbank.js"] + charts + ["data/briefs.js"] + learn_files(sec) + opt(f"data/quiz/{sec}.js")
     page(f"{sec}.html", f"{title} · Aptitude Hub", DOC, data, [],
          f'topbar("{sec}.html");\n  DocPage({{ sections: learnSections("{sec}"), kind: "{sec}", title: "{title}", noun: "topics" }});')
 

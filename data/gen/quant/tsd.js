@@ -12,9 +12,16 @@
   const SEC = (x) => N(x) + " s", MIN = (x) => N(x) + " min", HR = (x) => N(x) + (x === 1 ? " hour" : " hours");
   const c5 = (v) => v * 5 / 18, c18 = (m) => m * 18 / 5;   // km/h -> m/s, m/s -> km/h
 
+  // singular after "1": "1 hours" -> "1 hour", "1 men are" -> "1 man is"
+  const plz = (() => {
+    const S = { men: "man", women: "woman", boys: "boy", girls: "girl", people: "person" };
+    const re1 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (men|women|boys|girls) are\b/g, re2 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (hours|minutes|seconds|days|weeks|months|years|marks|litres|units|students|people|men|women|boys|girls)\b/g;
+    const one = (s) => (typeof s === "string" ? s.replace(re1, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + S[w] + " is").replace(re2, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + (S[w] || w.slice(0, -1))) : s);
+    return (r) => { if (r) { r.q = one(r.q); for (const k of ["sol", "opts", "why"]) if (Array.isArray(r[k])) r[k] = r[k].map(one); r.short = one(r.short); r.trap = one(r.trap); } return r; };
+  })();
   function wrap(fn) {
     return function (rng, d) {
-      for (let i = 0; i < 1500; i++) { const r = fn(rng, d); if (r) return r; }
+      for (let i = 0; i < 1500; i++) { const r = fn(rng, d); if (r) return plz(r); }
       throw new Error("tsd: no clean question found");
     };
   }
@@ -233,8 +240,10 @@
 
   /* ---------------------------------------------------------------- 3. late / early at two speeds */
   QB.gen("quant/tsd/late-early-at-two-speeds", { title: "Late / early at two speeds", gen: wrap((rng, d) => {
-    const nm = T(rng, NAMES), veh = T(rng, VEH), place = T(rng, ["office", "college", "station", "airport", "the market", "school", "the factory"]);
-    const SP = [3, 4, 5, 6, 8, 10, 12, 15, 20, 24, 25, 30, 32, 36, 40, 45, 48, 50, 60];
+    const nm = T(rng, NAMES), place = T(rng, ["office", "college", "station", "airport", "the market", "school", "the factory"]);
+    // believable speeds for each vehicle (km/h)
+    const [veh, lo, hi] = T(rng, [["bicycle", 10, 20], ["bicycle", 10, 20], ["scooter", 30, 60], ["motorcycle", 30, 60], ["car", 30, 60], ["bus", 30, 60], ["taxi", 30, 60], ["truck", 30, 60], ["van", 30, 60]]);
+    const SP = [10, 12, 15, 20, 24, 25, 30, 32, 36, 40, 45, 48, 50, 60].filter((v) => v >= lo && v <= hi);
     const s1 = T(rng, SP), s2 = T(rng, SP);
     if (s2 <= s1) return null;
     const D = rng.int(1, 40) * (s1 <= 6 ? 1 : 2);
@@ -571,7 +580,7 @@
 
   /* ---------------------------------------------------------------- 7. trains: two trains */
   QB.gen("quant/tsd/trains-two-trains", { title: "Trains: two trains", gen: wrap((rng, d) => {
-    const n1 = T(rng, ["Train A", "The Shatabdi", "The Duronto", "The Intercity", "The Garib Rath"]), n2 = T(rng, ["Train B", "A goods train", "A local", "The Mail", "A freight train"]);
+    const n1 = T(rng, ["Train A", "The Shatabdi", "The Duronto", "The Intercity", "The Garib Rath"]), n2 = T(rng, ["Train B", "a goods train", "a local train", "the Mail", "a freight train"]);
     if (d === "Easy") {
       const v1 = rng.int(4, 14) * 6, v2 = rng.int(4, 14) * 6, L1 = rng.int(4, 30) * 10, L2 = rng.int(4, 30) * 10;
       const opp = rng.chance(0.55), rel = opp ? v1 + v2 : Math.abs(v1 - v2);

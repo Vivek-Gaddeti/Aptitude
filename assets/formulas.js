@@ -61,6 +61,13 @@
 .ch-lists li::before { content: ""; position: absolute; left: .1rem; top: .75em; width: .35rem; height: .35rem; border-radius: 50%; background: currentColor; opacity: .55; }
 .ch-lists .t li::before { color: var(--green); } .ch-lists .x li::before { color: var(--amber); }
 .ch-tbl { overflow-x: auto; }
+.ch-tw { position: relative; }
+.ch-hint { display: none; }
+@media (max-width: 700px) {
+  .ch-tw.over::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 2.2rem; pointer-events: none; background: linear-gradient(90deg, transparent, var(--panel)); }
+  .ch-tw.over .ch-hint { display: block; position: absolute; right: .4rem; bottom: .3rem; z-index: 1; pointer-events: none; font: 700 .68rem/1 var(--mono); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); background: var(--panel); border: 1px solid var(--line); padding: .2rem .35rem; }
+}
+@media print { .ch-hint { display: none !important; } .ch-tw::after { display: none !important; } }
 .ch-tbl table { border-collapse: collapse; width: auto; min-width: min(100%, 30rem); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 .ch-tbl th { text-align: left; font-size: var(--fs-2xs); letter-spacing: .02em; color: var(--muted); padding: .4rem 1.4rem .4rem .7rem; font-weight: 700; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .ch-tbl td { padding: .32rem 1.4rem .32rem .7rem; border-bottom: 1px solid var(--border); }
@@ -209,8 +216,8 @@ html[data-device="tablet"][data-hand="left"] .ch-dm .ch-toc.open { transform: no
       const wide = t.head && t.head.length > 4 && t.zebra !== false && /squares|cubes/i.test(t.title);
       return `<section class="ch-card" id="c-tables-${t.id}" data-sec="tables" style="--tagc:${SEC_COLOR.tables}">
         <div class="ch-ct"><h3>${esc(t.title)}</h3><span class="ch-tag">Table</span></div>
-        <div class="ch-tbl${wide ? " zebra-cols" : ""}"><table><thead><tr>${t.head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead>
-        <tbody>${t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+        <div class="ch-tw"><div class="ch-tbl${wide ? " zebra-cols" : ""}"><table><thead><tr>${t.head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead>
+        <tbody>${t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div><span class="ch-hint" aria-hidden="true">scroll →</span></div>
         ${t.note ? `<p class="ch-tnote">${fmt(t.note)}</p>` : ""}</section>`;
     };
 
@@ -365,6 +372,10 @@ html[data-device="tablet"][data-hand="left"] .ch-dm .ch-toc.open { transform: no
         e.preventDefault(); ctl.toggle();
       });
     }
+    const tws = Array.from(root.querySelectorAll(".ch-tw"));
+    const hint = () => tws.forEach((w) => { const t = w.firstElementChild; w.classList.toggle("over", t.scrollWidth - t.clientWidth > 4 && t.scrollLeft + t.clientWidth < t.scrollWidth - 4); });
+    tws.forEach((w) => w.firstElementChild.addEventListener("scroll", hint, { passive: true }));
+    window.addEventListener("resize", hint); setTimeout(hint, 60); setTimeout(hint, 600);
     apply();
   }
   window.CheatSheet = CheatSheet;

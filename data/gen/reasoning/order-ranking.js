@@ -169,7 +169,7 @@
 
   /* ------------------------------------------------------------ 4. rank among those who passed */
   QB.gen("reasoning/order-ranking/rank-among-those-who-passed", { title: "Rank among those who passed", gen: wrap((rng, d) => {
-    const c = T(rng, CTX.filter((x) => x.kind === "rank")), [X] = names(rng, 1);
+    const c = T(rng, CTX.filter((x) => x.kind === "rank" && x.unit !== "employees")), [X] = names(rng, 1);
     if (d === "Easy") {
       const p = rng.int(5, 25), q = rng.int(8, 30), f = rng.int(2, q - 3), n = p + q - 1;
       const q1 = `${X} ${c.rankWord} **${ord(p)}** ${c.a} and **${ord(q)}** ${c.b} in an examination. The **${f}** ${c.unit} at the bottom failed. What is ${X}'s rank ${c.b} among those who passed?`;

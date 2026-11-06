@@ -184,7 +184,7 @@
       const list = words.map((w, i) => `(${i + 1}) ${w}`).join("  ");
       const q = T(rng, [`Arrange the words in dictionary order: **${list}**. Which word comes **${ord(k)}**?`, `The words **${list}** are put in dictionary order. Which one is **${ord(k)}** in the order?`]);
       const o = { opts: words, ans, why: words.map((w, i) => (i === ans ? null : `${w} is at position ${sorted.indexOf(w) + 1}, not ${k}`)) };
-      return Object.assign({ time: TIME[d] }, finish(d, q, [`Dictionary order: ${sorted.join(" < ")}`, `The ${ord(k)} word is ${target}, which is the correct option.`], "Sort by first letter, then second letter, then third.", "Do not count a longer word before the shorter word it starts with."), o, { check: chkW(`${J(words)}.slice().sort()[${k - 1}]`) });
+      return Object.assign({ time: TIME[d] }, finish(d, q, [`Dictionary order: ${sorted.join(" < ")}`, `The ${ord(k)} word is **${target}**, which is the correct option.`], "Sort by first letter, then second letter, then third.", "Do not count a longer word before the shorter word it starts with."), o, { check: chkW(`${J(words)}.slice().sort()[${k - 1}]`) });
     }
     if (kind === 5) {                             // number of letters that keep their place after sorting
       const w = T(rng, DISTINCT.concat(PW)); const s = [...w].sort();

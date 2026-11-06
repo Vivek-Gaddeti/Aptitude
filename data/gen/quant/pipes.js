@@ -10,9 +10,16 @@
   const TIME = { Easy: 40, Medium: 70, Hard: 100 };
   const lcm3 = (a, b, c) => QB.lcm(QB.lcm(a, b), c || 1);
 
+  // singular after "1": "1 hours" -> "1 hour", "1 men are" -> "1 man is"
+  const plz = (() => {
+    const S = { men: "man", women: "woman", boys: "boy", girls: "girl", people: "person" };
+    const re1 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (men|women|boys|girls) are\b/g, re2 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (hours|minutes|seconds|days|weeks|months|years|marks|litres|units|students|people|men|women|boys|girls)\b/g;
+    const one = (s) => (typeof s === "string" ? s.replace(re1, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + S[w] + " is").replace(re2, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + (S[w] || w.slice(0, -1))) : s);
+    return (r) => { if (r) { r.q = one(r.q); for (const k of ["sol", "opts", "why"]) if (Array.isArray(r[k])) r[k] = r[k].map(one); r.short = one(r.short); r.trap = one(r.trap); } return r; };
+  })();
   function wrap(fn) {
     return function (rng, d) {
-      for (let i = 0; i < 800; i++) { const r = fn(rng, d); if (r) return r; }
+      for (let i = 0; i < 800; i++) { const r = fn(rng, d); if (r) return plz(r); }
       throw new Error("pipes: no clean question found");
     };
   }
@@ -39,7 +46,7 @@
   const finish = (d, q, sol, short, trap) => ({ d, q, sol, short, trap });
 
   // context pieces
-  const TANK = ["tank", "cistern", "reservoir", "water tank", "storage tank", "swimming pool", "overhead tank"];
+  const TANK = ["tank", "cistern", "reservoir", "water tank", "storage tank", "swimming pool", "rooftop tank"];
   const WHO = ["A factory", "A housing society", "A hostel", "A farm", "A textile mill", "A school", "A dairy plant", "A village panchayat"];
   const UNIT = (rng) => (rng.chance(0.5) ? ["hours", "hours"] : ["minutes", "minutes"]);
   const uf = (u) => (x) => N(x) + " " + u;

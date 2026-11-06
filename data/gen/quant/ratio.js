@@ -13,9 +13,16 @@
   const names = (rng, n) => { const a = rng.shuffle(NM); return a.slice(0, n); };
   const rt = (v) => { const g = QB.gcd(v[0], v[1]); return `${v[0] / g} : ${v[1] / g}`; };
 
+  // singular after "1": "1 hours" -> "1 hour", "1 men are" -> "1 man is"
+  const plz = (() => {
+    const S = { men: "man", women: "woman", boys: "boy", girls: "girl", people: "person" };
+    const re1 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (men|women|boys|girls) are\b/g, re2 = /(?<![\d.,/₹]|[+−×÷*-] )(\*\*)?1(\*\*)? (hours|minutes|seconds|days|weeks|months|years|marks|litres|units|students|people|men|women|boys|girls)\b/g;
+    const one = (s) => (typeof s === "string" ? s.replace(re1, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + S[w] + " is").replace(re2, (m, a, b, w) => (a || "") + "1" + (b || "") + " " + (S[w] || w.slice(0, -1))) : s);
+    return (r) => { if (r) { r.q = one(r.q); for (const k of ["sol", "opts", "why"]) if (Array.isArray(r[k])) r[k] = r[k].map(one); r.short = one(r.short); r.trap = one(r.trap); } return r; };
+  })();
   function wrap(fn) {
     return function (rng, d) {
-      for (let i = 0; i < 800; i++) { const r = fn(rng, d); if (r) return r; }
+      for (let i = 0; i < 800; i++) { const r = fn(rng, d); if (r) return plz(r); }
       throw new Error("ratio: no clean question found");
     };
   }
@@ -93,7 +100,7 @@
   }) });
 
   /* ------------------------------------------------------------------ 2. dividing an amount */
-  const POTS = [["prize money", "prize"], ["profit", "profit"], ["scholarship fund", "fund"], ["bonus pool", "bonus"], ["inheritance", "inheritance"], ["donation", "donation"]];
+  const POTS = [["prize money", "prize"], ["profit", "profit"], ["scholarship fund", "fund"], ["bonus pool", "bonus"], ["family inheritance", "inheritance"], ["donation", "donation"]];
   QB.gen("quant/ratio/dividing-an-amount", { title: "Dividing an amount in a ratio", gen: wrap((rng, d) => {
     const [pot] = T(rng, POTS), nm = names(rng, 3);
     if (d === "Easy") {
@@ -428,7 +435,7 @@
   }) });
 
   /* ------------------------------------------------------------------ 6. adding / removing to change a ratio */
-  const GROUPS = [["boys", "girls", "students in a class"], ["men", "women", "employees at a firm"], ["red balls", "blue balls", "balls in a bag"], ["cows", "buffaloes", "animals on a farm"], ["fiction books", "non-fiction books", "books in a library"]];
+  const GROUPS = [["boys", "girls", "the students of a class", "Among the students of a class"], ["men", "women", "the employees of a firm", "Among the employees of a firm"], ["red balls", "blue balls", "a bag", "In a bag"], ["cows", "buffaloes", "a farm", "On a farm"], ["fiction books", "non-fiction books", "a library", "In a library"]];
   QB.gen("quant/ratio/adding-removing-to-change-a", { title: "Adding / removing to change a ratio", gen: wrap((rng, d) => {
     const g = T(rng, GROUPS);
     if (d === "Easy") {
@@ -462,7 +469,7 @@
         [B + add, "Gave the new count, not the original"],
         [add * b, "Multiplied the number added by the ratio term"],
         [(A + B), "Gave the total"],
-      ], finish(d, `In ${g[2]}, the number of ${g[0]} to ${g[1]} is **${a} : ${b}**. When **${add}** more ${g[1]} join, the ratio becomes **${c} : ${e}**. ${askTotal ? `How many are there originally in all?` : `How many ${g[1]} were there originally?`}`,
+      ], finish(d, `${g[3]}, the number of ${g[0]} to ${g[1]} is **${a} : ${b}**. When **${add}** more ${g[1]} join, the ratio becomes **${c} : ${e}**. ${askTotal ? `How many are there originally in all?` : `How many ${g[1]} were there originally?`}`,
         [`Let ${g[0]} = ${a}k and ${g[1]} = ${b}k`, `${a}k : (${b}k + ${add}) = ${c} : ${e} → ${e * a}k = ${c * b}k + ${c * add}`, `k = ${k}; ${g[0]} = ${A}, ${g[1]} = ${B}${askTotal ? `, total = **${A + B}**` : ` → **${B}**`}`],
         `The unchanged group (${g[0]}) is ${a}k = ${A}; use it to find k from the new ratio.`,
         `Only ${g[1]} changed, so keep ${g[0]} = ${a}k and add ${add} to ${b}k alone.`));
@@ -480,7 +487,7 @@
         [A, "Gave only the first quantity"],
         [B, "Gave only the second quantity"],
         [(a + b) * (x + y), "Multiplied the ratio sum by the total change"],
-      ], finish(d, `The ratio of ${g[0]} to ${g[1]} in ${g[2]} is **${a} : ${b}**. If **${x}** ${g[0]} are added and **${y}** ${g[1]} are removed, the ratio becomes **${c} : ${e}**. How many were there originally in all?`,
+      ], finish(d, `The ratio of ${g[0]} to ${g[1]} ${g[3][0].toLowerCase() + g[3].slice(1)} is **${a} : ${b}**. If **${x}** ${g[0]} are added and **${y}** ${g[1]} are removed, the ratio becomes **${c} : ${e}**. How many were there originally in all?`,
         [`(${a}k + ${x}) : (${b}k − ${y}) = ${c} : ${e}`, `${e}(${a}k + ${x}) = ${c}(${b}k − ${y}) → k(${Math.abs(e * a - c * b)}) = ${Math.abs(-c * y - e * x)} → k = ${k}`, `Original total = (${a} + ${b}) × ${k} = **${A + B}**`],
         `Set up with k, cross-multiply, solve for k, and finish with (${a} + ${b})k.`,
         `One group goes UP by ${x} and the other goes DOWN by ${y}; watch the signs when cross-multiplying.`));
@@ -497,7 +504,7 @@
       [na, "Gave the new count after the change"],
       [A + B, "Gave the total"],
       [(A - B) * 2, "Gave a multiple of the difference"],
-    ], finish(d, `In ${g[2]}, the ratio of ${g[0]} to ${g[1]} is **${a} : ${b}**. After **${x}** ${g[0]} leave and **${x}** ${g[1]} join, the ratio becomes **${c} : ${e}**. How many ${g[0]} were there originally?`,
+    ], finish(d, `${g[3]}, the ratio of ${g[0]} to ${g[1]} is **${a} : ${b}**. After **${x}** ${g[0]} leave and **${x}** ${g[1]} join, the ratio becomes **${c} : ${e}**. How many ${g[0]} were there originally?`,
       [`(${a}k − ${x}) : (${b}k + ${x}) = ${c} : ${e}`, `${e}(${a}k − ${x}) = ${c}(${b}k + ${x}) → k = ${k}`, `${g[0][0].toUpperCase() + g[0].slice(1)} = ${a} × ${k} = **${A}**`],
       `Find k from the cross-multiplication, then multiply by ${a}.`,
       `Total stays the same here (${A + B}), which is a useful check on k.`));

@@ -762,7 +762,7 @@
       }
       const l = T(rng, [10, 15, 20, 25, 5, 12]), g = T(rng, [10, 15, 20, 25, 30, 8]), cp = rng.int(4, 40) * 100;
       const s1 = cp * (1 - l / 100), s2 = cp * (1 + g / 100), want = T(rng, [10, 20, 25, 30, 40]);
-      if (!I(s1) || !I(s2)) return null;
+      if (!I(s1) || !I(s2) || want === g) return null;
       const ans = cp * (1 + want / 100);
       return mk(rng, M, ans, [
         [(s1 + s2) / 2, "Averaged the two selling prices"],

@@ -561,7 +561,7 @@ QB.add([
   "sec": "di",
   "topic": "di-tricks",
   "pattern": "fast-multiplication",
-  "d": "Hard",
+  "d": "Medium",
   "q": "Find **996 × 1,004**.",
   "opts": [
    "10,00,016",

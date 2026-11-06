@@ -49,18 +49,20 @@
     const s = back ? -t : t, den = dd * a - c * b;
     if (den === 0) return null;
     const x = (c * s - dd * s) / den;
-    if (Math.abs(x - g) > 1e-9) return null;
+    if (Math.abs(x - g) > 1e-9 || g < 2) return null;
     const askOlder = rng.chance(0.5), ans = askOlder ? A : B;
     const when = back ? `**${t}** years ago` : `after **${t}** years`;
     const ctx = d === "Easy" ? `The present ages of ${p} and ${q} are in the ratio **${rat(A, B)}**. ${back ? `${t} years ago` : `After ${t} years`} the ratio becomes **${rat(A2, B2)}**.` : `${p} and ${q} are of ages in the ratio **${rat(A, B)}** now, and ${when} their ages will ${back ? "have been" : "be"} in the ratio **${rat(A2, B2)}**.`;
     const who = askOlder ? p : q;
-    return mk(rng, ans, [
+    const res = mk(rng, ans, [
       [askOlder ? B : A, "Gave the other person's age"], [ans + (back ? -t : t), `Gave the age ${back ? "then" : "later"}, not the present age`],
       [askOlder ? a * ((A2 + B2) / (c + dd)) : b * ((A2 + B2) / (c + dd)), "Used the new ratio on the present total"], [ans + t * 2 * (back ? 1 : -1), "Adjusted by the wrong number of years"], [ans + g, "Was off by one ratio unit"],
     ], fin(d, `${ctx} What is the present age of ${who} (in years)?`,
       [`Let the present ages be ${a}x and ${b}x`, `(${a}x ${back ? "−" : "+"} ${t}) : (${b}x ${back ? "−" : "+"} ${t}) = ${c} : ${dd}`, `${dd}(${a}x ${back ? "−" : "+"} ${t}) = ${c}(${b}x ${back ? "−" : "+"} ${t}) → x = ${g}`, `${who}'s age = ${askOlder ? a : b} × ${g} = **${ans}**`],
       "Write ages as ax and bx, add (or subtract) the years to both, cross-multiply, and solve for x.",
       `The years are added to each actual age, not to each ratio part: ${a}x + ${t}, not ${a + t}x.`));
+    if (!res || new RegExp("(^|[^0-9])" + ans + "(?![0-9])").test(String(res.q).replace(/<[^>]*>/g, ""))) return null;
+    return res;
   }) });
 
   /* 2. sum and ratio */

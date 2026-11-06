@@ -137,6 +137,7 @@
       bolt: '<path d="M13 2.5 5 13.5h6l-1 8 8-11h-6z"/>',
       back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
       pin: '<path d="M12 17v5M5 17h14l-2-5V4H7v8z"/>',
+      pencil: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
       chevron: '<path d="m6 9 6 6 6-6"/>',
       skip: '<path d="M5 5l9 7-9 7zM18 5v14"/>',
       lock: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>',
@@ -339,7 +340,7 @@
               <li>${ic("timer")}<span>You get a warning at 5 minutes and at 1 minute. At 0:00 the ${secMode ? "section ends" : "test is submitted"} automatically.</span></li>
               <li>${ic("flag")}<span>The palette shows each question's state: not visited, not answered, answered, marked for review, and answered &amp; marked. Marked answers are still scored.</span></li>
               <li>${ic("pencil")}<span>The rough-work pad opens with <kbd>W</kbd>. ${p.calculator ? "This test allows an on-screen calculator, so the pad's calculator is fair game." : "The real test has no calculator: turn on <b>Exam mode</b> in the pad to hide its calculator."}</span></li>
-              <li>${ic("keyboard")}<span><kbd>1</kbd>–<kbd>4</kbd> or <kbd>A</kbd>–<kbd>D</kbd> choose (press again to clear), <kbd>Enter</kbd> save &amp; next, <kbd>M</kbd> mark for review, <kbd>Backspace</kbd> clear response, <kbd>←</kbd> <kbd>→</kbd> move.</span></li>
+              <li class="mk-kbd">${ic("keyboard")}<span><kbd>1</kbd>–<kbd>4</kbd> or <kbd>A</kbd>–<kbd>D</kbd> choose (press again to clear), <kbd>Enter</kbd> save &amp; next, <kbd>M</kbd> mark for review, <kbd>Backspace</kbd> clear response, <kbd>←</kbd> <kbd>→</kbd> move.</span></li>
               <li>${ic("restart")}<span>The page hides the header while the test runs. Reloading the page resumes the test with the clock still running.</span></li>
             </ul>${p.note ? `<p class="mk-note">${ic("bulb")}<span>${esc(p.note)}</span></p>` : ""}</details>
           </div>
@@ -404,6 +405,7 @@
       document.body.classList.remove("in-session", "mk-ws-on");
       try { if (root.RoughPad && RoughPad.undock) RoughPad.undock(); } catch (e) {}
       palOpen = false;
+      MK.on = false; dropLayers();
     }
     const running = () => view === "run" && R && !R.done && document.visibilityState === "visible" && !modalOpen();
     const secsOf = (i) => (R.tq[i] || 0) + (i === R.idx && T.since ? (Date.now() - T.since) / 1000 : 0);
@@ -445,8 +447,10 @@
       const keepWork = document.getElementById("mkWork"), af = document.activeElement, hadFocus = !!(keepWork && af && keepWork.contains(af));
       const oldLeft = main.querySelector(".mk-left"), leftTop = oldLeft ? oldLeft.scrollTop : 0;
       if (keepWork) keepWork.remove();
+      dropLayers();
       main.innerHTML = examHTML();
       syncWork(keepWork, hadFocus ? af : null);
+      mountLayers();
       const newLeft = main.querySelector(".mk-left"); if (newLeft && !fresh) newLeft.scrollTop = leftTop;
       if (fresh) {
         const q = getQ(R.items[R.idx].id);
@@ -475,6 +479,59 @@
       paint(false);
     }
     document.addEventListener("apt:rwtoggle", (e) => { if (view === "run" && wsDevice()) { e.preventDefault(); toggleWs(); } });
+
+    /* ---- mark up: ink over the question text and the shared stimulus, never the options (RoughPad.layer, guarded: it may not exist) ---- */
+    const MK = { on: false, layers: [] };
+    const penSeen = () => { try { return sessionStorage.getItem("apt:pen") === "1"; } catch (e) { return false; } };
+    if (penSeen()) document.documentElement.classList.add("apt-pen");
+    document.addEventListener("pointerdown", (e) => {
+      if (e.pointerType !== "pen" || penSeen()) return;
+      try { sessionStorage.setItem("apt:pen", "1"); } catch (err) {}
+      document.documentElement.classList.add("apt-pen");
+    }, true);
+    const markCapable = () => wsDevice() || penSeen();
+    const layerApi = () => (root.RoughPad && typeof root.RoughPad.layer === "function" ? root.RoughPad : null);
+    function dropLayers() { MK.layers.forEach((L) => { try { L.destroy(); } catch (e) {} }); MK.layers = []; }
+    function mountLayers() {
+      const R2 = layerApi();
+      if (!R2 || !markCapable() || view !== "run" || !R) return;
+      const qid = R.items[R.idx].id;
+      main.querySelectorAll("[data-mk]").forEach((host) => {
+        try {
+          const L = R2.layer(host, "mock:" + qid + (host.dataset.mk === "stim" ? "#stim" : ""));
+          if (!L) return;
+          if (L.readonly) L.readonly(!MK.on);
+          MK.layers.push(L);
+        } catch (e) {}
+      });
+    }
+    window.addEventListener("load", () => { if (view === "run" && R && layerApi() && !MK.layers.length) paint(false); });   // rough.js loads after this file
+    function toggleMarkup() {
+      if (!markCapable() || view !== "run" || !R) return;
+      MK.on = !MK.on;
+      paint(false);
+    }
+    function clearMarks() { MK.layers.forEach((L) => { try { L.clear(); } catch (e) {} }); toast("Marks cleared", 1200, "check"); }
+    function reviewMarks(d, key) {
+      const R2 = layerApi();
+      if (!R2 || !d.open || d.dataset.mkd) return;
+      const host = d.querySelector("[data-rv]");
+      if (!host) return;
+      d.dataset.mkd = "1";
+      try {
+        const L = R2.layer(host, key);
+        if (!L) return;
+        if (L.readonly) L.readonly(true);
+        if (L.hasMarks && !L.hasMarks()) L.destroy(); else MK.layers.push(L);
+      } catch (e) {}
+    }
+    /* end-of-screen bar: a row on wide screens; on a phone "More" + the primary, scrolling with the page (styles in practice.css) */
+    function finalBar(secs, primary) {
+      secs = secs.filter(Boolean);
+      const more = secs.length ? `<details class="pr-more"><summary class="btn">More</summary><div class="pr-more-list">${secs.join("")}</div></details>` : "";
+      return `<div class="pr-actions pr-final mk-final"><div class="pr-final-sec">${secs.join("")}</div>${more}<span class="grow"></span>${primary}</div>`;
+    }
+    document.addEventListener("click", (e) => { document.querySelectorAll(".pr-more[open]").forEach((d) => { if (!d.contains(e.target)) d.open = false; }); });
     const wsCheck = () => { if (view === "run" && R && wsDevice() !== WSL) paint(false); };
     document.addEventListener("apt:prefs", wsCheck);
     window.addEventListener("resize", wsCheck);
@@ -523,13 +580,14 @@
         const sibs = []; for (let k = f; k <= l; k++) if (getQ(R.items[k].id).set === q.set) sibs.push(k);
         setNav = `<div class="pr-setnav">Set question ${sibs.indexOf(i) + 1} of ${sibs.length} ${sibs.map((k) => `<i class="${k === i ? "cur" : R.ans[k] != null ? "c" : ""}"></i>`).join("")}</div>`;
       }
+      const mkChip = MK.on && markCapable() ? `<div class="pr-mkchip" role="status"><b>Marking up</b><span class="grow"></span><button type="button" class="pr-quiet" data-act="mkclear">Clear marks</button><button type="button" class="btn sm" data-act="mkdone">Done</button></div>` : "";
       const marked = !!R.mark[i];
       const nextLbl = atEnd ? (locked() && !lastSec ? "Save & next section" : "Save & submit") : "Save & next";
-      const qcard = `<div class="pr-card pr-qcard mk-qcard" id="mkQ">${setNav}
+      const qcard = `<div class="pr-card pr-qcard mk-qcard" id="mkQ">${mkChip}${setNav}
         <div class="pr-qhead"><span class="pr-qno">Q${pos}</span><span class="pr-pat">of ${n} · ${esc(sec.title)}</span><span class="grow"></span>
           <span class="mk-marks" title="Marking">+${p.marks}${p.negative ? ` / −${Math.abs(p.negative - 1 / 3) < 1e-9 ? "1/3" : p.negative}` : ""}</span>
           <button class="pr-icon${marked ? " mk" : ""}" data-act="mark" title="Mark for review (M)" aria-label="Mark for review" aria-pressed="${marked}">${ic("flag")}</button></div>
-        <div class="pr-qtext${set ? " sm" : ""}">${body(q.q)}</div>
+        <div class="pr-mkhost" data-mk="q"><div class="pr-qtext${set ? " sm" : ""}">${body(q.q)}</div></div>
         <div class="pr-opts">${opts}</div>
         <div class="pr-actions mk-actions">
           <button class="btn" data-act="prev"${(locked() ? i <= f : i <= 0) ? " disabled" : ""}>${ic("back")} Previous</button>
@@ -543,18 +601,19 @@
         <div class="pr-card"><h5>${esc(sec.title)} <small>${c.an + c.am} of ${c.n} answered</small></h5>${paletteHTML(f, l)}${legendHTML(c)}</div>
         <div class="pr-card mk-secbox">${locked() && !lastSec ? `<button class="btn mk-wide" data-act="nextsec">Finish section ${ic("arrow-right")}</button>` : ""}
           <button class="btn primary mk-wide" data-act="submit">Submit test</button></div>
-        <div class="pr-card"><h5>Keys</h5><div class="pr-keys">
+        <div class="pr-card mk-kbd"><h5>Keys</h5><div class="pr-keys">
           <span><kbd>1</kbd>–<kbd>4</kbd> <kbd>A</kbd>–<kbd>D</kbd></span><span>choose (again to clear)</span>
           <kbd>Enter</kbd><span>save &amp; next</span>
           <kbd>M</kbd><span>mark for review</span>
           <kbd>Backspace</kbd><span>clear response</span>
           <span><kbd>←</kbd> <kbd>→</kbd></span><span>previous / next</span>
+          ${markCapable() ? "<kbd>U</kbd><span>mark up</span>" : ""}
           <kbd>W</kbd><span>rough-work pad</span></div></div></aside>`;
       const mainCol = set
-        ? `<div class="pr-split mk-split"><div class="pr-card pr-stim"><span class="pr-pin">${ic("pin")}stays in view</span>${QB.setHTML(set)}</div>${qcard}</div>`
+        ? `<div class="pr-split mk-split"><div class="pr-card pr-stim"><span class="pr-pin">${ic("pin")}${MK.on ? "marking up" : "stays in view"}</span><div class="pr-mkhost" data-mk="stim">${QB.setHTML(set)}</div></div>${qcard}</div>`
         : qcard;
       const sessRail = `<aside class="session-rail" aria-label="Exam controls">
-        <div class="sr-top"><button type="button" class="sr-end" data-act="submit" title="End the test and submit">${ic("x")} End</button>
+        <div class="sr-top"><button type="button" class="sr-end" data-act="submit" title="Submit the test">${ic("check")} Submit</button>
           <div class="mk-rt" id="mkRT" title="${sectional() ? "Time left in this section" : "Time left"}">0:00</div></div>
         <div class="sr-sec">${nonEmpty().length > 1 ? p.sections.map((sx, si) => {
           const [f2, l2] = range(si);
@@ -567,23 +626,25 @@
           <button type="button" data-act="rough" title="Rough-work pad (W)" class="${wsOn() ? "on" : ""}"${wsDevice() ? ` aria-pressed="${wsOn()}"` : ""}>${ic("pencil")} ${wsDevice() ? (wsOn() ? "Hide pad" : "Show pad") : "Rough"}</button>
           ${fsBtn("")}
           <button type="button" data-act="clear"${a == null ? " disabled" : ""}>Clear</button>
-          <button type="button" data-act="mark" class="${marked ? "on" : ""}" aria-pressed="${marked}">${ic("flag")} ${marked ? "Unmark" : "Mark"}</button>
+          <button type="button" data-act="mark" class="${marked ? "on" : ""}" title="Mark for review (M)" aria-pressed="${marked}">${ic("flag")} Review</button>
+          <button type="button" data-act="markup" class="${MK.on ? "on" : ""}" title="Mark up the question (U)" aria-pressed="${MK.on}">${ic("pencil")} Mark up</button>
         </div>
         <button type="button" class="sr-go" data-act="next">${nextLbl.replace("&", "&amp;")}</button></aside>
         <div class="mk-palpop${palOpen ? " open" : ""}" id="mkPalPop"><h5>${esc(sec.title)} <small>${c.an + c.am} of ${c.n} answered</small></h5>${paletteHTML(f, l)}${legendHTML(c)}
           ${locked() && !lastSec ? `<button class="btn mk-wide" data-act="nextsec">Finish section ${ic("arrow-right")}</button>` : ""}
-          <button class="btn mk-wide" data-act="quit">Quit without saving</button></div>`;
+          <div class="mk-quitrow"><button class="btn mk-wide mk-quit2" data-act="quit">Quit without saving</button></div></div>`;
       const bar = `<div class="mk-bar">
         <div class="mk-title"><b>${esc(p.name)}</b><span>${locked() ? `Section ${nonEmpty().indexOf(s) + 1} of ${nonEmpty().length}` : "Sections open"} · ${esc(negShort(p.negative))}</span></div>
         ${tabsHTML()}<span class="grow"></span>
         <button type="button" class="btn sm mk-rough" data-act="rough" title="Rough-work pad (W)">${ic("pencil")}<span>Rough</span> <kbd>W</kbd></button>
+        <button type="button" class="btn sm mk-markupbtn${MK.on ? " on" : ""}" data-act="markup" title="Mark up the question (U)" aria-pressed="${MK.on}">${ic("pencil")}<span>Mark up</span></button>
         ${timerHTML()}
         ${fsBtn("btn sm mk-fs")}
         <button type="button" class="btn sm mk-quit" data-act="quit" title="Quit without saving">Quit</button>
       </div>`;
       WSL = wsDevice();
-      if (!WSL) return `<div class="mk-exam">${bar}<div class="mk-grid"><div class="mk-main">${mainCol}</div>${rail}</div>${sessRail}</div>`;
-      return `<div class="mk-exam"><div class="mk-ws"><div class="mk-left">${bar}<div class="mk-grid"><div class="mk-main">${mainCol}</div>${rail}</div></div><div class="mk-work" id="mkWork"${wsOn() ? "" : " hidden"}></div></div>${sessRail}</div>`;
+      if (!WSL) return `<div class="mk-exam${MK.on ? " mking" : ""}">${bar}<div class="mk-grid"><div class="mk-main">${mainCol}</div>${rail}</div>${sessRail}</div>`;
+      return `<div class="mk-exam${MK.on ? " mking" : ""}"><div class="mk-ws"><div class="mk-left">${bar}<div class="mk-grid"><div class="mk-main">${mainCol}</div>${rail}</div></div><div class="mk-work" id="mkWork"${wsOn() ? "" : " hidden"}></div></div>${sessRail}</div>`;
     }
 
     function tick() {
@@ -742,8 +803,15 @@
       return modalEl;
     }
     const modalOpen = () => !!(modalEl && modalEl.classList.contains("show"));
+    function closePal() {
+      if (!palOpen) return;
+      palOpen = false;
+      const pp = document.getElementById("mkPalPop"); if (pp) pp.classList.remove("open");
+      main.querySelectorAll('[data-act="pal"]').forEach((b) => { b.classList.remove("on"); b.setAttribute("aria-expanded", "false"); });
+    }
     function openModal(o) {
       ensureModal();
+      closePal();
       flush();
       modalEl.querySelector("#mkMT").textContent = o.title;
       modalEl.querySelector("#mkMB").innerHTML = o.html || "";
@@ -818,10 +886,11 @@
         const sol = (q.sol && q.sol.length ? `<ol>${q.sol.map((s) => `<li>${fmt(s)}</li>`).join("")}</ol>` : "") +
           (q.short ? `<div class="pr-box tip"><div class="lb">${ic("bolt")} Shortcut</div>${fmt(q.short)}</div>` : "") + (q.trap ? `<div class="pr-box trap"><div class="lb">${ic("warn")} Trap</div>${fmt(q.trap)}</div>` : "");
         const set = q.set && QB.sets[q.set] ? `<details class="mk-stimd"><summary>${ic("pin")} Show the ${esc(QB.sets[q.set].kind === "chart" ? "chart" : QB.sets[q.set].kind === "passage" ? "passage" : "figure")}</summary><div class="pr-stim mk-stim-inline">${QB.setHTML(q.set)}</div></details>` : "";
-        return `<details class="pr-qrow" id="mkRow${r.i}" data-st="${r.st}" data-s="s${a.s != null ? a.s : ""}" data-m="${a.marked ? 1 : 0}"><summary>${icn}<span class="n">Q${r.i + 1}</span><span class="t">${fmt(String(q.q).replace(/\n/g, " "))}</span>${a.marked ? `<span class="mk-flag" title="Marked for review">${ic("flag")}</span>` : ""}<span class="pr-chip ${q.d === "Easy" ? "easy" : q.d === "Hard" ? "hard" : "med"}">${esc(q.d || "")}</span><span class="tm">${a.secs ? mmss(a.secs) : "-"}</span>${ic("chevron", "chev")}</summary>
-          <div class="pr-qbody"><div class="muted small">${esc(secName(q.sec))} · ${esc(topicTitle(q.sec, q.topic))}${a.chosen == null ? " · not attempted" : ""}</div>${set}<div class="pr-qtext sm">${body(q.q)}</div><div class="pr-ro-list">${opts}</div><div class="pr-sol">${sol || '<span class="muted">No written solution for this one.</span>'}</div></div></details>`;
+        return `<details class="pr-qrow" id="mkRow${r.i}" data-st="${r.st}" data-s="s${a.s != null ? a.s : ""}" data-m="${a.marked ? 1 : 0}"><summary>${icn}<span class="n">Q${r.i + 1}</span><span class="t">${fmt(String(q.q).replace(/\n/g, " "))}</span><span class="meta">${a.marked ? `<span class="mk-flag" title="Marked for review">${ic("flag")}</span>` : ""}<span class="pr-chip ${q.d === "Easy" ? "easy" : q.d === "Hard" ? "hard" : "med"}">${esc(q.d || "")}</span><span class="tm">${a.secs ? mmss(a.secs) : "-"}</span></span>${ic("chevron", "chev")}</summary>
+          <div class="pr-qbody"><div class="muted small">${esc(secName(q.sec))} · ${esc(topicTitle(q.sec, q.topic))}${a.chosen == null ? " · not attempted" : ""}</div>${set}<div class="pr-mkhost" data-rv="1" data-key="mock:${esc(q.id)}"><div class="pr-qtext sm">${body(q.q)}</div></div><div class="pr-ro-list">${opts}</div><div class="pr-sol">${sol || '<span class="muted">No written solution for this one.</span>'}</div></div></details>`;
       }).join("");
       const nBad = rows.filter((r) => r.st === "bad").length, nSkip = rows.filter((r) => r.st === "skip").length, nMark = rows.filter((r) => r.a.marked).length;
+      const missing = Store ? rows.filter((r) => r.st !== "ok" && Store.item(QB.itemKey(r.q)).status !== "revise").length : 0;
       const filters = [["all", "All", rows.length], ["bad", "Wrong", nBad], ["skip", "Not attempted", nSkip], ["ok", "Right", rows.length - nBad - nSkip]].concat(nMark ? [["m", "Marked", nMark]] : []);
 
       main.innerHTML = `<div>
@@ -845,12 +914,14 @@
         <div class="pr-card"><h5>Questions <small>tap one for the solution</small></h5>
           <div class="pr-picks mk-filters">${filters.map(([k, t, c], j) => `<button type="button" class="pr-pick${j === 0 ? " on" : ""}" data-act="filter" data-f="${k}">${t}<small>${c}</small></button>`).join("")}</div>
           <div class="pr-qlist" id="mkList">${list}</div></div>
-        <div class="pr-actions pr-final mk-final">
-          <a class="btn" href="#start/${encodeURIComponent(m.preset)}?seed=${encodeURIComponent(m.seed)}">${ic("restart")} Retake same paper</a>
-          <a class="btn" href="#start/${encodeURIComponent(m.preset)}">New paper</a>
-          ${nBad + nSkip ? `<button class="btn" data-act="mistakes" data-id="${esc(m.id)}">${swapLabel(["Add wrong to mistake book", "Added to mistake book"], 0)}</button>` : ""}
-          <span class="grow"></span><a class="btn primary" href="#">All mock tests</a></div></div>`;
+        ${missing === 0 && nBad + nSkip ? `<p class="pr-bookline">Wrong answers are already in your <a href="revision.html">mistake book</a>.</p>` : ""}
+        ${finalBar([
+          `<a class="btn" href="#start/${encodeURIComponent(m.preset)}?seed=${encodeURIComponent(m.seed)}">${ic("restart")} Retake same paper</a>`,
+          `<a class="btn" href="#start/${encodeURIComponent(m.preset)}">New paper</a>`,
+          missing > 0 ? `<button class="btn" data-act="mistakes" data-id="${esc(m.id)}">Add ${missing} skipped to mistake book</button>` : "",
+        ], `<a class="btn primary" href="#">All mock tests</a>`)}</div>`;
       window.scrollTo(0, 0);
+      main.querySelectorAll("#mkList .pr-qrow").forEach((d) => d.addEventListener("toggle", () => { const h = d.querySelector("[data-rv]"); if (h) reviewMarks(d, h.dataset.key); }));
       const fresh = freshId === m.id;
       freshId = null;
       const sc = main.querySelector(".pr-score b");
@@ -877,12 +948,13 @@
       (m.answers || []).forEach((a) => {
         if (a.ok) return;
         const q = getQ(a.qid), k = QB.itemKey(q), it = Store.item(k);
+        if (it.status === "revise") return;
         Store.load().items[k] = Object.assign({}, it, { status: "revise", next: now, level: 0, doneAt: it.doneAt || now, updated: now });
         n++;
       });
       Store.save();
-      if (btn) { btn.textContent = "Added to mistake book"; if (root.stamp) stamp(btn); }
-      toast(plural(n, "question") + " (wrong and not attempted) in your mistake book", 2000, "check");
+      document.querySelectorAll('.mk-final [data-act="mistakes"]').forEach((x) => x.remove());
+      toast(plural(n, "skipped question") + " added to your mistake book", 2000, "check");
     }
 
     /* ================================================================ events */
@@ -890,6 +962,7 @@
       const el = e.target.closest("[data-act]");
       if (!el || !main.contains(el) || el.disabled) return;
       const act = el.dataset.act;
+      if (palOpen && view === "run" && !e.target.closest("#mkPalPop")) closePal();
       if (act === "discard") { R = null; ssx.del(RUNK); return route(); }
       if (view === "start" && act === "begin") return begin();
       if (view === "gallery" && act === "gfilter") return setGalleryFilter(el.dataset.f);
@@ -906,6 +979,8 @@
         if (act === "submit") return submitFlow();
         if (act === "quit") return quitFlow();
         if (act === "pal") { palOpen = !palOpen; return paint(false); }
+        if (act === "markup" || act === "mkdone") return toggleMarkup();
+        if (act === "mkclear") return clearMarks();
         if (act === "rough") { if (wsDevice()) return toggleWs(); if (root.RoughPad && RoughPad.toggle) RoughPad.toggle(); return; }
       }
       if (view === "result") {
@@ -933,6 +1008,7 @@
       }
       if (view !== "run" || !R) return;
       const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      if (k === "u" && markCapable()) { e.preventDefault(); return toggleMarkup(); }      // pen / tablet: U = mark up (A–D always answer)
       if (k.length === 1 && "1234".includes(k)) { e.preventDefault(); return choose(+k - 1); }
       if (k.length === 1 && "abcd".includes(k)) { e.preventDefault(); return choose("abcd".indexOf(k)); }
       if (k === "Enter") { e.preventDefault(); return saveNext(); }
@@ -1246,6 +1322,42 @@ html[data-device="tablet"][data-orient="portrait"] body.in-session .mk-palpop.op
 @media (orientation: portrait) {
   html[data-device="tablet"] body.mk-ws-on .page.mk, html[data-device="tablet"][data-hand="left"] body.mk-ws-on .page.mk { padding: calc(var(--sbar-h) + 12px) 16px 12px !important; }
 }
+
+/* ---- audit fixes: pen-friendly, mark up, start screen first, submit label, palette popover, tablet stimulus room ---- */
+.mk-exam .pr-opt, .mk-tab, .mk-pal button, .session-rail button, .mk .pr-pick, .mk .btn { touch-action: manipulation; }
+.mk .mk-markupbtn { display: none !important; }
+html.apt-pen .mk .mk-markupbtn { display: inline-flex !important; align-items: center; gap: .35rem; }
+html[data-device="tablet"] .mk .mk-markupbtn { display: none !important; }
+.mk-markupbtn .ico { width: 15px; height: 15px; }
+.mk .mk-markupbtn.on { background: var(--ink); color: var(--bg); }
+@media (max-width: 640px) { .mk-markupbtn span { display: none; } }
+.mk-qcard > .pr-mkchip { grid-column: 1 / -1; }
+.mk-qcard > .pr-mkhost { grid-column: 1; grid-row: 2 / span 2; }
+html[data-device="tablet"] body.mk-ws-on .mk-qcard > .pr-mkhost { grid-row: auto; }
+.mk-quitrow { margin-top: 1.7rem; padding-top: 1.1rem; border-top: 2px dashed var(--line); }
+.mk-bar .mk-quit { margin-left: .8rem; }
+.session-rail .sr-end { color: var(--text); }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail .sr-end { width: 72px; flex-direction: column; gap: .1rem; font-size: 12px; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail .mk-rt { min-width: 92px; font-size: 1.5rem; padding: 0 .3rem; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail button.sr-go { width: 136px; font-size: .95rem; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail .sr-mid { gap: .25rem; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail .sr-mid button { min-width: 52px; font-size: 11px; letter-spacing: -.02em; padding: .2rem .1rem; }
+html[data-device="tablet"][data-orient="portrait"] body.in-session .session-rail { gap: .35rem; }
+/* no keyboard tips on touch devices */
+html[data-device="tablet"] .mk-kbd, html[data-device="phone"] .mk-kbd { display: none !important; }
+@media (pointer: coarse) { .mk-kbd { display: none !important; } }
+/* the paper card (with Start) comes first when the page is one column */
+@media (max-width: 1000px) { .mk .pr-setup .pr-side { order: -1; position: static; } }
+/* the palette popover never covers the pad: it sits over the question column (landscape) or the question area (portrait) */
+@media (orientation: landscape) {
+  html[data-device="tablet"] body.mk-ws-on.in-session .mk-palpop.open { right: auto; left: 16px; top: 12px; width: min(340px, calc((100vw - var(--rail-w-session, 132px)) * .5 - 32px)); max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); }
+  html[data-device="tablet"][data-hand="left"] body.mk-ws-on.in-session .mk-palpop.open { left: calc(var(--rail-w-session, 132px) + 16px); right: auto; }
+  html[data-device="tablet"] body.mk-ws-on .mk-exam .pr-stim { max-height: 54dvh; }
+}
+html[data-device="tablet"][data-orient="portrait"] body.mk-ws-on.in-session .mk-palpop.open { max-height: 44dvh; }
+html[data-device="tablet"][data-orient="portrait"] body.mk-ws-on .mk-left { padding-bottom: 20px; }
+html[data-device="tablet"][data-orient="portrait"] body.mk-ws-on .mk-exam .pr-stim { max-height: none; overflow: visible; }
+html[data-device="tablet"] body.mk-ws-on .mk-exam .pr-stim svg:not(.ico) { max-width: 100%; height: auto; overflow: visible; }
 `;
     document.head.appendChild(st);
   }

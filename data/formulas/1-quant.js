@@ -152,7 +152,7 @@ window.FORMULAS = window.FORMULAS || [];
         ["SP with discount", "MP × (100 − D%)/100", ""],
         ["MP from CP", "MP = CP × (100 + P%)/(100 − D%)", "profit P% after D% discount"],
         ["Successive discounts d₁, d₂", "d₁ + d₂ − d₁d₂/100 %", "single equivalent discount"],
-        ["Same SP, profit x% and loss x%", "net loss % = x²/100", "no profit, no loss gain"],
+        ["Same SP, profit x% and loss x%", "net loss % = x²/100", "always a loss, never no-profit-no-loss; e.g. 20% each way loses 4%"],
         ["Two items, SP equal, gain a% on one, loss a% on other", "loss = a²/100 % of total CP", ""],
         ["False weight", "gain % = (error ÷ (true weight − error)) × 100", "error = true weight − false weight"],
         ["Dishonest dealer (both false weight and cost)", "gain % = [(100 + g)/(100 − e)·100] − 100", "g = markup %, e = weight shortfall %"],
@@ -884,7 +884,7 @@ window.FORMULAS = window.FORMULAS || [];
         ["Maximum overlap", "min(n(A), n(B))", ""],
         ["Minimum overlap", "max(0, n(A) + n(B) − total)", ""],
         ["Complement", "n(A') = total − n(A)", ""],
-        ["Data sufficiency options", "1: statement I alone; 2: II alone; 3: both together; 4: each alone; 5: neither", "standard 5-option form"],
+        ["Data sufficiency options", "I alone · II alone · either alone · both together", "the four choices used in this bank; read the options, their order may vary"],
         ["DS method", "decide I alone, decide II alone, then both", "never mix the statements first"],
         ["Value vs yes/no questions", "yes/no needs a definite answer (always yes or always no)", ""]
       ],

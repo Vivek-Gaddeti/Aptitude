@@ -240,7 +240,7 @@
           [ask === "son" ? s + n : f + n, "Gave the age after some years"],
           [ask === "son" ? S - m : S - s - 1, "Subtracted the multiple instead of the sum parts"],
         ].filter((w) => w[0] !== v), {
-          q: `${n1}'s age is **${m}** times the age of ${n1}'s son. Together their ages add up to **${S}** years. What is the ${ask}'s present age?`,
+          q: `A father's age is **${m}** times the age of his son. Together their ages add up to **${S}** years. What is the ${ask}'s present age?`,
           sol: [`Let the son be x: father = ${m}x, so ${m}x + x = ${S}`, `${m + 1}x = ${S}, so son = ${s} and father = ${f}`, `The ${ask}'s age is **${v}**.`],
           short: `Share the total in ratio ${m} : 1; one part = ${S} ÷ ${m + 1}.`,
           trap: "The ages add to the total; the father's age is the multiple, not the total.",
@@ -290,7 +290,7 @@
         [(f + n) / m, "Divided without removing the years first"],
         [Math.round((kk * n - m * n) / (kk - m)) + 1, "Slipped in solving"],
       ], {
-        q: `${n1}'s age is **${kk}** times the age of ${n1}'s son. After **${n}** years it will be **${m}** times the son's age. Find the son's present age.`,
+        q: `A father's age is **${kk}** times the age of his son. After **${n}** years his age will be **${m}** times the son's age. Find the son's present age.`,
         sol: [`Son = x, father = ${kk}x. After ${n} years: ${kk}x + ${n} = ${m}(x + ${n})`, `${kk - m}x = ${m * n - n} = ${(m - 1) * n}`, `x = **${s}**`],
         short: "Set up the second statement with +n on both ages; the difference of the multipliers divides the extra.",
         trap: "The multiple applies to the ages after the years, not to today's ages.",
