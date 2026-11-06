@@ -263,10 +263,16 @@
       return best;
     },
     exportJSON() {
+      const name = this.key.replace(/[:]/g, "-") + "-" + today() + ".json";
+      if (window.AptApp && AptApp.saveFile) {                      // Android app: the app writes the file to Downloads
+        const where = AptApp.saveFile(name, JSON.stringify(this.load(), null, 2));
+        toast(where ? "Saved to " + where : "Could not save the file", 3200, where ? "check" : "alert");
+        return;
+      }
       const blob = new Blob([JSON.stringify(this.load(), null, 2)], { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = this.key.replace(/[:]/g, "-") + "-" + today() + ".json";
+      a.download = name;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     },
@@ -358,7 +364,7 @@
     const de = document.documentElement;
     let framed = false; try { framed = window.top !== window; } catch (e) { framed = true; }
     // read once at load: "display-mode: fullscreen" also matches while the Fullscreen API is active, which is not "installed"
-    const isApp = !framed && !!(window.matchMedia && matchMedia("(display-mode: fullscreen), (display-mode: standalone)").matches) && !(document.fullscreenElement || document.webkitFullscreenElement);
+    const isApp = !framed && (!!window.AptApp || (!!(window.matchMedia && matchMedia("(display-mode: fullscreen), (display-mode: standalone)").matches) && !(document.fullscreenElement || document.webkitFullscreenElement)));
     const installed = () => isApp;
     let frame = null, fsOn = false, hostOk = framed;                  // frame: the host's iframe; fsOn / hostOk: what a framed page was told
     const api = () => !!((document.fullscreenEnabled || document.webkitFullscreenEnabled) && (de.requestFullscreen || de.webkitRequestFullscreen));

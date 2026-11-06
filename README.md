@@ -6,6 +6,7 @@ An offline study site for placement aptitude tests. It covers Quantitative Aptit
 
 - Live site: https://vivek-gaddeti.github.io/Aptitude/
 - Or open `index.html` directly in a browser (file://).
+- Android app (works with no internet): download https://vivek-gaddeti.github.io/Aptitude/dist/AptitudeHub.apk on the tablet and install it (allow "Install unknown apps" for the browser when asked). Rebuild it after site changes with `node tools/android/build.js` (needs the Android SDK and a JDK 11+; see the top of that file). Progress in the app is separate from the browser's: move it with Export / Import on the dashboard.
 - Settings (header button, or the tablet rail) has Layout (Auto, Desktop, Tablet) and Rail side (Left or Right) for the thumb rail on tablets.
 
 ## Project layout
