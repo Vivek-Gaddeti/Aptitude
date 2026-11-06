@@ -9,6 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -42,6 +43,8 @@ public class MainActivity extends Activity {
             getWindow().setAttributes(lp);
         }
         web = new WebView(this);
+        web.setOverScrollMode(View.OVER_SCROLL_NEVER);   // no stretch/glow while writing near an edge
+        if (Build.VERSION.SDK_INT >= 26) web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
         setContentView(web);
 
         WebSettings s = web.getSettings();
@@ -82,6 +85,14 @@ public class MainActivity extends Activity {
         if (state != null) web.restoreState(state);
         else web.loadUrl(HOME);
         hideBars();
+    }
+
+    /* Pen latency: by default Android batches touch and pen samples and hands them over once per frame. Chrome asks for every
+       sample as it arrives; do the same here so a stroke follows the pen tip as closely as in the browser. */
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) web.requestUnbufferedDispatch(ev);
+        return super.dispatchTouchEvent(ev);
     }
 
     @Override

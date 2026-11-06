@@ -589,7 +589,7 @@
     mountLayers();
     if (fresh) {
       const q = cur();
-      if (window.RoughPad && RoughPad.setContext) RoughPad.setContext(q.id);
+      if (window.RoughPad && RoughPad.setContext) RoughPad.setContext(q.id, { scope: "p" + S.started, group: q.set || "", label: "Q" + (S.idx + 1) });
       const top = main.getBoundingClientRect().top + window.scrollY - 70;
       if (window.scrollY > top) window.scrollTo(0, Math.max(0, top));
       const qEl = document.getElementById("prQ");
@@ -649,7 +649,7 @@
     const q = cur();
     main.querySelectorAll("[data-mk]").forEach((host) => {
       try {
-        const L = R.layer(host, host.dataset.mk === "stim" ? q.id + "#stim" : q.id);
+        const L = R.layer(host, host.dataset.mk === "stim" ? (q.set ? "set:" + q.set : q.id) + "#stim" : q.id);
         if (!L) return;
         if (L.readonly) L.readonly(!MK.on);
         MK.layers.push(L);

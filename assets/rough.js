@@ -1,11 +1,16 @@
 /* Rough-work pad: header button + right slide-out drawer, or docked into a page column (tablet workspace, tablet lessons).
    Tabs: Draw / Notes / Calculator.  Plain script, no dependencies.  Spec: docs/SPEC-pen.md.
-   API: window.RoughPad = { toggle, open, close, clear, undo, redo, setContext(id), dock(hostEl), undock(), docked(), layer(hostEl, contextKey), calc }.
+   API: window.RoughPad = { toggle, open, close, clear, undo, redo, setContext(id, opts?), dock(hostEl), undock(), docked(), layer(hostEl, contextKey), calc }.
    Keys: W toggles (the drawer, or the dock when docked), Esc closes the drawer, Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y undo / redo inside the pad.
    Docked: toggle() does not open the drawer; it fires a cancelable "apt:rwtoggle" event on document. The page that owns the
    dock handles it (and calls preventDefault); if nobody does, the dock host is just hidden / shown.
    Lessons (tablet landscape, pages with #sidebar): toggle() docks the pad as a right column that rough.js creates itself
    (#rwLessonDock); the content gets padding so it shrinks. Portrait and other devices keep the drawer.
+
+   Sheets: setContext(id, { scope, group?, label? }) switches the pad to rough-work sheets shared by a run of questions (one practice session / mock attempt = scope).
+   A sheet is a drawing keyed "sheet:" + scope + ":" + n; bookkeeping (order, question -> sheet, group -> sheet, current) lives in sessionStorage apt:rw:sheets.
+   Mode (localStorage apt:rw:sheetmode): auto = questions of one set share a sheet and a new unrelated question gets a fresh sheet when the current one has ink;
+   manual = one sheet continues until New sheet. A question remembers its sheet. Without opts, one drawing per context as before.
 
    RoughPad.layer(hostEl, contextKey) -> { clear(), destroy(), setTool(t), hasMarks(), readonly(on), undo(), redo() }
      A transparent ink layer over hostEl (made position:relative if it is static), same engine as the pad: pressure, smoothing, pen eraser,
@@ -18,8 +23,8 @@
   "use strict";
   if (window.RoughPad) return;
   var doc = document, root = doc.documentElement;
-  var LS = { notes: "apt:rw:notes", exam: "apt:rw:exam", paper: "apt:rw:paper", size: "apt:rw:size", tool: "apt:rw:tool", color: "apt:rw:color", penonly: "apt:rw:penonly", emode: "apt:rw:emode" };
-  var SS = { strokes: "apt:rw:strokes", pen: "apt:rw:pen" };
+  var LS = { notes: "apt:rw:notes", exam: "apt:rw:exam", paper: "apt:rw:paper", size: "apt:rw:size", tool: "apt:rw:tool", color: "apt:rw:color", penonly: "apt:rw:penonly", emode: "apt:rw:emode", smode: "apt:rw:sheetmode" };
+  var SS = { strokes: "apt:rw:strokes", pen: "apt:rw:pen", sheets: "apt:rw:sheets" };
   function lsGet(k, d) { try { var v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   function ssGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
@@ -42,6 +47,7 @@
     med: '<path d="M4 12h16" style="stroke-width:5"/>',
     stylus: '<path d="M5 19l1-4L16 5l3 3L9 18z"/><path d="M5 19l-1 2 2-1"/><path d="M14 7l3 3"/>',
     finger: '<path d="M9 12V6.5a1.5 1.5 0 0 1 3 0V11M12 10.5V5a1.5 1.5 0 0 1 3 0v6M15 11V7.5a1.5 1.5 0 0 1 3 0V15c0 3.5-2 6-5.5 6-2.6 0-4.2-1.3-5.5-3.5L4.500 13a1.5 1.5 0 0 1 2.5-1.5L9 14"/>',
+    sheets: '<path d="M8 4h12v12H8z"/><path d="M4 8v12h12"/>',
     hide: '<path d="M9 5l7 7-7 7"/>'
   };
   function svg(n) { return '<svg class="rw-ico" viewBox="0 0 24 24" aria-hidden="true">' + ICON[n] + '</svg>'; }
@@ -120,6 +126,12 @@
     ".rw-panel{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}",
     ".rw-tools{display:flex;flex-wrap:wrap;align-items:flex-start;gap:6px;margin-bottom:.55rem;flex:none}",
     ".rw-grp{display:inline-flex;gap:6px}",
+    ".rw-pager{display:flex;align-items:center;gap:6px;margin-bottom:.55rem;flex:none}",
+    ".rw-pg-t{flex:1;min-width:0;text-align:center;font:800 var(--fs-sm) var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
+    ".rw-pager .rw-tb:not(.rw-new){font-size:26px;line-height:1}",
+    ".rw-pager .rw-new{width:auto;padding:0 .8rem;font:800 var(--fs-sm) var(--display)}",
+    ".rw-pager .rw-new.flash{outline:3px solid var(--accent);outline-offset:1px}",
+    ".rw-pane .rw-tools .rw-sm{width:auto;min-width:46px;padding:0 6px}.rw-sm .rw-lb{display:block}",
     ".rw-gap{width:8px;flex:none}",
     ".rw-gap.wide{width:14px}",
     ".rw-pop{position:absolute;z-index:8;display:flex;gap:6px;padding:6px;background:var(--panel);border:2px solid var(--line)}",
@@ -534,6 +546,66 @@
   var drawer, pane, btn, sheet, page, E, built = false, calcExpr = "", calcRes = "", calcDone = false, moreBtn, pop = null, popFor = "";
   var dockHost = null, dockedOn = false, lessonHost = null, lessonOn = false;
   var el = {};
+  var sc = null;   /* sheets: { scope, qid, group, label } while the pad is in sheet mode, else null */
+
+  /* ---------- rough-work sheets ---------- */
+  var sheetsAll = (function () { try { var o = JSON.parse(ssGet(SS.sheets) || ""); if (o && o.d && o.o) return o; } catch (e) {} return { o: [], d: {} }; })();
+  function sheetMode() { return lsGet(LS.smode, "auto") === "manual" ? "manual" : "auto"; }
+  function saveSheets() { ssSet(SS.sheets, JSON.stringify(sheetsAll)); }
+  function scopeData(scope) {
+    var d = sheetsAll.d[scope];
+    if (!d) { d = sheetsAll.d[scope] = { list: [], map: {}, groups: {}, lab: {}, cur: "", n: 0 }; }
+    sheetsAll.o = sheetsAll.o.filter(function (x) { return x !== scope; }); sheetsAll.o.push(scope);
+    while (sheetsAll.o.length > 5) delete sheetsAll.d[sheetsAll.o.shift()];
+    return d;
+  }
+  function isBlank(key) { return !key || !(store.s[key] || []).some(function (s) { return s.k !== "er"; }); }
+  function newSheetKey(d) { d.n = Math.max(d.n || 0, d.list.length) + 1; var k = "sheet:" + sc.scope + ":" + d.n; d.list.push(k); return k; }
+  function assign(d, key) {
+    d.cur = key; d.map[sc.qid] = key; if (sc.group) d.groups[sc.group] = key;
+    if (sc.label) d.lab[sc.qid] = sc.label;
+  }
+  function chooseSheet() {
+    var d = scopeData(sc.scope), key = d.map[sc.qid];
+    if (!key || d.list.indexOf(key) < 0) {
+      if (sheetMode() === "manual") key = d.cur && d.list.indexOf(d.cur) >= 0 ? d.cur : newSheetKey(d);
+      else if (sc.group && d.groups[sc.group] && d.list.indexOf(d.groups[sc.group]) >= 0) key = d.groups[sc.group];
+      else if (d.cur && d.list.indexOf(d.cur) >= 0 && isBlank(d.cur)) key = d.cur;
+      else key = newSheetKey(d);
+    }
+    assign(d, key); saveSheets(); return key;
+  }
+  function showSheet(key) {
+    ctx = key;
+    if (built) { setCtxLabel(); syncPager(); closePop(); sheet.scrollTop = 0; padFit(); E.reset(); syncUndo(); }
+  }
+  function flipSheet(delta) {
+    if (!sc) return;
+    var d = scopeData(sc.scope), i = d.list.indexOf(ctx) + delta;
+    if (i < 0 || i >= d.list.length) return;
+    assign(d, d.list[i]); saveSheets(); showSheet(d.list[i]);
+  }
+  function newSheet() {
+    if (!sc) return;
+    if (isBlank(ctx)) { if (el.nw) { el.nw.classList.add("flash"); setTimeout(function () { el.nw && el.nw.classList.remove("flash"); }, 700); } return; }
+    var d = scopeData(sc.scope), k = newSheetKey(d);
+    assign(d, k); saveSheets(); showSheet(k);
+  }
+  function sheetNote() {
+    var d = scopeData(sc.scope), qs = [];
+    Object.keys(d.map).forEach(function (q) { if (d.map[q] === ctx && d.lab[q]) qs.push(d.lab[q]); });
+    return "Sheet " + (d.list.indexOf(ctx) + 1) + (qs.length ? " \u00b7 " + qs.join(", ") : "");
+  }
+  function syncPager() {
+    if (!built) return;
+    el.pager.hidden = !sc; el.sm.hidden = !sc;
+    if (!sc) return;
+    var d = scopeData(sc.scope), i = d.list.indexOf(ctx);
+    el.pgt.textContent = "Sheet " + (i + 1) + " of " + d.list.length;
+    el.prev.disabled = i <= 0; el.next.disabled = i >= d.list.length - 1;
+    var m = sheetMode(), t = m === "auto" ? "Sheets: Auto. A new question gets a fresh sheet unless it shares a chart or passage with an earlier one (tap for Manual)" : "Sheets: Manual. One sheet continues until you tap New sheet (tap for Auto)";
+    el.sm.innerHTML = svg("sheets") + '<span class="rw-lb">Sheets: ' + (m === "auto" ? "Auto" : "Manual") + '</span>'; el.sm.title = t; el.sm.setAttribute("aria-label", t);
+  }
 
   function pages() { return Math.max(2, Math.min(MAXPAGES, store.pg[ctx] || 2)); }
   function neededPages(unit) {
@@ -621,7 +693,10 @@
       '<div class="rw-dhead"><h4>Rough work</h4><span class="rw-ctx"></span>' +
         '<button type="button" class="rw-tb" id="rwHide" title="Hide the pad (W)" aria-label="Hide the rough work pad">' + svg("hide") + '</button></div>' +
       '<div class="rw-tabs" role="tablist"><button type="button" data-t="draw" class="on" role="tab">Draw</button><button type="button" data-t="notes" role="tab">Notes</button><button type="button" data-t="calc" role="tab">Calculator</button></div>' +
-      '<div class="rw-panel" data-p="draw"><div class="rw-tools" role="toolbar" aria-label="Drawing tools"><span class="rw-grp">' +
+      '<div class="rw-panel" data-p="draw"><div class="rw-pager" id="rwPager" hidden><button type="button" class="rw-tb" id="rwPrev" title="Previous sheet" aria-label="Previous sheet">\u2039</button>' +
+        '<span class="rw-pg-t" id="rwPgT" aria-live="polite"></span><button type="button" class="rw-tb" id="rwNext" title="Next sheet" aria-label="Next sheet">\u203a</button>' +
+        '<button type="button" class="rw-tb rw-new" id="rwNew" title="Start a new blank sheet" aria-label="New sheet">New sheet</button></div>' +
+        '<div class="rw-tools" role="toolbar" aria-label="Drawing tools"><span class="rw-grp">' +
         tbBtn('data-tool="pen" aria-pressed="true"', '<i class="rw-dot"></i>' + svg("pencil"), "Pen", "Pen (tap again for colour)") +
         tbBtn('data-tool="hl" aria-pressed="false"', svg("marker"), "Marker", "Highlighter") +
         tbBtn('data-tool="eraser" aria-pressed="false"', svg("eraser"), "Eraser", "Eraser (tap again for stroke or area)") +
@@ -631,6 +706,7 @@
         tbBtn('id="rwClear"', svg("trash"), "Clear", "Clear drawing") +
         '<span class="rw-gap"></span><span class="rw-grp">' +
         tbBtn('id="rwPaper"', "", "Paper", "Paper") + tbBtn('id="rwSize"', "", "Thin", "Pen size") + tbBtn('id="rwPO" aria-pressed="false"', "", "Pen only", "Pen only") +
+        '<button type="button" class="rw-tb rw-sm" id="rwSM" hidden></button>' +
         '</span></div>' +
         '<div class="rw-sheet" id="rwSheet"><div class="rw-page" id="rwPage"><button type="button" class="rw-more" id="rwMore">More space</button></div></div></div>' +
       '<div class="rw-panel" data-p="notes" hidden><textarea class="rw-notes" id="rwNotes" placeholder="Jot things down. Notes are saved in this browser." spellcheck="false"></textarea></div>' +
@@ -647,6 +723,8 @@
     el.paper = drawer.querySelector("#rwPaper"); el.undo = drawer.querySelector("#rwUndo"); el.redo = drawer.querySelector("#rwRedo");
     el.size = drawer.querySelector("#rwSize"); el.po = drawer.querySelector("#rwPO"); el.draw = drawer.querySelector('[data-p="draw"]');
     el.tools = drawer.querySelectorAll("[data-tool]");
+    el.pager = drawer.querySelector("#rwPager"); el.pgt = drawer.querySelector("#rwPgT"); el.prev = drawer.querySelector("#rwPrev"); el.next = drawer.querySelector("#rwNext");
+    el.nw = drawer.querySelector("#rwNew"); el.sm = drawer.querySelector("#rwSM");
     sheet = drawer.querySelector("#rwSheet"); page = drawer.querySelector("#rwPage"); moreBtn = drawer.querySelector("#rwMore");
 
     E = Engine({
@@ -670,6 +748,8 @@
     });
     el.size.onclick = function () { prefs.size = prefs.size === "thin" ? "med" : "thin"; lsSet(LS.size, prefs.size); syncTools(); };
     el.po.onclick = function () { prefs.penOnly = !prefs.penOnly; lsSet(LS.penonly, prefs.penOnly ? "1" : "0"); syncTools(); };
+    el.prev.onclick = function () { flipSheet(-1); }; el.next.onclick = function () { flipSheet(1); }; el.nw.onclick = newSheet;
+    el.sm.onclick = function () { lsSet(LS.smode, sheetMode() === "auto" ? "manual" : "auto"); syncPager(); };
     el.paper.onclick = function () { setPaper(PAPERS[(PAPERS.indexOf(paper) + 1) % PAPERS.length]); };
     drawer.querySelectorAll(".rw-tabs button").forEach(function (b) { b.onclick = function () { setTab(b.dataset.t); }; });
     pane.addEventListener("keydown", function (e) {
@@ -692,7 +772,7 @@
     uiSync = syncTools;
     syncTools(); syncUndo();
     calcPaint();
-    setCtxLabel();
+    setCtxLabel(); syncPager();
     syncTabEnd();
 
     if (window.ResizeObserver) new ResizeObserver(padFit).observe(sheet);
@@ -754,6 +834,7 @@
   }
   function setCtxLabel() {
     if (!el.ctxs) return;
+    if (sc) { var sn = sheetNote(); el.ctxs.forEach(function (n) { n.textContent = sn; }); return; }
     var t = ctx && ctx !== "default" ? (ctx.indexOf("lesson:") === 0 ? "saved for this lesson" : "saved for this question") : "";
     el.ctxs.forEach(function (n) { n.textContent = t; });
   }
@@ -841,9 +922,14 @@
   }
   function undo() { if (built) E.undo(); }
   function redo() { if (built) E.redo(); }
-  function setContext(id) {
+  function setContext(id, opts) {
+    if (opts && opts.scope != null && id != null && id !== "") {
+      sc = { scope: String(opts.scope), qid: String(id), group: opts.group ? String(opts.group) : "", label: opts.label ? String(opts.label) : "" };
+      showSheet(chooseSheet()); return;
+    }
+    sc = null;
     ctx = id == null || id === "" ? "default" : String(id);
-    if (built) { setCtxLabel(); closePop(); sheet.scrollTop = 0; padFit(); E.reset(); syncUndo(); }
+    if (built) { setCtxLabel(); syncPager(); closePop(); sheet.scrollTop = 0; padFit(); E.reset(); syncUndo(); }
   }
   /* dock the whole pad (tabs, tools, canvas, exam switch) into a page column. Cheap and idempotent; call after every re-render. */
   function dock(host) {

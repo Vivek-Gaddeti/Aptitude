@@ -2,7 +2,7 @@
    and stylesheet URL exactly as the pages reference it, the manifest and the icons). Install precaches ASSETS, so every page works offline
    even if it was never opened online. Pages and files are fetched network first, with the cache as the offline fallback.
    Activate deletes every other "apt-" cache, so old stamped URLs do not pile up. Registered by assets/common.js over http(s) only. */
-const CACHE = "apt-6e7c2e58";
+const CACHE = "apt-897447d2";
 const ASSETS = [
   "./",
   "di.html",
@@ -22,12 +22,12 @@ const ASSETS = [
   "assets/formulas.js?v=a4053701",
   "assets/glossary.js?v=6284c13b",
   "assets/home.js?v=07032693",
-  "assets/mock.js?v=2232130c",
+  "assets/mock.js?v=33bcc699",
   "assets/practice.css?v=fd3352a9",
-  "assets/practice.js?v=92370f77",
+  "assets/practice.js?v=919abb30",
   "assets/qbank.js?v=15abda44",
   "assets/revision.js?v=eb423054",
-  "assets/rough.js?v=41476e79",
+  "assets/rough.js?v=d5b4f65c",
   "assets/search.js?v=a0d20e8e",
   "assets/site.js?v=a1b17399",
   "assets/style.css?v=40dce9f4",

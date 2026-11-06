@@ -454,7 +454,7 @@
       const newLeft = main.querySelector(".mk-left"); if (newLeft && !fresh) newLeft.scrollTop = leftTop;
       if (fresh) {
         const q = getQ(R.items[R.idx].id);
-        if (root.RoughPad && RoughPad.setContext) RoughPad.setContext("mock:" + q.id);
+        if (root.RoughPad && RoughPad.setContext) RoughPad.setContext("mock:" + q.id, { scope: "m" + R.started, group: q.set || "", label: "Q" + (R.idx + 1) });
         window.scrollTo(0, 0);
         if (enter && root.Motion && Motion.enter) { const qe = document.getElementById("mkQ"); if (qe) Motion.enter(qe); }
       } else window.scrollTo(0, y);
@@ -495,10 +495,10 @@
     function mountLayers() {
       const R2 = layerApi();
       if (!R2 || !markCapable() || view !== "run" || !R) return;
-      const qid = R.items[R.idx].id;
+      const qid = R.items[R.idx].id, qset = getQ(qid).set;
       main.querySelectorAll("[data-mk]").forEach((host) => {
         try {
-          const L = R2.layer(host, "mock:" + qid + (host.dataset.mk === "stim" ? "#stim" : ""));
+          const L = R2.layer(host, host.dataset.mk === "stim" ? (qset ? "mock:set:" + R.started + ":" + qset : "mock:" + qid) + "#stim" : "mock:" + qid);
           if (!L) return;
           if (L.readonly) L.readonly(!MK.on);
           MK.layers.push(L);
